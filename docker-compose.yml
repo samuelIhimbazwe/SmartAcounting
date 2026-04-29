@@ -1,0 +1,37 @@
+version: "3.9"
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: smartchain
+      POSTGRES_USER: smartchain
+      POSTGRES_PASSWORD: smartchain
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  forecast-service:
+    build:
+      context: ./forecast-service
+    ports:
+      - "8090:8090"
+
+  smartchain-backend:
+    build: .
+    depends_on:
+      - postgres
+      - redis
+      - forecast-service
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/smartchain
+      DB_USERNAME: smartchain
+      DB_PASSWORD: smartchain
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      FORECAST_BASE_URL: http://forecast-service:8090
+    ports:
+      - "8080:8080"
