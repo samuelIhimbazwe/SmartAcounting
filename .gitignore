@@ -3,3 +3,9 @@
 /.idea/
 *.iml
 out/
+
+.vscode/
+bin/
+perf/
+build/
+.gradle/
