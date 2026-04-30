@@ -1,0 +1,60 @@
+import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
+import type { Role } from '../types/roles'
+import { persistTenantId, resolveTenantId } from '../tenant/resolveTenant'
+
+interface AuthState {
+  role: Role | null
+  accessToken: string | null
+  refreshToken: string | null
+  expiresAt: number | null
+  tenantId: string
+  userId: string
+  setSession: (session: { role: Role; accessToken: string; refreshToken: string | null; expiresAt: number | null }) => void
+  setTokens: (tokens: { accessToken: string; refreshToken: string | null; expiresAt: number | null }) => void
+  setTenantId: (tenantId: string) => void
+  clearSession: () => void
+}
+
+const defaultTenant = resolveTenantId()
+const defaultUser = crypto.randomUUID()
+
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
+      role: null,
+      accessToken: null,
+      refreshToken: null,
+      expiresAt: null,
+      tenantId: defaultTenant,
+      userId: defaultUser,
+      setSession: ({ role, accessToken, refreshToken, expiresAt }) =>
+        set({
+          role,
+          accessToken,
+          refreshToken,
+          expiresAt,
+        }),
+      setTokens: ({ accessToken, refreshToken, expiresAt }) =>
+        set({
+          accessToken,
+          refreshToken,
+          expiresAt,
+        }),
+      setTenantId: (tenantId) => {
+        persistTenantId(tenantId)
+        set({ tenantId })
+      },
+      clearSession: () =>
+        set({
+          role: null,
+          accessToken: null,
+          refreshToken: null,
+          expiresAt: null,
+        }),
+    }),
+    {
+      name: 'smartchain-auth',
+    },
+  ),
+)
