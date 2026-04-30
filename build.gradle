@@ -1,0 +1,158 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.3.5'
+    id 'io.spring.dependency-management' version '1.1.6'
+}
+
+group = 'com.smartchain'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
+    implementation 'org.springframework.kafka:spring-kafka'
+    implementation 'io.micrometer:micrometer-tracing-bridge-otel'
+    implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
+
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
+    implementation 'org.postgresql:postgresql:42.7.4'
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-database-postgresql'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+
+    testRuntimeOnly 'com.h2database:h2'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.testcontainers:kafka'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+tasks.register('acceptanceReport') {
+    group = 'verification'
+    description = 'Generate acceptance criteria report from test XML'
+    dependsOn tasks.named('test')
+    doLast {
+        def resultsDir = file("$buildDir/test-results/test")
+        def reportDir = file("$buildDir/reports/acceptance")
+        reportDir.mkdirs()
+        def reportFile = file("$reportDir/acceptance-report.md")
+
+        def criteriaMap = [
+            'roleDataIsolationIsEnforcedOnDashboardApis': 'AC-01 Role data isolation',
+            'kpiLoadMeetsPerformanceSmokeTarget': 'AC-02 KPI load performance',
+            'copilotResponseMeetsFirstTokenSmokeBudget': 'AC-03 Copilot first response budget',
+            'auditCompletenessCoversDashboardAiAndActionFlows': 'AC-04 Audit completeness',
+            'exportAndUnauthorizedPathsRemainProtected': 'AC-05 Auth protection baseline'
+        ]
+
+        def statuses = [:].withDefault { [status: 'NOT RUN', details: 'No test result found'] }
+        criteriaMap.each { k, v -> statuses[v] = [status: 'NOT RUN', details: 'No test result found'] }
+
+        fileTree(resultsDir).matching { include 'TEST-*.xml' }.files.each { f ->
+            def xml = new XmlSlurper().parse(f)
+            xml.testcase.each { tc ->
+                def name = tc.@name.text()
+                if (criteriaMap.containsKey(name)) {
+                    def criterion = criteriaMap[name]
+                    if (tc.failure.size() > 0 || tc.error.size() > 0) {
+                        def msg = tc.failure.size() > 0 ? tc.failure[0].@message.text() : tc.error[0].@message.text()
+                        statuses[criterion] = [status: 'FAIL', details: msg ?: 'Failed']
+                    } else {
+                        statuses[criterion] = [status: 'PASS', details: 'Passed']
+                    }
+                }
+            }
+        }
+
+        def lines = []
+        lines << '# SmartChain Acceptance Criteria Report'
+        lines << ''
+        lines << "Generated: ${new Date()}"
+        lines << ''
+        lines << '| Criterion | Status | Details |'
+        lines << '|---|---|---|'
+        statuses.each { criterion, result ->
+            lines << "| ${criterion} | ${result.status} | ${result.details.replace('|', '\\|')} |"
+        }
+        lines << ''
+        lines << '## Notes'
+        lines << '- This report is generated from automated backend integration tests.'
+        lines << '- Frontend-only criteria (WCAG, responsive layout, export visual fidelity) require separate UI/E2E validation.'
+
+        reportFile.text = lines.join(System.lineSeparator())
+        println "Acceptance report written to: ${reportFile}"
+    }
+}
+
+tasks.register('perfSmoke', Exec) {
+    group = 'verification'
+    description = 'Run k6 KPI and Copilot smoke tests'
+    if (org.gradle.internal.os.OperatingSystem.current().isWindows()) {
+        commandLine 'powershell', '-ExecutionPolicy', 'Bypass', '-File', './perf/smoke.ps1'
+    } else {
+        commandLine 'bash', './perf/smoke.sh'
+    }
+}
+
+tasks.register('accountingRegression', Test) {
+    group = 'verification'
+    description = 'Run accounting, reconciliation, and close workflow regressions'
+    useJUnitPlatform()
+    include '**/AccountingEdgeCasesIT.class'
+    include '**/AcceptanceCriteriaIT.class'
+    include '**/AuthRefreshSecurityIT.class'
+    include '**/DashboardRoleAccessIT.class'
+    include '**/DashboardRoleMatrixIT.class'
+    include '**/CopilotRoleScopeIT.class'
+}
+
+tasks.register('accountingRegressionPg', Test) {
+    group = 'verification'
+    description = 'Run accounting regressions plus optional Postgres/Kafka gated tests'
+    useJUnitPlatform()
+
+    environment 'RUN_PG_TESTS', System.getenv('RUN_PG_TESTS') ?: 'false'
+    environment 'RUN_KAFKA_TESTS', System.getenv('RUN_KAFKA_TESTS') ?: 'false'
+    if (System.getenv('DB_URL')) environment 'DB_URL', System.getenv('DB_URL')
+    if (System.getenv('DB_USERNAME')) environment 'DB_USERNAME', System.getenv('DB_USERNAME')
+    if (System.getenv('DB_PASSWORD')) environment 'DB_PASSWORD', System.getenv('DB_PASSWORD')
+
+    include '**/AccountingEdgeCasesIT.class'
+    include '**/AcceptanceCriteriaIT.class'
+    include '**/AuthRefreshSecurityIT.class'
+    include '**/DashboardRoleAccessIT.class'
+    include '**/DashboardRoleMatrixIT.class'
+    include '**/CopilotRoleScopeIT.class'
+    include '**/RlsIsolationIT.class'
+    include '**/KafkaPipelineIT.class'
+}
