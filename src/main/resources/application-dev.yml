@@ -1,0 +1,54 @@
+# Development profile — same AI stack as default; keys optional (empty env = deterministic embed + stub completion).
+# Set ANTHROPIC_API_KEY / OPENAI_API_KEY in the environment (or IDE run config) for real models.
+# Activate with: spring.profiles.active=dev  (or SPRING_PROFILES_ACTIVE=dev)
+
+smartaccounting:
+  ai:
+    fail-on-missing-provider-keys: false
+    embedding:
+      provider: openai
+      model: text-embedding-3-small
+      api-key: ${OPENAI_API_KEY:}
+      dimensions: 1536
+    completion:
+      provider: anthropic
+      model: claude-haiku-4-5-20251001
+      api-key: ${ANTHROPIC_API_KEY:}
+      max-tokens: 1000
+  copilot:
+    agent:
+      policy:
+        default-dry-run: true
+        action-requires-approval: false
+  mobile-money:
+    mtn-webhook-secret: dev-secret
+    airtel-webhook-secret: dev-secret
+  sms:
+    enabled: true
+    dry-run: true
+    provider-url: http://localhost:9999/sms
+    bearer-token: dev-token
+    sender-id: SmartAccounting-Dev
+  forecast:
+    base-url: http://localhost:8090
+
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/smartchain}
+    username: ${DB_USERNAME:smartchain}
+    password: ${DB_PASSWORD:smartchain}
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+logging:
+  level:
+    com.smartaccounting: DEBUG
+    org.springframework.security: INFO
+    org.hibernate.SQL: INFO

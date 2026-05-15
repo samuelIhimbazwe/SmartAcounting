@@ -3,9 +3,9 @@ server:
 
 spring:
   application:
-    name: smartchain-backend
+    name: smartaccounting-backend
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/smartchain}
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/smartchain}
     username: ${DB_USERNAME:smartchain}
     password: ${DB_PASSWORD:smartchain}
     driver-class-name: org.postgresql.Driver
@@ -16,7 +16,7 @@ spring:
       max-lifetime: ${DB_MAX_LIFETIME_MS:1800000}
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     properties:
       hibernate:
         format_sql: true
@@ -33,12 +33,14 @@ spring:
       properties:
         enable.idempotence: true
     consumer:
-      group-id: ${KAFKA_GROUP_ID:smartchain-backend}
+      group-id: ${KAFKA_GROUP_ID:smartaccounting-backend}
       auto-offset-reset: earliest
   data:
     redis:
-      host: ${REDIS_HOST}
-      port: ${REDIS_PORT}
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      repositories:
+        enabled: false
 
 management:
   endpoints:
@@ -52,7 +54,7 @@ management:
       show-details: always
       group:
         readiness:
-          include: db,redis,rls,kafka,forecast
+          include: db,redis,rls,forecast
         liveness:
           include: ping
   tracing:
@@ -60,23 +62,41 @@ management:
       probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
   otlp:
     tracing:
+      enabled: ${OTEL_EXPORTER_OTLP_ENABLED:false}
       endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
 
 logging:
   pattern:
     level: "corr=%X{correlationId:-na} tenant=%X{tenantId:-na} user=%X{userId:-na} %5p"
 
-smartchain:
+smartaccounting:
+  cors:
+    # Comma-separated origins, or patterns containing * (see CorsConfig). Default uses patterns so any
+    # localhost / 127.0.0.1 dev port (e.g. Vite 5173–5176) works without editing env when CORS_ALLOWED_ORIGINS is unset.
+    allowed-origins: "${CORS_ALLOWED_ORIGINS:http://localhost:*,http://127.0.0.1:*}"
   api:
     v1-deprecation-enabled: ${API_V1_DEPRECATION_ENABLED:false}
     v1-sunset: ${API_V1_SUNSET:Wed, 31 Dec 2026 23:59:59 GMT}
+  ai:
+    fail-on-missing-provider-keys: ${SMARTACCOUNTING_AI_FAIL_ON_MISSING_PROVIDER_KEYS:false}
+    embedding:
+      provider: openai
+      model: text-embedding-3-small
+      api-key: ${OPENAI_API_KEY:}
+      dimensions: 1536
+    completion:
+      provider: anthropic
+      model: claude-haiku-4-5-20251001
+      # Empty default so local/default profile starts without env; prod profile overrides with required key.
+      api-key: ${ANTHROPIC_API_KEY:}
+      max-tokens: 1000
   forecast:
     base-url: ${FORECAST_BASE_URL:http://forecast-service:8090}
     timeout-seconds: ${FORECAST_TIMEOUT_SECONDS:8}
     job-delay-ms: ${FORECAST_JOB_DELAY_MS:2000}
   documents:
     provider: ${DOCUMENTS_PROVIDER:s3}
-    bucket: ${DOCUMENTS_BUCKET:smartchain-docs}
+    bucket: ${DOCUMENTS_BUCKET:smartaccounting-docs}
   copilot:
     agent:
       policy:
@@ -96,7 +116,7 @@ smartchain:
   security:
     jwt-secret: ${JWT_SECRET:change-me-enterprise-secret-change-in-prod}
     jwt-secret-file: ${JWT_SECRET_FILE:}
-    jwt-key-id: ${JWT_KEY_ID:smartchain-k1}
+    jwt-key-id: ${JWT_KEY_ID:smartaccounting-k1}
     jwt-legacy-secrets: ${JWT_LEGACY_SECRETS:}
     jwt-legacy-secrets-file: ${JWT_LEGACY_SECRETS_FILE:}
     jwt-expiration-minutes: ${JWT_EXP_MINUTES:120}
@@ -104,3 +124,55 @@ smartchain:
     mfa:
       challenge-ttl-seconds: ${MFA_CHALLENGE_TTL_SECONDS:300}
       debug-return-code: ${MFA_DEBUG_RETURN_CODE:false}
+  pos:
+    default-inventory-location: ${POS_DEFAULT_LOCATION:SHOP}
+    sale-sink-location: ${POS_SALE_SINK_LOCATION:SOLD}
+    allow-negative-stock: ${POS_ALLOW_NEGATIVE_STOCK:false}
+    business-time-zone: ${POS_BUSINESS_TIME_ZONE:Africa/Kigali}
+  mobile-money:
+    mtn-webhook-secret: ${MOBILE_MONEY_MTN_WEBHOOK_SECRET:}
+    airtel-webhook-secret: ${MOBILE_MONEY_AIRTEL_WEBHOOK_SECRET:}
+    webhook-actor-user-id: ${MOBILE_MONEY_WEBHOOK_USER_ID:00000000-0000-0000-0000-000000000001}
+  sms:
+    enabled: ${SMS_ENABLED:false}
+    dry-run: ${SMS_DRY_RUN:true}
+    provider-url: ${SMS_PROVIDER_URL:}
+    bearer-token: ${SMS_BEARER_TOKEN:}
+    sender-id: ${SMS_SENDER_ID:SMARTACCOUNTING}
+    connect-timeout-ms: ${SMS_CONNECT_TIMEOUT_MS:5000}
+    read-timeout-ms: ${SMS_READ_TIMEOUT_MS:10000}
+  receipt:
+    store-name: ${RECEIPT_STORE_NAME:SMARTACCOUNTING}
+    store-address: ${RECEIPT_STORE_ADDRESS:}
+    footer-text: ${RECEIPT_FOOTER_TEXT:Thank you.}
+    printer-type: ${RECEIPT_PRINTER_TYPE:thermal}
+  label:
+    printer-type: ${LABEL_PRINTER_TYPE:thermal-label}
+  public-signup:
+    platform-admin-phone: ${PLATFORM_ADMIN_PHONE:}
+    login-url-text: ${SIGNUP_LOGIN_URL_TEXT:smartaccounting.rw}
+    otp-ttl-minutes: ${PUBLIC_SIGNUP_OTP_TTL_MINUTES:10}
+    lock-minutes: ${PUBLIC_SIGNUP_LOCK_MINUTES:30}
+    otp-max-failures: ${PUBLIC_SIGNUP_OTP_MAX_FAILURES:5}
+  oauth:
+    google-client-ids: ${OAUTH_GOOGLE_CLIENT_IDS:}
+    microsoft-client-ids: ${OAUTH_MICROSOFT_CLIENT_IDS:}
+  tenant-plans:
+    max-users-by-plan:
+      TRIAL: 5
+      STARTER: 25
+      PROFESSIONAL: 100
+      ENTERPRISE: 500
+      STANDARD: 1000
+  rra:
+    rwanda:
+      enabled: ${RRA_RWANDA_ENABLED:false}
+      base-url: ${RRA_RWANDA_BASE_URL:https://eis.api.rra.example.invalid}
+      eis-submit-path: ${RRA_RWANDA_EIS_SUBMIT_PATH:/eis/v1/invoice}
+      vat-return-submit-path: ${RRA_RWANDA_VAT_RETURN_PATH:/eis/v1/vat-return}
+      api-token-environment-variable: ${RRA_RWANDA_TOKEN_ENV:RRA_EIS_API_TOKEN}
+      vat-rate-percent: 18
+      vat-mandatory-registration-turnover-rwf: 20000000
+      vat-return-due-day-of-next-month: 15
+      connect-timeout-ms: 15000
+      read-timeout-ms: 60000

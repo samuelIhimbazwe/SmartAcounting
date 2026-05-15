@@ -1,0 +1,39 @@
+# Production profile — activate with spring.profiles.active=prod
+
+smartaccounting:
+  ai:
+    fail-on-missing-provider-keys: ${SMARTACCOUNTING_AI_FAIL_ON_MISSING_PROVIDER_KEYS:true}
+    embedding:
+      provider: openai
+      model: text-embedding-3-small
+      api-key: ${OPENAI_API_KEY}
+      dimensions: 1536
+    completion:
+      provider: anthropic
+      model: claude-sonnet-4-20250514
+      api-key: ${ANTHROPIC_API_KEY}
+      max-tokens: 1000
+  copilot:
+    agent:
+      policy:
+        default-dry-run: false
+        action-requires-approval: true
+  mobile-money:
+    mtn-webhook-secret: ${MOBILE_MONEY_MTN_WEBHOOK_SECRET}
+    airtel-webhook-secret: ${MOBILE_MONEY_AIRTEL_WEBHOOK_SECRET}
+  sms:
+    enabled: true
+    dry-run: false
+    provider-url: ${SMS_PROVIDER_URL}
+    bearer-token: ${SMS_BEARER_TOKEN}
+    sender-id: ${SMS_SENDER_ID}
+  forecast:
+    base-url: ${FORECAST_BASE_URL}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS}
+
+logging:
+  level:
+    com.smartaccounting: INFO
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN

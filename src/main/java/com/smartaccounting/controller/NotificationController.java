@@ -1,0 +1,77 @@
+package com.smartaccounting.controller;
+
+import com.smartaccounting.dto.NotificationEventRequest;
+import com.smartaccounting.dto.NotificationRuleRequest;
+import com.smartaccounting.entity.NotificationEvent;
+import com.smartaccounting.entity.NotificationRule;
+import com.smartaccounting.entity.NotificationSmsDeliveryLog;
+import com.smartaccounting.service.NotificationService;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/v1/notifications")
+public class NotificationController {
+    private final NotificationService service;
+
+    public NotificationController(NotificationService service) {
+        this.service = service;
+    }
+
+    @PostMapping("/rules")
+    @PreAuthorize("hasRole('CEO') or hasRole('CFO') or hasRole('ACCOUNTING_CONTROLLER')")
+    public Map<String, UUID> createRule(@RequestBody @Valid NotificationRuleRequest req) {
+        return Map.of("ruleId", service.createRule(req));
+    }
+
+    @GetMapping("/rules")
+    @PreAuthorize("hasRole('CEO') or hasRole('CFO') or hasRole('ACCOUNTING_CONTROLLER')")
+    public List<NotificationRule> rules(@RequestParam(defaultValue = "0") int page,
+                                        @RequestParam(defaultValue = "50") int size) {
+        return service.activeRules(page, size);
+    }
+
+    @PostMapping("/events")
+    @PreAuthorize("hasRole('CEO') or hasRole('CFO') or hasRole('ACCOUNTING_CONTROLLER')")
+    public Map<String, UUID> emit(@RequestBody @Valid NotificationEventRequest req) {
+        return Map.of("eventId", service.emit(req));
+    }
+
+    @GetMapping("/events")
+    @PreAuthorize("hasRole('CEO') or hasRole('CFO') or hasRole('ACCOUNTING_CONTROLLER')")
+    public List<NotificationEvent> events(@RequestParam(defaultValue = "0") int page,
+                                          @RequestParam(defaultValue = "50") int size) {
+        return service.recentEvents(page, size);
+    }
+
+    @GetMapping("/sms-deliveries")
+    @PreAuthorize("hasRole('CEO') or hasRole('CFO') or hasRole('ACCOUNTING_CONTROLLER')")
+    public List<NotificationSmsDeliveryLog> smsDeliveries(@RequestParam(required = false) UUID eventId,
+                                                          @RequestParam(defaultValue = "0") int page,
+                                                          @RequestParam(defaultValue = "50") int size) {
+        return service.recentSmsDeliveries(eventId, page, size);
+    }
+
+    @GetMapping("/sms-deliveries/export")
+    @PreAuthorize("hasRole('CEO') or hasRole('CFO') or hasRole('ACCOUNTING_CONTROLLER')")
+    public ResponseEntity<byte[]> exportSmsDeliveries(@RequestParam(required = false) UUID eventId,
+                                                      @RequestParam(required = false) String status,
+                                                      @RequestParam(required = false) String phone,
+                                                      @RequestParam(defaultValue = "5000") int limit) {
+        String csv = service.smsDeliveriesCsv(eventId, status, phone, limit);
+        String filename = "sms-deliveries.csv";
+        return ResponseEntity.ok()
+            .contentType(MediaType.parseMediaType("text/csv"))
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+            .body(csv.getBytes(StandardCharsets.UTF_8));
+    }
+}

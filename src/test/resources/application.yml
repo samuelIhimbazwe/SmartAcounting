@@ -1,14 +1,5 @@
+# Shared test defaults (no datasource: integration tests activate profile "it" + @ServiceConnection PostgreSQL).
 spring:
-  datasource:
-    url: jdbc:h2:mem:smartchain_test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    username: sa
-    password:
-    driver-class-name: org.h2.Driver
-  jpa:
-    hibernate:
-      ddl-auto: create-drop
-  flyway:
-    enabled: false
   kafka:
     bootstrap-servers: localhost:9092
   data:
@@ -16,9 +7,38 @@ spring:
       host: localhost
       port: 6379
 
-smartchain:
+smartaccounting:
+  cors:
+    allowed-origins: http://localhost:5173
+  ai:
+    fail-on-missing-provider-keys: false
+    embedding:
+      provider: placeholder
+      model: text-embedding-3-small
+      api-key: ""
+      dimensions: 1536
+    completion:
+      provider: placeholder
+      model: claude-sonnet-4-20250514
+      api-key: ""
+      max-tokens: 1000
+  pos:
+    default-inventory-location: SHOP
+    sale-sink-location: SOLD
+    allow-negative-stock: false
+    business-time-zone: Africa/Kigali
   kafka:
     enabled: false
+  sms:
+    enabled: false
+    dry-run: true
+  receipt:
+    store-name: SMARTACCOUNTING TEST
+    store-address: Kigali
+    footer-text: Thank you.
+    printer-type: thermal
+  label:
+    printer-type: thermal-label
   security:
     jwt-secret: test-secret-key-for-jwt-signing-32-bytes-minimum
     jwt-expiration-minutes: 120

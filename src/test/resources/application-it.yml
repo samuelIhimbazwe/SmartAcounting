@@ -1,0 +1,7 @@
+# Profile "it": full Spring Boot integration tests use Testcontainers PostgreSQL + Flyway (see AbstractPostgresSpringBootIntegrationTest).
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: none
+  flyway:
+    enabled: true
