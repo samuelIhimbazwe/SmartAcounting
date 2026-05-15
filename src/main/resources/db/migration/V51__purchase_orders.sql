@@ -13,7 +13,7 @@ ALTER TABLE purchase_orders
     ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 
 UPDATE purchase_orders
-SET po_number = 'PO-' || substr(replace(id::text, '-', ''), 1, 8)
+SET po_number = 'PO-' || replace(id::text, '-', '')
 WHERE po_number IS NULL;
 
 ALTER TABLE purchase_orders ALTER COLUMN po_number SET NOT NULL;

@@ -24,7 +24,7 @@ export const roleApiMap: Record<Role, string> = {
   CEO: 'ceo',
   CFO: 'cfo',
   SALES: 'sales',
-  OPERATIONS: 'ops',
+  OPERATIONS: 'operations',
   HR: 'hr',
   MARKETING: 'marketing',
   ACCOUNTING: 'accounting',

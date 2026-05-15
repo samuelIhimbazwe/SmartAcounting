@@ -5,6 +5,7 @@ import { useAuthStore } from '../../shared/stores/authStore'
 import { pathRoleMap } from '../../shared/types/roles'
 import { AppShell } from '../../shared/components/layout/AppShell'
 import { useAlertStream } from '../alerts/useAlertStream'
+import { useDashboardAlerts } from '../alerts/useDashboardAlerts'
 import { DrilldownDrawer } from '../drilldown/DrilldownDrawer'
 import { canAccessRoleDashboard } from '../../shared/security/roleAccess'
 import type { DashboardPageProps } from './routes/types'
@@ -31,6 +32,7 @@ export function DashboardRoute() {
   const drillMetric = searchParams.get('drill')
 
   useAlertStream(normalizedRole ?? null, allowed)
+  useDashboardAlerts(normalizedRole ?? null, allowed)
 
   if (!sessionRole || !accessToken) {
     return <Navigate to="/login" replace />

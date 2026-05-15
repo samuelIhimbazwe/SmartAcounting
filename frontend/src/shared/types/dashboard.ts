@@ -4,10 +4,18 @@ export interface DateRange {
 }
 
 export interface KPIItem {
+  /** Backend KPI key when provided */
+  key?: string
   label: string
   value: number
+  /** Raw formatted value from API when present (e.g. "12.4%", "74 days") */
+  displayValue?: string
   trend: number
+  /** Raw trend string from API (e.g. "+1.8%", "-4 days") */
+  trendDisplay?: string
   format: 'currency' | 'percent' | 'number' | 'days'
+  /** GREEN | AMBER | RED from backend */
+  status?: string
 }
 
 export interface TrendPoint {
@@ -19,6 +27,7 @@ export interface TrendPoint {
 export interface DashboardPayload {
   kpis: KPIItem[]
   trend: TrendPoint[]
+  chartWidget?: string
 }
 
 export interface DrilldownRow {

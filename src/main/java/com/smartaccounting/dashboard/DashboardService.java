@@ -181,9 +181,9 @@ public class DashboardService {
                     margin = "89%";
                 }
                 return List.of(
-                    new KpiDto("event_count", "Event Volume", snapshotPayload, "Projected", "GREEN"),
+                    new KpiDto("event_count", "Executive Snapshot", snapshotPayload, "Projected", "GREEN"),
                     new KpiDto("cash_runway", "Cash Runway", runway, "Model", "AMBER"),
-                    new KpiDto("forecast_accuracy", "Forecast Accuracy", margin, "+2%", "GREEN")
+                    new KpiDto("gross_margin", "Gross Margin", margin, "+2%", "GREEN")
                 );
             }
         }
@@ -265,7 +265,7 @@ public class DashboardService {
             }
         }
         if (tenantId != null) {
-            return tenantDefaultKpis(tenantId);
+            return tenantDefaultKpis(role, tenantId);
         }
         return List.of(
             new KpiDto("revenue_growth", "Revenue Growth", "12.4%", "+1.8%", "GREEN"),
@@ -275,39 +275,131 @@ public class DashboardService {
     }
 
     public List<ChartPointDto> chart(String role, String widget) {
-        auditService.logAction("VIEW_DASHBOARD", role + "_CHART_" + widget, "{}", "{}");
+        String resolved = (widget == null || widget.isBlank()) ? defaultChartWidget(role) : widget;
+        auditService.logAction("VIEW_DASHBOARD", role + "_CHART_" + resolved, "{}", "{}");
         setTenantConfig();
         UUID tenantId = TenantContext.tenantId();
         LocalDate end = LocalDate.now();
         LocalDate start = end.minusDays(CHART_RANGE_DAYS);
         if (tenantId == null) {
-            return sparseZeros(end, widget);
+            return sparseZeros(end, resolved);
         }
         try {
-            Map<LocalDate, BigDecimal> byDay = new LinkedHashMap<>();
-            String sql = """
-                select (created_at at time zone 'UTC')::date as d, coalesce(sum(amount), 0) as total
-                from invoices
-                where tenant_id = ?::uuid and upper(status) = 'PAID'
-                  and (created_at at time zone 'UTC')::date between ?::date and ?::date
-                group by 1
-                order by 1
-                """;
-            jdbcTemplate.query(sql, rs -> {
-                Map<LocalDate, BigDecimal> m = new HashMap<>();
-                while (rs.next()) {
-                    m.put(rs.getObject("d", LocalDate.class), rs.getBigDecimal("total"));
-                }
-                return m;
-            }, tenantId.toString(), start, end).forEach(byDay::put);
-            List<ChartPointDto> out = new ArrayList<>();
-            for (LocalDate d = start; !d.isAfter(end); d = d.plusDays(1)) {
-                out.add(new ChartPointDto(d, byDay.getOrDefault(d, BigDecimal.ZERO), widget));
-            }
-            return out;
+            return switch (resolved.toLowerCase(Locale.ROOT)) {
+                case "margin" -> chartFromDailyTotals(tenantId, start, end, resolved, marginTrendSql());
+                case "inventory" -> chartFromDailyTotals(tenantId, start, end, resolved, inventoryMovementSql());
+                case "payroll" -> chartFromDailyTotals(tenantId, start, end, resolved, hrHeadcountSql());
+                case "promotions" -> chartFromDailyTotals(tenantId, start, end, resolved, promotionDiscountSql());
+                case "expenses" -> chartFromDailyTotals(tenantId, start, end, resolved, journalVolumeSql());
+                case "sales-orders" -> chartFromDailyTotals(tenantId, start, end, resolved, salesOrderSql());
+                default -> chartFromDailyTotals(tenantId, start, end, resolved, paidRevenueSql());
+            };
         } catch (Exception ex) {
-            return sparseZeros(end, widget);
+            return sparseZeros(end, resolved);
         }
+    }
+
+    private static String defaultChartWidget(String role) {
+        return switch (roleBucket(role)) {
+            case "CFO" -> "margin";
+            case "SALES" -> "sales-orders";
+            case "OPERATIONS" -> "inventory";
+            case "HR" -> "payroll";
+            case "MARKETING" -> "promotions";
+            case "ACCOUNTING" -> "expenses";
+            default -> "revenue";
+        };
+    }
+
+    private static String paidRevenueSql() {
+        return """
+            select (created_at at time zone 'UTC')::date as d, coalesce(sum(amount), 0) as total
+            from invoices
+            where tenant_id = ?::uuid and upper(status) = 'PAID'
+              and (created_at at time zone 'UTC')::date between ?::date and ?::date
+            group by 1
+            order by 1
+            """;
+    }
+
+    private static String marginTrendSql() {
+        return """
+            select snapshot_date as d,
+                   coalesce((payload->>'grossMarginPct')::numeric, 0) as total
+            from cfo_kpi_snapshot
+            where tenant_id = ?::uuid and snapshot_date between ?::date and ?::date
+            order by 1
+            """;
+    }
+
+    private static String salesOrderSql() {
+        return """
+            select (created_at at time zone 'UTC')::date as d, coalesce(sum(total_amount), 0) as total
+            from sales_orders
+            where tenant_id = ?::uuid and upper(status) = 'COMPLETED'
+              and (created_at at time zone 'UTC')::date between ?::date and ?::date
+            group by 1
+            order by 1
+            """;
+    }
+
+    private static String inventoryMovementSql() {
+        return """
+            select (created_at at time zone 'UTC')::date as d, coalesce(sum(quantity), 0) as total
+            from stock_movements
+            where tenant_id = ?::uuid
+              and (created_at at time zone 'UTC')::date between ?::date and ?::date
+            group by 1
+            order by 1
+            """;
+    }
+
+    private static String hrHeadcountSql() {
+        return """
+            select snapshot_date as d,
+                   coalesce((payload->>'activeEmployees')::numeric, 0) as total
+            from hr_workforce_snapshot
+            where tenant_id = ?::uuid and snapshot_date between ?::date and ?::date
+            order by 1
+            """;
+    }
+
+    private static String promotionDiscountSql() {
+        return """
+            select (applied_at at time zone 'UTC')::date as d, coalesce(sum(discount_applied), 0) as total
+            from promotion_results
+            where tenant_id = ?::uuid
+              and (applied_at at time zone 'UTC')::date between ?::date and ?::date
+            group by 1
+            order by 1
+            """;
+    }
+
+    private static String journalVolumeSql() {
+        return """
+            select entry_date as d, coalesce(count(*), 0) as total
+            from journal_entries
+            where tenant_id = ?::uuid and deleted_at is null
+              and entry_date between ?::date and ?::date
+            group by 1
+            order by 1
+            """;
+    }
+
+    private List<ChartPointDto> chartFromDailyTotals(UUID tenantId, LocalDate start, LocalDate end,
+                                                     String series, String sql) {
+        Map<LocalDate, BigDecimal> byDay = new LinkedHashMap<>();
+        jdbcTemplate.query(sql, rs -> {
+            while (rs.next()) {
+                byDay.put(rs.getObject("d", LocalDate.class), rs.getBigDecimal("total"));
+            }
+            return null;
+        }, tenantId.toString(), start, end);
+        List<ChartPointDto> out = new ArrayList<>();
+        for (LocalDate d = start; !d.isAfter(end); d = d.plusDays(1)) {
+            out.add(new ChartPointDto(d, byDay.getOrDefault(d, BigDecimal.ZERO), series));
+        }
+        return out;
     }
 
     private static List<ChartPointDto> sparseZeros(LocalDate end, String widget) {
@@ -903,7 +995,7 @@ public class DashboardService {
         return switch (role.toLowerCase(Locale.ROOT)) {
             case "cfo" -> "CFO";
             case "sales" -> "SALES";
-            case "operations" -> "OPERATIONS";
+            case "operations", "ops" -> "OPERATIONS";
             case "accounting" -> "ACCOUNTING";
             case "hr" -> "HR";
             case "marketing" -> "MARKETING";
@@ -1024,7 +1116,7 @@ public class DashboardService {
             case "OPERATIONS" -> Set.of("INVENTORY_COST", "SUPPLIER_COST_SPIKE", "STOCK_GAP", "COGS_VARIANCE");
             case "ACCOUNTING" -> Set.of("RECONCILIATION", "TILL_VARIANCE", "JOURNAL_QUALITY", "MOMO_UNMATCHED");
             case "HR" -> Set.of("PAYROLL_VARIANCE", "HEADCOUNT_COST");
-            case "MARKETING" -> Set.of();
+            case "MARKETING" -> Set.of("CHURN_SIGNAL", "CUSTOMER_CREDIT", "MARGIN_DROP");
             default -> Set.of();
         };
     }
@@ -1082,7 +1174,7 @@ public class DashboardService {
             addAlert(out, openCloseTasks + " month-end close tasks still open", "/accounting/close");
         }
         addBankReconciliationAlerts(tenantId, out);
-        addEbmComplianceAlerts(tenantId, out);
+        addEbmComplianceAlerts(tenantId, out, false);
     }
 
     private void buildSalesAlerts(UUID tenantId, List<String> out) {
@@ -1167,7 +1259,7 @@ public class DashboardService {
             addAlert(out, journalFlags + " journal entries flagged for review", "/finance/journal-entries");
         }
         addBankReconciliationAlerts(tenantId, out);
-        addEbmComplianceAlerts(tenantId, out);
+        addEbmComplianceAlerts(tenantId, out, true);
     }
 
     private void buildHrAlerts(UUID tenantId, List<String> out) {
@@ -1219,17 +1311,18 @@ public class DashboardService {
         }
     }
 
-    private void addEbmComplianceAlerts(UUID tenantId, List<String> out) {
+    private void addEbmComplianceAlerts(UUID tenantId, List<String> out, boolean operationalDetail) {
         try {
             EbmComplianceReport ebmReport = ebmService.getComplianceReport(
                 tenantId.toString(), YearMonth.now().toString());
             if (!ebmReport.isCompliant()) {
                 addAlert(out, "EBM coverage is "
                     + String.format(Locale.ROOT, "%.1f%%", ebmReport.coverageRate())
-                    + " — below 99% compliance threshold. "
-                    + ebmReport.failedSubmissions() + " failed submissions", "/compliance/ebm");
+                    + " — below 99% compliance threshold"
+                    + (operationalDetail ? ". " + ebmReport.failedSubmissions() + " failed submissions" : ""),
+                    "/compliance/ebm");
             }
-            if (ebmReport.pendingSubmissions() > 10) {
+            if (operationalDetail && ebmReport.pendingSubmissions() > 10) {
                 addAlert(out, ebmReport.pendingSubmissions()
                     + " EBM receipts pending submission", "/compliance/ebm");
             }
@@ -1314,14 +1407,6 @@ public class DashboardService {
                 "DSO is " + String.format(Locale.ROOT, "%.0f", dso) + " days. Focus on largest past-due balances in the credit ledger.",
                 "HIGH",
                 "/finance/credit-ledger");
-        }
-        long suggestedBankMatches = bankStatementLineRepository.countByTenantIdAndStatus(tenantId, "SUGGESTED");
-        if (suggestedBankMatches > 0) {
-            recommend(out, "cfo-confirm-bank-matches", "REVIEW",
-                "Confirm " + suggestedBankMatches + " suggested bank matches",
-                "Auto-match found likely journal entries — confirm to close bank reconciliation gaps.",
-                "HIGH",
-                "/finance/bank-accounts");
         }
     }
 
@@ -1495,13 +1580,20 @@ public class DashboardService {
                     "MEDIUM",
                     "/promotions");
             }
-            long expiring = inventoryService.getExpiringCount(tenantId, 7);
-            if (expiring > 0) {
-                recommend(out, "expiry-markdown-campaign", "EXECUTE",
-                    "Launch expiry markdown campaign",
-                    expiring + " batches expiring within 7 days — create auto-markdown promotions.",
-                    "HIGH",
-                    "/api/v1/inventory/expiry-markdown");
+            Long promoUsageWeek = jdbcTemplate.queryForObject(
+                """
+                select count(*) from promotion_results
+                where tenant_id = ?::uuid
+                  and applied_at >= now() - interval '7 days'
+                """,
+                Long.class,
+                tenantId.toString());
+            if (promoUsageWeek != null && promoUsageWeek == 0 && activePromos != null && activePromos > 0) {
+                recommend(out, "boost-promotion-uptake", "REVIEW",
+                    "Boost promotion uptake",
+                    "Active promotions recorded no redemptions this week — verify POS pricing rules.",
+                    "MEDIUM",
+                    "/promotions");
             }
         } catch (Exception ignored) {
         }
@@ -1571,18 +1663,117 @@ public class DashboardService {
         }
     }
 
-    private List<KpiDto> tenantDefaultKpis(UUID tenantId) {
-        BigDecimal growth = revenueGrowthPct(tenantId, 30, 30);
-        String growthStr = formatPercent(growth, 1);
-        String growthTrend = formatSignedPercent(growth);
-        String runway = cashRunwayProxyDays(tenantId);
-        String accuracy = revenueStabilityScore(tenantId);
-        String gStatus = growth.compareTo(BigDecimal.ZERO) >= 0 ? "GREEN" : "AMBER";
-        return List.of(
-            new KpiDto("revenue_growth", "Revenue Growth", growthStr, growthTrend, gStatus),
-            new KpiDto("cash_runway", "Cash Runway", runway, "-4 days", "AMBER"),
-            new KpiDto("forecast_accuracy", "Forecast Accuracy", accuracy, "+2%", "GREEN")
-        );
+    private List<KpiDto> tenantDefaultKpis(String role, UUID tenantId) {
+        return switch (roleBucket(role)) {
+            case "SALES" -> List.of(
+                new KpiDto("pipeline", "Open Pipeline", countOpenInvoices(tenantId) + " invoices", "Live", "GREEN"),
+                new KpiDto("win_rate", "Collection Rate", formatPercent(invoicePaidSharePct(tenantId, 90), 1), "+1%", "GREEN"),
+                new KpiDto("lost_sales", "Lost Sales (7d)", lostSalesSummaryValue(tenantId), "Live", "AMBER"));
+            case "OPERATIONS" -> List.of(
+                new KpiDto("low_stock", "Low Stock SKUs", String.valueOf(inventoryService.getLowStockCount(tenantId)), "Live", "AMBER"),
+                new KpiDto("expiring", "Expiring Batches (7d)", String.valueOf(inventoryService.getExpiringCount(tenantId, 7)), "Live", "AMBER"),
+                new KpiDto("shrinkage", "Shrinkage (7d)", shrinkageCountLastDays(tenantId, 7), "Live", "AMBER"));
+            case "HR" -> List.of(
+                new KpiDto("headcount", "Active Employees", String.valueOf(countActiveEmployees(tenantId)), "Live", "GREEN"),
+                new KpiDto("attendance", "Attendance Today", attendanceCountToday(tenantId) + " recorded", "Live", "GREEN"),
+                new KpiDto("payroll_due", "Payroll Due In", safePayrollDueDays(tenantId) + " days", "Live", "AMBER"));
+            case "MARKETING" -> List.of(
+                new KpiDto("active_promos", "Active Promotions", activePromotionCount(tenantId), "Live", "GREEN"),
+                new KpiDto("promo_usage", "Redemptions (7d)", promotionRedemptionsLastDays(tenantId, 7), "Live", "GREEN"),
+                new KpiDto("blended_roi", "Blended ROI", marketingBlendedRoi(tenantId), "Live", "GREEN"));
+            case "ACCOUNTING" -> List.of(
+                new KpiDto("reconciliation", "Open Recon Items", String.valueOf(reconciliationMatchingService.getUnmatchedCount(tenantId)), "Live", "AMBER"),
+                new KpiDto("till_variance", "Till Variances", String.valueOf(tillService.getVarianceCount(tenantId)), "Live", "AMBER"),
+                new KpiDto("close_tasks", "Close Tasks Open", String.valueOf(closeWorkflowService.getOpenTaskCount(tenantId)), "Live", "AMBER"));
+            case "CFO" -> {
+                BigDecimal growth = revenueGrowthPct(tenantId, 30, 30);
+                yield List.of(
+                    new KpiDto("revenue_growth", "Revenue Growth", formatPercent(growth, 1), formatSignedPercent(growth),
+                        growth.compareTo(BigDecimal.ZERO) >= 0 ? "GREEN" : "AMBER"),
+                    new KpiDto("cash_runway", "Cash Runway", cashRunwayProxyDays(tenantId), "-4 days", "AMBER"),
+                    new KpiDto("dso", "DSO", String.format(Locale.ROOT, "%.0f days", cfoKpiProjector.getDso(tenantId)), "Live", "GREEN"));
+            }
+            default -> {
+                BigDecimal growth = revenueGrowthPct(tenantId, 30, 30);
+                String gStatus = growth.compareTo(BigDecimal.ZERO) >= 0 ? "GREEN" : "AMBER";
+                yield List.of(
+                    new KpiDto("revenue_growth", "Revenue Growth", formatPercent(growth, 1), formatSignedPercent(growth), gStatus),
+                    new KpiDto("cash_runway", "Cash Runway", cashRunwayProxyDays(tenantId), "-4 days", "AMBER"),
+                    new KpiDto("gross_margin", "Gross Margin", revenueStabilityScore(tenantId), "+2%", "GREEN"));
+            }
+        };
+    }
+
+    private String lostSalesSummaryValue(UUID tenantId) {
+        try {
+            var summary = salesAnalyticsService.getLostSalesSummary(
+                tenantId.toString(), LocalDate.now().minusDays(7), LocalDate.now());
+            return summary.totalLostRevenue().toPlainString() + " FRW";
+        } catch (Exception ex) {
+            return "0 FRW";
+        }
+    }
+
+    private String shrinkageCountLastDays(UUID tenantId, int days) {
+        try {
+            Long n = jdbcTemplate.queryForObject(
+                """
+                select count(*) from shrinkage_records
+                where tenant_id = ?::uuid and incident_date >= current_date - (? || ' days')::interval
+                """,
+                Long.class,
+                tenantId.toString(),
+                days);
+            return String.valueOf(n == null ? 0L : n);
+        } catch (Exception ex) {
+            return "0";
+        }
+    }
+
+    private String activePromotionCount(UUID tenantId) {
+        try {
+            Long n = jdbcTemplate.queryForObject(
+                """
+                select count(*) from promotions
+                where tenant_id = ?::uuid and upper(status) = 'ACTIVE' and deleted_at is null
+                """,
+                Long.class,
+                tenantId.toString());
+            return String.valueOf(n == null ? 0L : n);
+        } catch (Exception ex) {
+            return "0";
+        }
+    }
+
+    private String promotionRedemptionsLastDays(UUID tenantId, int days) {
+        try {
+            Long n = jdbcTemplate.queryForObject(
+                """
+                select count(*) from promotion_results
+                where tenant_id = ?::uuid and applied_at >= now() - (? || ' days')::interval
+                """,
+                Long.class,
+                tenantId.toString(),
+                days);
+            return String.valueOf(n == null ? 0L : n);
+        } catch (Exception ex) {
+            return "0";
+        }
+    }
+
+    private long countOpenInvoices(UUID tenantId) {
+        try {
+            Long n = jdbcTemplate.queryForObject(
+                """
+                select count(*) from invoices
+                where tenant_id = ?::uuid and upper(status) = 'OPEN' and deleted_at is null
+                """,
+                Long.class,
+                tenantId.toString());
+            return n == null ? 0L : n;
+        } catch (Exception ex) {
+            return 0L;
+        }
     }
 
     private BigDecimal revenueGrowthPct(UUID tenantId, int recentDays, int priorDays) {

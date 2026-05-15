@@ -4,7 +4,7 @@ const allRoles: Role[] = ['CEO', 'CFO', 'SALES', 'OPERATIONS', 'HR', 'MARKETING'
 
 const accessMatrix: Record<Role, Role[]> = {
   CEO: allRoles,
-  CFO: ['CFO', 'ACCOUNTING'],
+  CFO: ['CFO'],
   SALES: ['SALES'],
   OPERATIONS: ['OPERATIONS'],
   HR: ['HR'],

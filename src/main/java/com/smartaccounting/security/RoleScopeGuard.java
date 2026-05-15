@@ -22,11 +22,15 @@ public class RoleScopeGuard {
             return false;
         }
         String normalized = requestedRole.toLowerCase();
+        if ("ops".equals(normalized)) {
+            normalized = "operations";
+        }
+        String roleToMatch = normalized;
         return auth.getAuthorities().stream().anyMatch(authority -> {
             if ("ROLE_CEO".equals(authority.getAuthority())) {
                 return true;
             }
-            return normalized.equals(ROLE_TO_DASHBOARD.get(authority.getAuthority()));
+            return roleToMatch.equals(ROLE_TO_DASHBOARD.get(authority.getAuthority()));
         });
     }
 }
