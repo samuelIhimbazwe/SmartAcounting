@@ -179,6 +179,12 @@ export default function TillOpenScreen() {
       </View>
 
       <TouchableOpacity
+        style={styles.linkButton}
+        onPress={() => navigation.navigate('Shifts')}>
+        <Text style={styles.linkButtonText}>View shift schedule</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
         style={[styles.openButton, opening && styles.openButtonDisabled]}
         onPress={() => void openTill()}
         disabled={opening}>
@@ -236,4 +242,6 @@ const styles = StyleSheet.create({
   },
   openButtonDisabled: {backgroundColor: '#86EFAC'},
   openButtonText: {color: '#FFFFFF', fontSize: 18, fontWeight: '700'},
+  linkButton: {alignItems: 'center', marginBottom: 12},
+  linkButtonText: {color: '#1B6FDB', fontWeight: '600', fontSize: 15},
 });

@@ -14,6 +14,7 @@ import {
   setDiscount,
   setLastTransaction,
   setPosRegisterCode,
+  setTenderType,
   setProcessing,
   setSessionCurrency,
   updateQuantity,
@@ -40,6 +41,7 @@ export default function CheckoutScreen() {
   const posRegisterCode = useSelector((s: RootState) => s.pos.posRegisterCode);
   const barcodeInput = useSelector((s: RootState) => s.pos.barcodeInput);
   const processing = useSelector((s: RootState) => s.pos.isProcessing);
+  const tenderType = useSelector((s: RootState) => s.pos.tenderType);
   const online = useSelector((s: RootState) => s.network.online);
 
   const subtotal = useMemo(
@@ -67,7 +69,7 @@ export default function CheckoutScreen() {
       lines,
       tenders: [
         {
-          tenderType: 'CASH',
+          tenderType,
           amount: Number(total.toFixed(2)),
           reference: null as string | null,
         },
@@ -137,6 +139,19 @@ export default function CheckoutScreen() {
           contentStyle={styles.btnInner}>
           USD
         </Button>
+      </View>
+      <Text style={[styles.section, styles.sectionTitle]}>Payment method</Text>
+      <View style={styles.row}>
+        {(['CASH', 'MOMO', 'CARD'] as const).map(t => (
+          <Button
+            key={t}
+            mode={tenderType === t ? 'contained' : 'outlined'}
+            onPress={() => dispatch(setTenderType(t))}
+            style={styles.currencyBtn}
+            contentStyle={styles.btnInner}>
+            {t}
+          </Button>
+        ))}
       </View>
       <TextInput
         label="Customer name (optional)"

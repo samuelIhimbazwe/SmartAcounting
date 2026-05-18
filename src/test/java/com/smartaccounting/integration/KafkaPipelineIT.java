@@ -6,6 +6,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -23,6 +24,7 @@ import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@Tag("integration")
 @SpringBootTest(properties = {
     "smartaccounting.kafka.enabled=true",
     "smartaccounting.kafka.topic-domain-events=domain.events",

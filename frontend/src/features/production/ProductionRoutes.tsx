@@ -9,6 +9,8 @@ import { MonthEndClosePage } from '../finance/MonthEndClosePage'
 import { WorkflowRulesPage } from '../admin/WorkflowRulesPage'
 import { DocumentsPage } from '../documents/DocumentsPage'
 import { AttendancePage } from '../hr/AttendancePage'
+import { MarketingCampaignsPage } from '../marketing/MarketingCampaignsPage'
+import { PromotionsPage } from '../marketing/PromotionsPage'
 
 function guard(allowed: Role[], children: ReactNode) {
   const sessionRole = useAuthStore((s) => s.role)
@@ -40,4 +42,12 @@ export function DocumentsRoute() {
 
 export function AttendanceRoute() {
   return guard(['CEO', 'CFO', 'HR', 'ACCOUNTING'], <AttendancePage />)
+}
+
+export function MarketingCampaignsRoute() {
+  return guard(['CEO', 'CFO', 'SALES', 'MARKETING'], <MarketingCampaignsPage />)
+}
+
+export function PromotionsRoute() {
+  return guard(['CEO', 'CFO', 'SALES', 'MARKETING'], <PromotionsPage />)
 }

@@ -27,6 +27,7 @@ interface PosState {
   openingFloat: number | null;
   shiftStartTime: string | null;
   cashierName: string | null;
+  tenderType: 'CASH' | 'MOMO' | 'CARD';
 }
 
 const initialState: PosState = {
@@ -42,6 +43,7 @@ const initialState: PosState = {
   openingFloat: null,
   shiftStartTime: null,
   cashierName: null,
+  tenderType: 'CASH',
 };
 
 const posSlice = createSlice({
@@ -110,6 +112,26 @@ const posSlice = createSlice({
     setBarcodeInput: (state, action: PayloadAction<string>) => {
       state.barcodeInput = action.payload;
     },
+    setTenderType: (
+      state,
+      action: PayloadAction<'CASH' | 'MOMO' | 'CARD'>,
+    ) => {
+      state.tenderType = action.payload;
+    },
+    setShiftContext: (
+      state,
+      action: PayloadAction<{
+        posRegisterCode: string;
+        openingFloat: number;
+        shiftStartTime: string;
+        cashierName: string;
+      }>,
+    ) => {
+      state.posRegisterCode = action.payload.posRegisterCode;
+      state.openingFloat = action.payload.openingFloat;
+      state.shiftStartTime = action.payload.shiftStartTime;
+      state.cashierName = action.payload.cashierName;
+    },
   },
 });
 
@@ -126,5 +148,6 @@ export const {
   clearCart,
   setBarcodeInput,
   setShiftContext,
+  setTenderType,
 } = posSlice.actions;
 export default posSlice.reducer;

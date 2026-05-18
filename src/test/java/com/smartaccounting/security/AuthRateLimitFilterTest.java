@@ -57,14 +57,14 @@ class AuthRateLimitFilterTest {
             .thenThrow(new RedisConnectionFailureException("redis down"));
         MockHttpServletRequest request = request("/api/v1/auth/login");
         MockHttpServletResponse response = new MockHttpServletResponse();
-        for (int i = 0; i < 12; i++) {
+        for (int i = 0; i < 5; i++) {
             filter.doFilterInternal(request, response, filterChain);
         }
 
         assertThatThrownBy(() -> filter.doFilterInternal(request, response, filterChain))
             .isInstanceOf(RateLimitExceededException.class)
             .hasMessageContaining("Too many auth attempts");
-        assertThat(response.getHeader("Retry-After")).isEqualTo("60");
+        assertThat(response.getHeader("Retry-After")).isEqualTo("900");
     }
 
     private MockHttpServletRequest request(String uri) {

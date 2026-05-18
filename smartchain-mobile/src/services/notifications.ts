@@ -3,7 +3,7 @@ import {Platform} from 'react-native';
 import DeviceInfo from 'react-native-device-info';
 import Toast from 'react-native-toast-message';
 import {apiClient} from '../api/client';
-import {navigateFromPush} from '../navigation/navigationRef';
+import {navigateFromPushRoute} from '../navigation/pushNavigation';
 
 export async function registerPushNotifications(): Promise<void> {
   try {
@@ -37,13 +37,13 @@ export async function registerPushNotifications(): Promise<void> {
     messaging().onNotificationOpenedApp(remoteMessage => {
       const route = remoteMessage.data?.route;
       if (route && typeof route === 'string') {
-        navigateFromPush(route);
+        navigateFromPushRoute(route);
       }
     });
 
     const initial = await messaging().getInitialNotification();
     if (initial?.data?.route && typeof initial.data.route === 'string') {
-      navigateFromPush(initial.data.route);
+      navigateFromPushRoute(initial.data.route);
     }
   } catch (e) {
     console.warn('Push notifications unavailable:', e);
@@ -61,7 +61,7 @@ function showInAppNotification(
     text2: body,
     onPress: () => {
       if (route) {
-        navigateFromPush(route);
+        navigateFromPushRoute(route);
       }
     },
     visibilityTime: 5000,

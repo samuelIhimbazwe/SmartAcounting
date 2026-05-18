@@ -1,6 +1,7 @@
 package com.smartaccounting.integration;
 
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres;
+import org.junit.jupiter.api.Tag;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -12,6 +13,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * Embedded PostgreSQL (Zonky) + Flyway for full {@code @SpringBootTest} integration tests.
  * No Docker required; matches production PostgreSQL behaviour without H2 gaps.
  */
+@Tag("integration")
 @ActiveProfiles("it")
 public abstract class AbstractPostgresSpringBootIntegrationTest {
 

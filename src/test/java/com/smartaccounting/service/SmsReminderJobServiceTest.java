@@ -30,6 +30,7 @@ class SmsReminderJobServiceTest {
     @Mock private InvoiceRepository invoiceRepository;
     @Mock private SmsDispatchService smsDispatchService;
     @Mock private AuditService auditService;
+    @Mock private PushNotificationService pushNotificationService;
 
     private SmsReminderJobService service;
     private final UUID tenant = UUID.fromString("10000000-0000-0000-0000-000000000111");
@@ -37,7 +38,8 @@ class SmsReminderJobServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new SmsReminderJobService(invoiceRepository, smsDispatchService, auditService);
+        service = new SmsReminderJobService(
+            invoiceRepository, smsDispatchService, auditService, pushNotificationService);
         TenantContext.set(tenant, user);
     }
 

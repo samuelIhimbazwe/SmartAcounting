@@ -2,10 +2,12 @@ import React from 'react';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import TillOpenScreen from '../screens/till/TillOpenScreen';
 import TillCloseScreen from '../screens/till/TillCloseScreen';
+import ShiftManagementScreen from '../screens/till/ShiftManagementScreen';
 
 export type TillStackParamList = {
   TillOpen: undefined;
   TillClose: undefined;
+  Shifts: undefined;
 };
 
 const Stack = createNativeStackNavigator<TillStackParamList>();
@@ -22,6 +24,11 @@ export default function TillNavigator() {
         name="TillClose"
         component={TillCloseScreen}
         options={{title: 'Close till'}}
+      />
+      <Stack.Screen
+        name="Shifts"
+        component={ShiftManagementScreen}
+        options={{title: 'Shifts'}}
       />
     </Stack.Navigator>
   );

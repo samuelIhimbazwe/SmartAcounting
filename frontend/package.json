@@ -11,6 +11,9 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@azure/msal-browser": "^4.12.0",
+    "@azure/msal-react": "^3.0.12",
+    "@react-oauth/google": "^0.12.2",
     "@hookform/resolvers": "^5.2.2",
     "@sentry/react": "^10.51.0",
     "@tanstack/react-query": "^5.100.6",

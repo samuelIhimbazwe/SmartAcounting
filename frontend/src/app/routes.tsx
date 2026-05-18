@@ -26,6 +26,8 @@ import { HrPayrollRoute } from '../features/hr/HrPayrollRoute'
 import { EbmComplianceRoute } from '../features/compliance/EbmComplianceRoute'
 import {
   AttendanceRoute,
+  MarketingCampaignsRoute,
+  PromotionsRoute,
   DocumentsRoute,
   FixedAssetsRoute,
   MonthEndCloseRoute,
@@ -64,6 +66,8 @@ export const appRoutes: RouteObject[] = [
       { path: '/finance/close', element: <MonthEndCloseRoute /> },
       { path: '/admin/workflow-rules', element: <WorkflowRulesRoute /> },
       { path: '/documents', element: <DocumentsRoute /> },
+      { path: '/marketing/campaigns', element: <MarketingCampaignsRoute /> },
+      { path: '/marketing/promotions', element: <PromotionsRoute /> },
       { path: '/compliance/ebm', element: <EbmComplianceRoute /> },
       { path: '/settings', element: <SettingsRoute /> },
       { path: '/unauthorized', element: <UnauthorizedPage /> },

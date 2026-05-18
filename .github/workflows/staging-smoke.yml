@@ -1,0 +1,28 @@
+name: Staging smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'Staging base URL (e.g. https://staging.example.com)'
+        required: true
+        default: 'http://localhost'
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS "${{ github.event.inputs.base_url }}/actuator/health" >/dev/null 2>&1; then
+              echo "healthy"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "health check timed out"
+          exit 1
+      - name: Run smoke script
+        run: chmod +x scripts/smoke-staging.sh && ./scripts/smoke-staging.sh "${{ github.event.inputs.base_url }}"

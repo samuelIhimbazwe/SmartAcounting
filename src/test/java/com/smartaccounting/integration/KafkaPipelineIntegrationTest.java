@@ -1,6 +1,7 @@
 package com.smartaccounting.integration;
 
 import com.smartaccounting.events.DomainEventPublisher;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -20,6 +21,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@Tag("integration")
 @SpringBootTest(properties = {
     "smartaccounting.kafka.enabled=true",
     "smartaccounting.kafka.topic-domain-events=domain.events"

@@ -40,6 +40,7 @@ class RetailOpsServiceTest {
     @Mock private PosTillCloseRepository posTillCloseRepository;
     @Mock private CurrencyService currencyService;
     @Mock private AuditService auditService;
+    @Mock private PushNotificationService pushNotificationService;
 
     private RetailOpsService service;
     private final UUID tenant = UUID.fromString("10000000-0000-0000-0000-000000000111");
@@ -60,7 +61,8 @@ class RetailOpsServiceTest {
             currencyService,
             posProperties,
             labelProperties,
-            auditService
+            auditService,
+            pushNotificationService
         );
         TenantContext.set(tenant, user);
     }

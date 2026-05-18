@@ -34,8 +34,10 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: gradle
-      - name: Compile and test
+      - name: Compile and unit test
         run: ./gradlew compileJava test dependencyCheckAnalyze --no-daemon
+      - name: Integration tests
+        run: ./gradlew integrationTest --no-daemon
         env:
           RUN_PG_TESTS: 'true'
           DB_URL: jdbc:postgresql://localhost:5432/smartaccounting_test
@@ -64,6 +66,21 @@ jobs:
       - run: npm run build
       - run: npm run lint
         continue-on-error: true
+
+  mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: smartchain-mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: smartchain-mobile/package-lock.json
+      - run: npm ci --legacy-peer-deps
+      - run: npx tsc --noEmit
 
   docker-build:
     runs-on: ubuntu-latest

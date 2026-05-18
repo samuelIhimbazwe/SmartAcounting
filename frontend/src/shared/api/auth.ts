@@ -34,7 +34,7 @@ export interface AuthSession {
   userId?: string
 }
 
-function toExpiryTimestamp(expiresIn?: number) {
+export function toExpiryTimestamp(expiresIn?: number) {
   if (!expiresIn || Number.isNaN(expiresIn)) {
     return null
   }

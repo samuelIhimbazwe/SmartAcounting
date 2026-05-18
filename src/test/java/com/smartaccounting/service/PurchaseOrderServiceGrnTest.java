@@ -6,7 +6,6 @@ import com.smartaccounting.entity.GoodsReceivedNote;
 import com.smartaccounting.entity.GrnLine;
 import com.smartaccounting.entity.PurchaseOrder;
 import com.smartaccounting.entity.PurchaseOrderLine;
-import com.smartaccounting.entity.ShrinkageRecord;
 import com.smartaccounting.repository.GoodsReceivedNoteRepository;
 import com.smartaccounting.repository.GrnLineRepository;
 import com.smartaccounting.repository.ProductRepository;
@@ -50,7 +49,6 @@ class PurchaseOrderServiceGrnTest {
     @Mock private InventoryService inventoryService;
     @Mock private SupplierBillGrnService supplierBillGrnService;
     @Mock private SalesKpiProjector salesKpiProjector;
-    @Mock private ShrinkageService shrinkageService;
 
     private PurchaseOrderService service;
     private final UUID tenant = UUID.fromString("11111111-1111-4111-8111-111111111111");
@@ -73,8 +71,7 @@ class PurchaseOrderServiceGrnTest {
             supplierBillRepository,
             inventoryService,
             supplierBillGrnService,
-            salesKpiProjector,
-            shrinkageService
+            salesKpiProjector
         );
         TenantContext.set(tenant, user);
     }
@@ -102,7 +99,6 @@ class PurchaseOrderServiceGrnTest {
         grn.setSupplierName(po.getSupplierName());
         grn.setReceivedBy(user);
         grn.setStatus("DRAFT");
-        grn.setAllowExpiredReceipt(false);
         when(grnRepository.findByIdAndTenantId(grnId, tenant)).thenReturn(Optional.of(grn));
 
         GrnLine line = new GrnLine();
@@ -127,28 +123,15 @@ class PurchaseOrderServiceGrnTest {
         when(purchaseOrderLineRepository.findByPurchaseOrderId(poId)).thenReturn(List.of(poLine));
         when(purchaseOrderRepository.findByIdAndTenantIdAndDeletedAtIsNull(poId, tenant)).thenReturn(Optional.of(po));
 
-        when(shrinkageService.recordShrinkage(any(), any(), any(), any(), any(), any(), any(), any()))
-            .thenReturn(new ShrinkageRecord());
-
         service.confirmGrn(grnId);
 
         ArgumentCaptor<com.smartaccounting.dto.ReceiveStockRequest> receiveCaptor =
             ArgumentCaptor.forClass(com.smartaccounting.dto.ReceiveStockRequest.class);
         verify(inventoryService).receiveStock(receiveCaptor.capture());
-        assertThat(receiveCaptor.getValue().quantity()).isEqualByComparingTo("8");
+        assertThat(receiveCaptor.getValue().quantity()).isEqualByComparingTo("10");
 
         verify(supplierBillGrnService).createFromGrn(
             any(GoodsReceivedNote.class),
-            org.mockito.ArgumentMatchers.argThat(b -> b.compareTo(new BigDecimal("800")) == 0));
-        verify(shrinkageService).recordShrinkage(
-            eq(tenant.toString()),
-            eq(productId),
-            eq("SKU-1"),
-            eq("Milk"),
-            eq(new BigDecimal("2")),
-            eq(new BigDecimal("100")),
-            eq("GRN_REJECTED"),
-            eq(user.toString())
-        );
+            org.mockito.ArgumentMatchers.argThat(b -> b.compareTo(new BigDecimal("1000")) == 0));
     }
 }

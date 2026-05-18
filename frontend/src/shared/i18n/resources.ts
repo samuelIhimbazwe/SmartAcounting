@@ -237,6 +237,8 @@ export const resources = {
         monthEndClose: 'Month-end close',
         documents: 'Documents',
         attendance: 'Attendance',
+        marketingCampaigns: 'Marketing campaigns',
+        promotions: 'Promotions',
         workflowRules: 'Workflow rules',
         admin: 'Admin',
         userTenantManagement: 'User & Tenant Management',
