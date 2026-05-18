@@ -1,37 +1,35 @@
-version: "3.9"
+# Local dev: Postgres (with pgvector) + Redis — Postgres on host port 5433 (see application.yml).
+# Usage: docker compose up -d
+# Then: .\gradlew.bat bootRun  (optional: --args="--spring.profiles.active=dev" for placeholder AI)
+
 services:
   postgres:
-    image: postgres:16
+    image: pgvector/pgvector:pg16
     environment:
-      POSTGRES_DB: smartchain
       POSTGRES_USER: smartchain
       POSTGRES_PASSWORD: smartchain
+      POSTGRES_DB: smartchain
     ports:
-      - "5432:5432"
+      # Host 5433 avoids clashing with a local PostgreSQL on 5432; matches application.yml default.
+      - "5433:5432"
+    volumes:
+      - smartchain-pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init-01-vector.sql:/docker-entrypoint-initdb.d/01-vector.sql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U smartchain -d smartchain']
+      interval: 5s
+      timeout: 5s
+      retries: 12
 
   redis:
-    image: redis:7
+    image: redis:7-alpine
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
-  forecast-service:
-    build:
-      context: ./forecast-service
-    ports:
-      - "8090:8090"
-
-  smartchain-backend:
-    build: .
-    depends_on:
-      - postgres
-      - redis
-      - forecast-service
-    environment:
-      DB_URL: jdbc:postgresql://postgres:5432/smartchain
-      DB_USERNAME: smartchain
-      DB_PASSWORD: smartchain
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      FORECAST_BASE_URL: http://forecast-service:8090
-    ports:
-      - "8080:8080"
+volumes:
+  smartchain-pgdata:

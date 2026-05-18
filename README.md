@@ -1,6 +1,6 @@
-# SmartChain Backend v3.0
+# SmartAccounting Backend v3.0
 
-Enterprise multi-tenant ERP backend implementation aligned to the SmartChain v3.0 architecture and delivery scope.
+Enterprise multi-tenant ERP backend implementation aligned to the SmartAccounting v3.0 architecture and delivery scope.
 
 ## Current feature set
 
@@ -40,6 +40,51 @@ Windows PowerShell:
 .\gradlew.bat bootRun
 ```
 
+One-command local startup (opens backend + frontend terminals and starts docker dependencies):
+
+```powershell
+.\dev-up.ps1
+```
+
+Optional flags:
+
+- `-SkipDeps` (skip `docker compose up -d`)
+- `-SkipInstall` (skip `npm install` before frontend dev server)
+- `-IncludeAi` (use `docker compose -f docker-compose.yml -f docker-compose.ai.yml up -d` instead of core-only)
+
+### Database setup
+
+Default local database settings used by backend:
+
+- `DB_URL=jdbc:postgresql://localhost:5433/smartchain` (Compose publishes Postgres on **5433** so it does not collide with a separate PostgreSQL install on 5432)
+- `DB_USERNAME=smartchain`
+- `DB_PASSWORD=smartchain`
+
+Start **core** dependencies only (PostgreSQL, Redis, backend — accounting/POS keep running even if AI services are down):
+
+```powershell
+# Set DB_PASSWORD in .env (required); example for local dev:
+# DB_PASSWORD=smartchain
+
+docker compose up -d
+```
+
+Optional **AI layer** (forecast + Kafka). Backend does **not** wait for these services to start.
+
+```powershell
+docker compose -f docker-compose.yml -f docker-compose.ai.yml up -d
+```
+
+When Kafka is enabled in config, point the app at the compose broker (for example `KAFKA_BOOTSTRAP_SERVERS=kafka:9092` and `KAFKA_ENABLED=true` via environment).
+
+Then run backend locally (without Docker backend):
+
+```powershell
+.\gradlew.bat bootRun
+```
+
+Flyway migrations run automatically on startup.
+
 ## Authentication flow
 
 1. Call `POST /api/v1/auth/login` with:
@@ -51,6 +96,35 @@ Windows PowerShell:
 3. All `/api/v1/**` routes require JWT, and dashboard APIs enforce role-to-dashboard scoping.
 4. Rotate sessions with `POST /api/v1/auth/refresh` using `refreshToken`.
 5. Revoke with `POST /api/v1/auth/logout`.
+
+### OAuth2 social login (Google / Microsoft)
+
+The web app supports **authorization-code** social login when the API has IdP credentials configured. This is separate from (and preferred over) the older **ID-token** buttons that use `VITE_GOOGLE_CLIENT_ID` / `VITE_MICROSOFT_CLIENT_ID` in the frontend.
+
+**Backend environment variables** (restart API after setting):
+
+| Variable | Purpose |
+|----------|---------|
+| `GOOGLE_CLIENT_ID` | Google OAuth2 web client ID |
+| `GOOGLE_CLIENT_SECRET` | Google client secret |
+| `MICROSOFT_CLIENT_ID` | Microsoft Entra application (client) ID |
+| `MICROSOFT_CLIENT_SECRET` | Microsoft client secret |
+| `OAUTH2_REDIRECT_URI` | Frontend callback after login (default `http://localhost:5173/auth/oauth2/callback`) |
+
+**Redirect URIs to register with each provider** (API callbacks):
+
+- Local: `http://localhost:8080/api/v1/auth/oauth2/callback/google` and `.../microsoft`
+- Production: `https://api.smartchain.rw/api/v1/auth/oauth2/callback/google` and `.../microsoft`
+
+**Flow:** Login page → “Continue with Google/Microsoft” → IdP → API callback → redirect to `{OAUTH2_REDIRECT_URI}` with JWT query params → `/auth/oauth2/callback` stores session and routes to the role dashboard.
+
+- `GET /api/v1/auth/oauth2/providers` — lists enabled providers (empty if secrets are not set).
+- New users get a **TRIAL** tenant and **CEO** role; existing email accounts are linked automatically.
+- Username/password login and `POST /api/v1/auth/oauth-login` (ID token) are unchanged.
+
+When backend OAuth2 is configured, the login page shows only the redirect buttons (not the popup / One Tap widgets).
+
+**Desktop (Electron):** set `OAUTH2_REDIRECT_URI=smartchain://auth/oauth2/callback` on the API and use the `smartchain-desktop` app. See [`smartchain-desktop/README.md`](smartchain-desktop/README.md).
 
 ## JWT key rotation
 
@@ -71,6 +145,83 @@ New access tokens are signed with the active key id (`kid`); validation accepts 
 - `hr` / `password`
 - `marketing` / `password`
 - `accounting` / `password`
+
+Use tenant UUID **`11111111-1111-4111-8111-111111111111`** on the login screen (or copy `frontend/.env.example` to `frontend/.env.local`) so JWT tenant scope matches the seeded demo data below.
+
+### Demo catalog & inventory (Flyway V40)
+
+Migration **`V40__dev_demo_seed.sql`** inserts a tenant **Demo Retail Co**, three products, **SHOP** inventory rows, and POS catalog lines with barcodes:
+
+| Barcode       | Item                         |
+|---------------|------------------------------|
+| `5901234123457` | Demo Water 500ml           |
+| `5901234123458` | Demo Maize Flour 2kg       |
+| `5901234123459` | Demo Mobile Airtime Card   |
+
+Flour is seeded with **low stock** (8 units vs reorder 15) so low-stock views have something to show. Clear persisted browser auth (`localStorage` key `smartaccounting-auth`) if an old tenant UUID is stuck after upgrading.
+
+### Expanded end-to-end demo seed (Flyway V41)
+
+Migration **`V41__dev_demo_seed_expanded.sql`** layers a realistic, cross-feature dataset on the same demo tenant so every screen — and any AI/copilot agent — has something to act on. It is **idempotent** (re-running is safe) and uses fixed UUIDs so links between objects are stable across runs.
+
+| Feature area | What V41 seeds | How to test (UI / API) |
+|---|---|---|
+| Retail catalog | 12 extra products (oil, rice, sugar, soap, tea, bread, milk, eggs, drink, notebook, pen, charcoal) with unique barcodes | `GET /api/v1/retail/products`, `/retail` screen |
+| Inventory levels | On-hand at **SHOP** for all 15 SKUs (3 deliberately at/below reorder) | `GET /api/v1/inventory/balances?location=SHOP`, low-stock dashboards |
+| Inventory batches (FEFO) | 10 lots across products with **near-expiry**, mid-expiry, and long-shelf dates, including cost prices | `GET /api/v1/inventory/expiry-risk?location=SHOP&daysAhead=30`, `GET /api/v1/inventory/batches?location=SHOP` |
+| POS catalog | 12 priced FRW items linked back to products with reorder points | POS Scan/Add screen, `GET /api/v1/pos/catalog/items` |
+| Sales orders + POS sales | 6 walk-in POS sales (3 registers, last 7 days) + 2 direct orders with line items, cost prices, and tenders (CASH / MOMO / AIRTEL_MONEY / CARD / ON_ACCOUNT) | Sales dashboards, `GET /api/v1/retail/till/expected?...`, receipt reprint `POST /api/v1/pos/receipts/{transactionId}/reprint` |
+| Mobile money reconciliation | Settlement dedup rows for matched MoMo references | `pos_payment_tenders.reconciliation_status` reads MATCHED / PENDING |
+| Till closes | 5 historical closes across **REG-01** / **REG-02** including a deliberate variance day | `GET /api/v1/retail/till/expected?businessDate=YYYY-MM-DD&posRegisterCode=REG-01` |
+| Customers (AR) | 7 customers with varied credit limits + bad-debt risk scores | `GET /api/v1/finance/customers/{id}/credit-status`, `/finance/credit-ledger` |
+| Suppliers (AP) | 5 suppliers with credit limits and payment terms | `GET /api/v1/finance/suppliers/{id}/credit-status` |
+| Invoices (AR) | 9 invoices covering OPEN / PARTIALLY_PAID / PAID / aged 30 / 60 / 90+ buckets + POS on-account | `GET /api/v1/finance/invoices?status=`, CFO aging widgets |
+| Supplier bills (AP) | 6 bills across current / 30 / 60 / 90+ + paid + partial | CFO AP widgets, `/finance/credit-ledger` style screens |
+| Payments | IN + OUT payments (CONFIRMED + PENDING) tied to invoices/bills | Payment application views |
+| Payment applications + recon | Matched and unmatched recon items, account-level reconciliations (variance + clean) | `POST /api/v1/accounting/reconciliation/auto-match`, `GET /api/v1/accounting/reconciliation/unmatched` |
+| Journal entries | 6 sample journals covering sales, payments, inventory receipt, payroll, depreciation | Ledger views, journal export |
+| Purchase orders | 4 POs across RECEIVED / OPEN / CONFIRMED statuses | Procurement screens |
+| Fixed assets | 5 assets (POS terminal, fridge, motorbike, shelving, laptop) with varying useful life | `GET /api/v1/assets`, `GET /api/v1/assets/{id}/depreciation-schedule` |
+| HR | 10 employees + 4 leave requests (PENDING / APPROVED / MATERNITY) | `GET /api/v1/hr/headcount`, `/api/v1/hr/leave` |
+| Workflow rules | 3 active rules (high-value invoice, credit-limit breach, low-stock auto-PO) | `GET /api/v1/workflow/rules/{id}/evaluate?dryRun=true` |
+| Notification rules + events + SMS log | Rules for INVOICE_OVERDUE / LOW_STOCK / POS_RECEIPT / EXPIRY_RISK + 5 sample events + SENT/FAILED/DRY_RUN SMS rows | `GET /api/v1/notifications/rules`, `/events`, `/sms-deliveries` |
+| Action queue | 4 actions including 2 in PENDING_APPROVAL (approval workflow demo) | `GET /api/v1/actions/queue`, copilot approval flow |
+| Tax profiles | Rwanda VAT_STANDARD 18%, VAT_ZERO 0%, WHT_SERVICES 15% | `POST /api/v1/tax/calculate` |
+| Scenario library | 1 template per role (CEO/CFO/Sales/Ops/HR/Marketing/Accounting) | `GET /api/v1/platform/scenarios/{role}` |
+| Tenant feature flags | 7 flags (Copilot, RRA, Mobile Money, etc.) | `GET /api/v1/platform/features` |
+| Marketplace plugins | rra-eis-rwanda, pos-thermal, momo-mtn | Marketplace screens |
+| FX rates | USD/EUR/KES/UGX → FRW for today + USD historic | `GET /api/v1/currency/convert?...`, `/finance/fx-rates` |
+| Webhooks | 3 subscriptions (active + disabled) + 2 delivery log entries (DELIVERED + FAILED w/ retries) | Webhook admin screens |
+| Anomaly cases + feed | 1 case per role with severity/z-score/contributors + dashboard feed entries | `GET /api/v1/anomaly/cases/{role}`, dashboard "Anomalies" panels |
+| Close tasks | Current period: 1 IN_PROGRESS + 6 OPEN with dependencies + 1 completed task from last period | `GET /api/v1/accounting/close/tasks/{period}`, `.../critical-path` |
+| Dashboard snapshots | Today's row in **every** snapshot table (CEO/CFO/CFO-KPI/Sales/Sales-pipeline/Ops/Ops-efficiency/HR/Marketing/Accounting-close) + AR/AP aging | All `/api/v1/dashboards/{role}/kpis` payloads come back populated immediately |
+| RRA Rwanda | Settings row, 2 EIS submissions (ACK + PENDING), 2 VAT filings (SUBMITTED + DRAFT) | RRA admin screens |
+| Tenant data sharing | 2 grants in each direction with a partner tenant | `GET /api/v1/platform/data-sharing/grants` |
+| Custom fields | `loyalty_tier` enum on customers + `origin_country` on products with sample values | Custom field UI / API |
+| Audit log | 2-entry hash chain for invoice create + update | `GET /api/v1/audit/...` (if exposed) and DB inspection |
+| Copilot agent | 3 historical runs (CFO/Ops/Sales), per-step traces, and 2 hash-chained audit rows | `GET /api/v1/ai/copilot/agent/runs`, copilot UI history |
+| Forecast jobs | 1 COMPLETED job + 1 QUEUED job | `GET /api/v1/ai/forecast/jobs/{metric}` |
+| Service account keys | 1 active + 1 revoked key | `GET /api/v1/admin/service-accounts/keys` |
+| Second tenant | `11111111-1111-4111-8111-111111111112` "Demo Supply Partner Co" — for data-sharing/RLS tests | n/a |
+
+#### Suggested AI-assisted test prompts
+
+Once logged in, ask the copilot agent (`/api/v1/ai/copilot/agent/run`) prompts that exercise the seeded data, for example:
+
+- **CFO**: `"Summarize AR aging and recommend collection actions for the top 2 overdue customers."`
+- **CFO**: `"action: escalate overdue invoices and stage purchase orders for low-stock SKUs."` (writes routed through approval gate — already 2 pending approvals seeded)
+- **Ops**: `"List products at risk (low stock or expiring within 7 days) and draft a restock list."`
+- **Sales**: `"Compare today's till takings to the last 5 business days. Where is the variance?"`
+- **CEO**: `"Brief me on this week's anomalies across finance, ops, and sales."`
+- **Accounting**: `"Walk me through the open month-end close tasks and the critical path blockers."`
+
+The seed leaves obvious "hooks" (overdue invoices, low-stock SKUs, near-expiry batches, MoMo pending recon, recon variance) so each prompt has concrete things to return.
+
+## Retail operations (buy → store → sell)
+
+API sequence diagrams and business rules for procurement (GRN rejection, accepted-qty billing), FEFO inventory, POS, returns, and AR SMS reminders:
+
+- [docs/retail-buy-store-sell-flows.md](docs/retail-buy-store-sell-flows.md)
 
 ## Implementation status
 
@@ -213,11 +364,35 @@ Gradle shortcut:
 ## Additional platform APIs
 
 - Sync queue: `POST /api/v1/sync/queue`, `POST /api/v1/sync/flush`
+  - `POST /api/v1/sync/queue` accepts a batched array of sync operations (each with `deviceId`, `idempotencyKey`, Lamport clock, and payload).
+  - `POST /api/v1/sync/flush` replays queued `POS_SALE` payloads through checkout (stock + ledger), and attempts mobile-money settlement for MOMO / AIRTEL references.
+  - conflict handling: if a sale line lacks stock at flush time, that line is skipped, flagged in queue `error_message`, and remaining lines continue (`SYNCED_WITH_CONFLICT`).
+  - manual trigger for tests/ops: `POST /api/v1/admin/jobs/sync-flush/run`
 - Dashboard export: `POST /api/v1/dashboards/{role}/export`
 - Webhook dispatch logging: persisted in `webhook_delivery_log` via async dispatch service.
 - Drill-down pagination/filtering: `GET /api/v1/dashboards/{role}/charts/{widget}/drilldown?page=&size=&from=&to=`
 - Accounting execution APIs: `POST /api/v1/accounting/payments`, `POST /api/v1/accounting/reconciliations`
 - Anomaly case APIs: `POST /api/v1/anomaly/cases`, `GET /api/v1/anomaly/cases/{role}`
+- **MTN MoMo / Airtel Money (POS):** `POST` or `PUT` `/api/v1/integrations/mobile-money/mtn/callback` and `.../airtel/callback` (unauthenticated; send header `X-Webhook-Token` set to `MOBILE_MONEY_MTN_WEBHOOK_SECRET` or `MOBILE_MONEY_AIRTEL_WEBHOOK_SECRET`). Register the operator callback URL with `?tenantId=<uuid>` when the body does not include `tenantId`. The JSON body can be our **canonical** shape (`tenantId`, `transactionId`, `amount`, `currencyCode`, optional `phoneNumber`) or a **provider-native** payload: common fields (e.g. `financialTransactionId`, `referenceId`, `amount`, `currency`, `status`, phone/MSISDN, and nested `data/...` paths) are mapped in `MobileMoneyIngressService`. If the callback omits amount/currency, we infer them from the matching POS tender line when the transaction reference matches.
+- **POS receipts:** `POST /api/v1/pos/receipts/print` with `{ "transactionId": "<sales-order-uuid>" }` returns an ESC/POS payload (`escPos`) for 80mm thermal printers, including store header, date/time, cashier, itemized SKU lines, payment methods, total, change, and transaction reference. `POST /api/v1/pos/receipts/{transactionId}/reprint` regenerates the same payload with a reprint marker. If receipt tenders include `MOMO` or `AIRTEL_MONEY` and callback phone is captured, an SMS receipt is dispatched to that phone.
+- **POS → inventory:** Link a catalog barcode to a `productId` and optional `reorderPoint` via `POST /api/v1/pos/catalog/items` (or the POS “Add / edit catalog item” form). On successful checkout, stock moves from `POS_DEFAULT_LOCATION` (default `SHOP`) to `POS_SALE_SINK_LOCATION` (default `SOLD`) through `InventoryService#deductForPosSale`. Load on-hand with `POST /api/v1/inventory/receive` (or existing move APIs) to the same location before selling. `LOW_STOCK` is published on `domain.inventory.events` when on-hand at that location is at or below `reorderPoint` after a sale. Set `POS_ALLOW_NEGATIVE_STOCK=true` only if you accept overselling.
+- **Customer credit limits (ON_ACCOUNT):** POS checkout enforces customer credit limit from `finance_customers.credit_limit` (FRW) before creating on-account invoices. If exceeded, API returns `422` with `{ error: "CREDIT_LIMIT_EXCEEDED", currentBalance, creditLimit, availableCredit }`. Use `managerOverride: true` in POS checkout request to bypass **only** for authenticated `ACCOUNTING_CONTROLLER` / `CFO`.
+- **Inventory pull endpoints:** `GET /api/v1/inventory/low-stock?location=` returns products where on-hand is at/below reorder point at the location, with `currentOnHand`, `reorderPoint`, `daysOfStockRemaining` (based on 30-day POS sales velocity), and `lastRestockedDate`. `GET /api/v1/inventory/expiry-risk?location=&daysAhead=` returns positive-on-hand batches expiring within the lookahead window. Backend roles: `OPS_MANAGER`, `ACCOUNTING_CONTROLLER`.
+- **Inventory batches / expiry (FEFO):** `POST /api/v1/inventory/receive` accepts optional `lotCode` and `expiryDate` (ISO date), and `GET /api/v1/inventory/batches?location=` lists on-hand lots. POS deduction uses FEFO (earliest expiry first) when batch rows exist; legacy non-batch balances still deduct normally.
+- **Retail ops / till:** `GET|POST /api/v1/retail/products` lists or creates tenant products (SKU, name, optional barcode). `GET /api/v1/retail/till/expected?businessDate=<ISO date>&posRegisterCode=` returns expected cash/mobile totals for that **business day** (timezone `smartaccounting.pos.business-time-zone`, default `Africa/Kigali`). `POST /api/v1/retail/till/close` with `businessDate`, `posRegisterCode`, and counted tender amounts records variance vs expected. The UI lives at `/retail`. Backend roles: `CEO`, `SALES_MANAGER`, `OPS_MANAGER`, `ACCOUNTING_CONTROLLER`.
+- **Customer credit status:** `GET /api/v1/finance/customers/{id}/credit-status` returns `currentBalance`, `creditLimit`, `availableCredit`, and oldest overdue invoice metadata.
+- **Supplier credit controls:** supplier finance profile stores `creditLimit` and `paymentTermsDays`. `POST /api/v1/finance/supplier-bills` now checks post-save outstanding payable against supplier credit limit; if exceeded, it emits `SUPPLIER_CREDIT_LIMIT_EXCEEDED` notification with channels `["sms","in-app"]` targeted to CFO and message `"Supplier [name] credit limit exceeded. Outstanding: [amount]. Limit: [limit]."`. `GET /api/v1/finance/suppliers/{id}/credit-status` returns `totalOutstanding`, `creditLimit`, `availableCredit`, and `nextDueDate`.
+- **Barcode label printing:** `GET /api/v1/retail/products/{productId}/barcode-label` returns a printable Code-128 (ZXing) label payload with barcode image (`barcodePngBase64`), product name, FRW price, and earliest expiry date (if any). If product barcode is missing, an internal barcode is auto-generated and persisted. `POST /api/v1/retail/products/barcode-labels/batch` accepts a list of `{ productId, quantity }` and returns bulk label jobs.
+- **Inventory visibility:** `GET /api/v1/inventory/balances?location=` returns on-hand per product at a location (product name when linked).
+- **POS on account:** Checkout may include tender `ON_ACCOUNT` plus `onAccountCustomerName`; when the on-account amount is positive, an AR **invoice** is created (due date +14 days) via `ReceivablesPayablesService`.
+- **Credit ledger:** `GET /api/v1/finance/invoices?status=&customerName=` returns tenant AR invoices (`FINANCE_READ`) with overdue flagging for open invoices past due; UI at `/finance/credit-ledger` for CEO/CFO/ACCOUNTING/SALES/OPERATIONS.
+- **POS multi-currency:** The checkout session currency must match tender totals. Catalog items may be priced in another currency; lines are converted using the latest tenant `fx_rates` row for the pair (**quote-per-base**; inverse used when only the reverse pair exists). Preview conversion with `GET /api/v1/currency/convert?amount=&from=&to=` (CEO/CFO/SALES_MANAGER/OPS_MANAGER/ACCOUNTING_CONTROLLER). Post rates with `POST /api/v1/currency/rates` (CEO/CFO/ACCOUNTING_CONTROLLER) or the **FX rates** screen in the app at `/finance/fx-rates` (same roles).
+- **Notifications tenant isolation:** notification rule matching and rule/event listing are tenant-scoped in `NotificationService` (`/api/v1/notifications/rules` and `/api/v1/notifications/events`) to avoid cross-tenant fanout.
+- **SMS notifications (channel-aware):** add `"sms"` in notification rule channels, then emit payload with `phoneNumber` or `phoneNumbers` plus optional `message`. Delivery is controlled by `smartaccounting.sms.*` (`SMS_ENABLED`, `SMS_DRY_RUN`, `SMS_PROVIDER_URL`, `SMS_BEARER_TOKEN`, `SMS_SENDER_ID`); default is disabled + dry-run safe.
+- **Receipt printing config:** `smartaccounting.receipt.*` is mapped to `RECEIPT_STORE_NAME`, `RECEIPT_STORE_ADDRESS`, `RECEIPT_FOOTER_TEXT`, `RECEIPT_PRINTER_TYPE` (`thermal`, `pdf`, `sms-only`).
+- **Label printing config:** `smartaccounting.label.printer-type` is mapped to `LABEL_PRINTER_TYPE` (`thermal-label`, `pdf`, `a4-sheet`).
+- **SMS delivery audit:** `GET /api/v1/notifications/sms-deliveries?page=&size=&eventId=` returns per-recipient SMS outcomes (`SENT`, `FAILED`, `DRY_RUN`) with response code and error message for support/ops traceability.
+- **SMS CSV export (server-side):** `GET /api/v1/notifications/sms-deliveries/export?eventId=&status=&phone=&limit=` streams CSV (max 5000 rows per request) for operations evidence sharing and archive.
 - Webhook security/retries: HMAC-SHA256 signature header + retry/backoff metadata in delivery logs.
 - Ledger flow APIs:
   - `POST /api/v1/finance/flows/invoice-issued`
@@ -285,7 +460,7 @@ Gradle shortcut:
 - Forecast service integration:
   - backend endpoint uses external forecast service (`FORECAST_BASE_URL`)
   - Dockerized Python forecast service in `forecast-service/`
-  - `docker-compose.yml` wires postgres + redis + forecast + backend
+  - `docker-compose.yml` wires postgres + redis + backend; optional `docker-compose.ai.yml` adds forecast + Kafka
  - Copilot agent run APIs:
    - `POST /api/v1/ai/copilot/agent/run`
    - `POST /api/v1/ai/copilot/agent/run/stream` (SSE)
@@ -323,8 +498,8 @@ Gradle shortcut:
      - `query`, `whatif`, `briefing`, and agent runs return persona-aligned framing
      - agent run includes a `ROLE_PERSONA_ALIGNMENT` step in the execution trace
    - run safety controls:
-     - per-run max duration timeout (`smartchain.copilot.agent.execution.max-duration-seconds`)
-     - step cap (`smartchain.copilot.agent.execution.max-steps`)
+     - per-run max duration timeout (`smartaccounting.copilot.agent.execution.max-duration-seconds`)
+     - step cap (`smartaccounting.copilot.agent.execution.max-steps`)
      - explicit cancel endpoint for frontend-triggered cancellation
    - user isolation:
      - run status/list/cancel are scoped to current `tenantId + userId`
@@ -431,3 +606,19 @@ Use this section as the source of truth for UI integration.
 - Show `PREVIEW` and `PENDING_APPROVAL` as safe-action UX states.
 - On `timed_out`/`cancelled` SSE events, stop stream UI and surface retry option.
 - If `status=FAILED`, show `error` from run status endpoint; do not infer from step text.
+
+## H2/RLS Compatibility Matrix
+
+| Area | PostgreSQL behavior | H2 behavior | Guard strategy |
+|---|---|---|---|
+| Tenant DB session var (`set_config`/`current_setting`) | Session variable set and validated | Function not available | Skip on non-Postgres using JDBC product detection |
+| Transaction tenant hook (`TenantDbSessionAspect`) | Applies transaction-local `app.tenant_id` | May throw bad SQL grammar | Catch runtime SQL errors and continue |
+| Dashboard tenant hook (`DashboardService#setTenantConfig`) | Sets DB tenant config before queries | `set_config` unsupported | Wrap in guarded try/catch |
+| KPI payload reads (`payload::text`) | Uses Postgres cast for JSONB | Cast unsupported | Fallback query without `::text` |
+| Snapshot projectors (`jsonb_build_object`) | Native JSONB payloads | Function unsupported | H2 fallback path / tolerant rebuild execution |
+| Projection rebuild endpoint | All projectors run in one flow | Individual projectors can fail on SQL dialect | Continue per-projector, report failures in job details |
+
+### Audit scope completed
+
+- Covered all main runtime uses of: `set_config('app.tenant_id', ...)`, `current_setting('app.tenant_id', ...)`, `jsonb_build_object`, `::jsonb`, and `::text`.
+- Added/kept explicit fallback behavior so integration tests can run under H2 without weakening Postgres production behavior.

@@ -1,3 +1,10 @@
+.env
+.env.production
+.env.local
+application-prod-local.yml
+*.secret
+secrets/
+frontend/.env.production
 /.gradle/
 /build/
 /.idea/
