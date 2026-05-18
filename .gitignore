@@ -5,6 +5,11 @@ application-prod-local.yml
 *.secret
 secrets/
 frontend/.env.production
+frontend/.env.development
+node_modules/
+.vscode/
+hs_err_pid*.log
+replay_pid*.log
 /.gradle/
 /build/
 /.idea/
