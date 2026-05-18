@@ -1,4 +1,17 @@
 import { apiClient } from './client'
+
+export interface CopilotProviderStatus {
+  provider: string
+  model: string
+  configured: boolean
+  mode: 'anthropic' | 'stub' | string
+  hint: string
+}
+
+export async function fetchCopilotProviderStatus() {
+  const { data } = await apiClient.get<CopilotProviderStatus>('/api/v1/ai/copilot/provider-status')
+  return data
+}
 import { useAuthStore } from '../stores/authStore'
 import type { AgentApproval, StartCopilotRunRequest } from '../types/copilot'
 

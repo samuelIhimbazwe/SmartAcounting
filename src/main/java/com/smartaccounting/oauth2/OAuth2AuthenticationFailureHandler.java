@@ -16,7 +16,7 @@ public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationF
     private final String redirectUri;
 
     public OAuth2AuthenticationFailureHandler(
-        @Value("${smartaccounting.oauth2.redirect-uri:http://localhost:5173/auth/oauth2/callback}") String redirectUri
+        @Value("${smartaccounting.oauth2.redirect-uri:${SMARTACCOUNTING_OAUTH2_REDIRECT_URI:http://localhost:5173/auth/oauth2/callback}}") String redirectUri
     ) {
         this.redirectUri = redirectUri;
     }

@@ -20,6 +20,10 @@ import { SupplierBillsRoute } from '../features/finance/SupplierBillsRoute'
 import { CustomerRecordRoute } from '../features/finance/CustomerRecordRoute'
 import { SupplierRecordRoute } from '../features/finance/SupplierRecordRoute'
 import { SettingsRoute } from '../features/settings/SettingsRoute'
+import { BankReconciliationRoute } from '../features/finance/BankReconciliationRoute'
+import { PurchaseOrdersRoute } from '../features/procurement/PurchaseOrdersRoute'
+import { HrPayrollRoute } from '../features/hr/HrPayrollRoute'
+import { EbmComplianceRoute } from '../features/compliance/EbmComplianceRoute'
 
 export const appRoutes: RouteObject[] = [
   {
@@ -43,6 +47,11 @@ export const appRoutes: RouteObject[] = [
       { path: '/finance/customers/:customerId', element: <CustomerRecordRoute /> },
       { path: '/finance/suppliers/:supplierId', element: <SupplierRecordRoute /> },
       { path: '/finance/sms-deliveries', element: <SmsDeliveryLogRoute /> },
+      { path: '/finance/bank-accounts', element: <BankReconciliationRoute /> },
+      { path: '/procurement/purchase-orders', element: <PurchaseOrdersRoute /> },
+      { path: '/hr/payroll', element: <HrPayrollRoute /> },
+      { path: '/hr/attendance', element: <HrPayrollRoute /> },
+      { path: '/compliance/ebm', element: <EbmComplianceRoute /> },
       { path: '/settings', element: <SettingsRoute /> },
       { path: '/unauthorized', element: <UnauthorizedPage /> },
       { path: '*', element: <Navigate to="/login" replace /> },

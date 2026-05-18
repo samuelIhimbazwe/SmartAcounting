@@ -1,5 +1,9 @@
 package com.smartaccounting.config;
 
+import com.smartaccounting.oauth2.CookieOAuth2AuthorizationRequestRepository;
+import com.smartaccounting.oauth2.OAuth2AuthenticationFailureHandler;
+import com.smartaccounting.oauth2.OAuth2AuthenticationSuccessHandler;
+import com.smartaccounting.oauth2.SmartChainOAuth2UserService;
 import com.smartaccounting.security.AuthRateLimitFilter;
 import com.smartaccounting.security.ApiKeyAuthenticationFilter;
 import com.smartaccounting.security.ApiVersionDeprecationFilter;
@@ -19,6 +23,8 @@ import org.springframework.security.authentication.dao.DaoAuthenticationProvider
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -28,12 +34,19 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                            JwtAuthenticationFilter jwtAuthenticationFilter,
-                                            CorrelationIdFilter correlationIdFilter,
-                                            AuthRateLimitFilter authRateLimitFilter,
-                                            ApiKeyAuthenticationFilter apiKeyAuthenticationFilter,
-                                            ApiVersionDeprecationFilter apiVersionDeprecationFilter) throws Exception {
+    SecurityFilterChain securityFilterChain(
+        HttpSecurity http,
+        JwtAuthenticationFilter jwtAuthenticationFilter,
+        CorrelationIdFilter correlationIdFilter,
+        AuthRateLimitFilter authRateLimitFilter,
+        ApiKeyAuthenticationFilter apiKeyAuthenticationFilter,
+        ApiVersionDeprecationFilter apiVersionDeprecationFilter,
+        ClientRegistrationRepository clientRegistrationRepository,
+        CookieOAuth2AuthorizationRequestRepository oauth2AuthorizationRequestRepository,
+        OAuth2AuthenticationSuccessHandler oauth2SuccessHandler,
+        OAuth2AuthenticationFailureHandler oauth2FailureHandler,
+        SmartChainOAuth2UserService smartChainOAuth2UserService
+    ) throws Exception {
         http
             .cors(Customizer.withDefaults())
             .csrf(csrf -> csrf.disable())
@@ -41,6 +54,9 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/health", "/actuator/health/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/api/v1/public/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/ai/copilot/provider-status").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/auth/oauth2/**").permitAll()
+                .requestMatchers("/oauth2/**", "/api/v1/auth/oauth2/callback/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/oauth-login").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/mfa/challenge").permitAll()
@@ -59,7 +75,33 @@ public class SecurityConfig {
             .addFilterAfter(authRateLimitFilter, CorrelationIdFilter.class)
             .addFilterAfter(apiKeyAuthenticationFilter, AuthRateLimitFilter.class)
             .addFilterAfter(jwtAuthenticationFilter, AuthRateLimitFilter.class);
+
+        if (hasOAuth2Clients(clientRegistrationRepository)) {
+            http.oauth2Login(oauth -> oauth
+                .authorizationEndpoint(endpoint -> endpoint
+                    .authorizationRequestRepository(oauth2AuthorizationRequestRepository))
+                .redirectionEndpoint(endpoint -> endpoint
+                    .baseUri("/api/v1/auth/oauth2/callback"))
+                .userInfoEndpoint(user -> user.userService(smartChainOAuth2UserService))
+                .successHandler(oauth2SuccessHandler)
+                .failureHandler(oauth2FailureHandler)
+            );
+        }
+
         return http.build();
+    }
+
+    private static boolean hasOAuth2Clients(ClientRegistrationRepository repository) {
+        for (String id : new String[] { "google", "microsoft" }) {
+            ClientRegistration registration = repository.findByRegistrationId(id);
+            if (registration != null) {
+                return true;
+            }
+        }
+        if (repository instanceof Iterable<?> iterable) {
+            return iterable.iterator().hasNext();
+        }
+        return false;
     }
 
     /**

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, Link2, Monitor, Printer } from 'lucide-react'
 import { fetchOAuth2Providers, requestOAuth2Link, type OAuth2Provider } from '../../shared/api/auth'
+import { fetchCopilotProviderStatus, type CopilotProviderStatus } from '../../shared/api/copilot'
 import { API_BASE_URL } from '../../shared/api/config'
 import { rolePathMap } from '../../shared/types/roles'
 import { useAuthStore } from '../../shared/stores/authStore'
@@ -18,6 +19,7 @@ export function SettingsPage() {
   const [providers, setProviders] = useState<OAuth2Provider[]>([])
   const [linkMessage, setLinkMessage] = useState<string | null>(null)
   const [linkError, setLinkError] = useState<string | null>(null)
+  const [aiStatus, setAiStatus] = useState<CopilotProviderStatus | null>(null)
 
   const dashboardPath = role ? `/dashboard/${rolePathMap[role]}` : '/dashboard'
 
@@ -34,6 +36,9 @@ export function SettingsPage() {
     fetchOAuth2Providers()
       .then(setProviders)
       .catch(() => setProviders([]))
+    fetchCopilotProviderStatus()
+      .then(setAiStatus)
+      .catch(() => setAiStatus(null))
   }, [])
 
   async function onLinkProvider(provider: OAuth2Provider) {
@@ -65,6 +70,16 @@ export function SettingsPage() {
         <h1>{t('settings.title')}</h1>
         <p className="settings-page__subtitle">{t('settings.subtitle')}</p>
       </header>
+
+      {aiStatus && (
+        <section className="settings-card">
+          <h2>AI copilot</h2>
+          <p className="settings-muted">
+            Mode: <strong>{aiStatus.mode}</strong> · Model: {aiStatus.model}
+          </p>
+          <p className={aiStatus.configured ? 'settings-info' : 'settings-error'}>{aiStatus.hint}</p>
+        </section>
+      )}
 
       {isDesktop() && (
         <section className="settings-card">

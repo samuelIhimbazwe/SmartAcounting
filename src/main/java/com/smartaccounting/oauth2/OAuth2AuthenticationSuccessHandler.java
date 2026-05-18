@@ -27,7 +27,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         JwtService jwtService,
         RefreshTokenService refreshTokenService,
         UserDetailsService userDetailsService,
-        @Value("${smartaccounting.oauth2.redirect-uri:http://localhost:5173/auth/oauth2/callback}") String redirectUri
+        @Value("${smartaccounting.oauth2.redirect-uri:${SMARTACCOUNTING_OAUTH2_REDIRECT_URI:http://localhost:5173/auth/oauth2/callback}}") String redirectUri
     ) {
         this.jwtService = jwtService;
         this.refreshTokenService = refreshTokenService;

@@ -100,6 +100,19 @@ public class CopilotService {
         }
     }
 
+    /** True when Anthropic completions are configured (not stub/fallback). */
+    public boolean isAnthropicConfigured() {
+        return useAnthropicCompletion();
+    }
+
+    public String completionProviderName() {
+        return completionProvider;
+    }
+
+    public String completionModelName() {
+        return completionModel;
+    }
+
     public Map<String, Object> query(String role, String question) {
         UUID tenant = TenantContext.tenantId();
         if (tenant == null) {

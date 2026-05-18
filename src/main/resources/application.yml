@@ -70,6 +70,8 @@ logging:
     level: "corr=%X{correlationId:-na} tenant=%X{tenantId:-na} user=%X{userId:-na} %5p"
 
 smartaccounting:
+  oauth2:
+    redirect-uri: ${SMARTACCOUNTING_OAUTH2_REDIRECT_URI:http://localhost:5173/auth/oauth2/callback}
   cors:
     # Comma-separated origins, or patterns containing * (see CorsConfig). Default uses patterns so any
     # localhost / 127.0.0.1 dev port (e.g. Vite 5173–5176) works without editing env when CORS_ALLOWED_ORIGINS is unset.

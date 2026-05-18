@@ -52,6 +52,20 @@ public class AiController {
         this.anomalyService = anomalyService;
     }
 
+    @GetMapping("/copilot/provider-status")
+    public Map<String, Object> copilotProviderStatus() {
+        boolean ready = copilotService.isAnthropicConfigured();
+        return Map.of(
+            "provider", copilotService.completionProviderName(),
+            "model", copilotService.completionModelName(),
+            "configured", ready,
+            "mode", ready ? "anthropic" : "stub",
+            "hint", ready
+                ? "ANTHROPIC_API_KEY is set — copilot uses live Claude completions."
+                : "Set ANTHROPIC_API_KEY and restart the backend for real prose (otherwise stub responses)."
+        );
+    }
+
     @PostMapping("/copilot/query")
     @PreAuthorize("@roleScopeGuard.canAccessRole(authentication, #request.role)")
     public Map<String, Object> copilotQuery(@RequestBody @Valid CopilotQueryRequest request) {

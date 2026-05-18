@@ -51,6 +51,24 @@ export async function login(request: LoginRequest): Promise<AuthSession> {
   }
 }
 
+export interface OAuth2Provider {
+  provider: string
+  displayName: string
+  loginUrl: string
+  iconUrl?: string
+}
+
+export async function fetchOAuth2Providers(): Promise<OAuth2Provider[]> {
+  const response = await apiClient.get<OAuth2Provider[]>('/api/v1/auth/oauth2/providers')
+  return response.data
+}
+
+/** Server-side OAuth2 redirect path (prepend API_BASE_URL). */
+export async function requestOAuth2Link(provider: string): Promise<string> {
+  const response = await apiClient.get<{ authorizePath: string }>(`/api/v1/auth/oauth2/authorize/${provider}`)
+  return response.data.authorizePath
+}
+
 export async function refreshAccessToken(request: { refreshToken: string; tenantId: string; userId: string }) {
   const response = await apiClient.post<RefreshResponse>('/api/v1/auth/refresh', request)
   const accessToken = response.data.accessToken ?? response.data.token
