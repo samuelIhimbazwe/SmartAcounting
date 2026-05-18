@@ -9,6 +9,7 @@ import com.smartaccounting.dto.OAuthLoginRequest;
 import com.smartaccounting.dto.RefreshRequest;
 import com.smartaccounting.service.OidcAuthService;
 import com.smartaccounting.signup.DbUserLoginValidator;
+import com.smartaccounting.signup.LoginIdentityService;
 import com.smartaccounting.security.JwtService;
 import com.smartaccounting.security.MfaService;
 import com.smartaccounting.security.RefreshTokenService;
@@ -35,6 +36,7 @@ public class AuthController {
     private final MfaService mfaService;
     private final DbUserLoginValidator dbUserLoginValidator;
     private final OidcAuthService oidcAuthService;
+    private final LoginIdentityService loginIdentityService;
 
     public AuthController(AuthenticationManager authenticationManager,
                           UserDetailsService userDetailsService,
@@ -42,7 +44,8 @@ public class AuthController {
                           RefreshTokenService refreshTokenService,
                           MfaService mfaService,
                           DbUserLoginValidator dbUserLoginValidator,
-                          OidcAuthService oidcAuthService) {
+                          OidcAuthService oidcAuthService,
+                          LoginIdentityService loginIdentityService) {
         this.authenticationManager = authenticationManager;
         this.userDetailsService = userDetailsService;
         this.jwtService = jwtService;
@@ -50,6 +53,7 @@ public class AuthController {
         this.mfaService = mfaService;
         this.dbUserLoginValidator = dbUserLoginValidator;
         this.oidcAuthService = oidcAuthService;
+        this.loginIdentityService = loginIdentityService;
     }
 
     @PostMapping("/oauth-login")
@@ -63,25 +67,35 @@ public class AuthController {
             new UsernamePasswordAuthenticationToken(request.username(), request.password())
         );
 
-        UUID tenantUuid = UUID.fromString(request.tenantId().trim());
-        UUID userUuid = UUID.fromString(request.userId().trim());
-        TenantContext.set(tenantUuid, userUuid);
+        LoginIdentityService.LoginIdentity identity = loginIdentityService.resolve(
+            request.username(), request.tenantId(), request.userId());
+        String tenantId = identity.tenantId().toString();
+        String userId = identity.userId().toString();
+        TenantContext.set(identity.tenantId(), identity.userId());
         try {
-            dbUserLoginValidator.validateTenantUserMatches(request.username(), request.tenantId(), request.userId());
+            dbUserLoginValidator.validateTenantUserMatches(request.username(), tenantId, userId);
 
             UserDetails userDetails = userDetailsService.loadUserByUsername(request.username());
             if (mfaService.requiresSecondFactor(userDetails)) {
                 mfaService.assertValidOtp(
                     request.username(),
-                    request.tenantId(),
-                    request.userId(),
+                    tenantId,
+                    userId,
                     request.mfaChallengeId(),
                     request.otpCode()
                 );
             }
-            String accessToken = jwtService.generateToken(userDetails, request.tenantId(), request.userId());
-            String refreshToken = refreshTokenService.issue(request.tenantId(), request.userId(), userDetails);
-            return new AuthResponse(accessToken, "Bearer", jwtService.expirationSeconds(), refreshToken);
+            String accessToken = jwtService.generateToken(userDetails, tenantId, userId);
+            String refreshToken = refreshTokenService.issue(tenantId, userId, userDetails);
+            return new AuthResponse(
+                accessToken,
+                "Bearer",
+                jwtService.expirationSeconds(),
+                refreshToken,
+                identity.role(),
+                tenantId,
+                userId
+            );
         } finally {
             TenantContext.clear();
         }

@@ -1,6 +1,8 @@
 # Production profile — activate with spring.profiles.active=prod
 
 smartaccounting:
+  auth:
+    demo-fallback-enabled: false
   ai:
     fail-on-missing-provider-keys: ${SMARTACCOUNTING_AI_FAIL_ON_MISSING_PROVIDER_KEYS:true}
     embedding:

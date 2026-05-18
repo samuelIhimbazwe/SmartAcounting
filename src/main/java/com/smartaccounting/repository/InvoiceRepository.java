@@ -1,6 +1,7 @@
 package com.smartaccounting.repository;
 import com.smartaccounting.entity.Invoice;
 import org.springframework.data.jpa.repository.JpaRepository;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -33,5 +34,19 @@ public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
         @Param("status") String status,
         @Param("dueBefore") LocalDate dueBefore,
         Pageable pageable
+    );
+
+    @Query("""
+        select coalesce(sum(i.amount), 0) from Invoice i
+        where i.tenantId = :tenantId and i.deletedAt is null
+          and upper(i.status) = 'PAID'
+          and i.customerName in :customerNames
+          and i.createdAt >= :from and i.createdAt < :to
+        """)
+    BigDecimal sumRevenueByCustomerNamesAndDateBetween(
+        @Param("tenantId") UUID tenantId,
+        @Param("customerNames") List<String> customerNames,
+        @Param("from") Instant from,
+        @Param("to") Instant to
     );
 }

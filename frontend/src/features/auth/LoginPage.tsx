@@ -28,7 +28,12 @@ export function LoginPage() {
         accessToken: response.accessToken,
         refreshToken: response.refreshToken,
         expiresAt: response.expiresAt,
+        tenantId: response.tenantId,
+        userId: response.userId,
       })
+      if (response.tenantId) {
+        setTenantId(response.tenantId)
+      }
       navigate(`/dashboard/${rolePathMap[role]}`)
     } catch (caughtError) {
       const apiError = normalizeApiError(caughtError)

@@ -14,6 +14,8 @@ interface LoginResponse {
   expiresIn?: number
   token?: string
   role?: Role
+  tenantId?: string
+  userId?: string
 }
 
 interface RefreshResponse {
@@ -28,6 +30,8 @@ export interface AuthSession {
   refreshToken: string | null
   expiresAt: number | null
   role: Role
+  tenantId?: string
+  userId?: string
 }
 
 function toExpiryTimestamp(expiresIn?: number) {
@@ -48,6 +52,8 @@ export async function login(request: LoginRequest): Promise<AuthSession> {
     refreshToken: response.data.refreshToken ?? null,
     expiresAt: toExpiryTimestamp(response.data.expiresIn),
     role: response.data.role ?? 'CEO',
+    tenantId: response.data.tenantId,
+    userId: response.data.userId,
   }
 }
 

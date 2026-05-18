@@ -30,4 +30,18 @@ public interface SupplierBillRepository extends JpaRepository<SupplierBill, UUID
         @Param("status") String status,
         @Param("dueBefore") LocalDate dueBefore
     );
+
+    @Query("""
+        select b from SupplierBill b
+        where b.tenantId = :tenantId and b.deletedAt is null
+          and upper(b.status) = upper(:status)
+          and b.dueDate >= :fromDate and b.dueDate <= :toDate
+        order by b.dueDate asc
+        """)
+    List<SupplierBill> findByTenantIdAndStatusAndDueDateBetweenAndDeletedAtIsNull(
+        @Param("tenantId") UUID tenantId,
+        @Param("status") String status,
+        @Param("fromDate") LocalDate fromDate,
+        @Param("toDate") LocalDate toDate
+    );
 }
