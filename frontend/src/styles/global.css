@@ -1,0 +1,54 @@
+/*
+ * Cross-cutting status-banner utility classes used by the PWA layer
+ * (`OfflineBanner`, `PwaUpdatePrompt`).
+ *
+ * These intentionally bypass Tailwind utilities so the banners stay aligned
+ * with the design-token color system, dark-mode aware via tokens.css.
+ */
+
+.offline-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: center;
+  width: 100%;
+  z-index: 50;
+}
+
+.offline-banner.offline {
+  background-color: var(--color-danger);
+  color: var(--color-text-inverse);
+}
+
+.offline-banner.syncing {
+  background-color: var(--color-warning);
+  color: var(--color-text-inverse);
+}
+
+.pwa-update-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background-color: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: 0.875rem;
+  font-weight: 500;
+  width: 100%;
+  z-index: 50;
+}
+
+.pwa-update-banner button {
+  padding: 4px 12px;
+  background-color: var(--color-text-inverse);
+  color: var(--color-primary);
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  font-size: 0.8rem;
+  cursor: pointer;
+  border: none;
+}

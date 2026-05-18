@@ -11,7 +11,13 @@ node_modules/
 hs_err_pid*.log
 replay_pid*.log
 /.gradle/
+**/.gradle/
 /build/
+**/build/
+**/android/app/build/
+**/ios/Pods/
+**/ios/build/
+.DS_Store
 /.idea/
 *.iml
 out/

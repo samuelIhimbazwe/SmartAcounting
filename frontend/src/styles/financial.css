@@ -1,0 +1,94 @@
+/* Financial data display utilities */
+
+.value-positive {
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+.value-negative {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.value-warning {
+  color: var(--color-warning);
+  font-weight: 600;
+}
+
+.value-neutral {
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.amount-large {
+  font-size: 2rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.amount-table {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  font-weight: 500;
+}
+
+.kpi-widget {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  box-shadow: var(--shadow-sm);
+  transition:
+    box-shadow var(--duration-normal) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-normal) var(--ease-out);
+}
+
+.kpi-widget:hover {
+  box-shadow: var(--shadow-md);
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
+  transform: translateY(-2px);
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kpi-widget,
+  .kpi-widget:hover {
+    transition: none;
+    transform: none;
+  }
+}
+
+.badge {
+  border-radius: var(--radius-full);
+  padding: 2px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.badge-success {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.badge-warning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.badge-danger {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.badge-info {
+  background: var(--color-info-bg);
+  color: var(--color-info);
+}
+
+.badge-neutral {
+  background: var(--color-bg-muted);
+  color: var(--color-text-secondary);
+}
+

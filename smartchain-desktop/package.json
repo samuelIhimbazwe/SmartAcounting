@@ -1,0 +1,39 @@
+{
+  "name": "smartchain-desktop",
+  "version": "0.1.0",
+  "description": "SmartAccounting Electron desktop shell — wraps the web frontend with native printer, scanner, offline-queue and updater capabilities.",
+  "private": true,
+  "main": "dist/main/index.js",
+  "scripts": {
+    "clean": "rimraf dist",
+    "tsc": "tsc",
+    "dev": "concurrently \"cd ../frontend && npm run dev\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\"",
+    "dev:electron-only": "cross-env NODE_ENV=development electron .",
+    "build:frontend": "cd ../frontend && cross-env VITE_DESKTOP_BUNDLE=true npm run build",
+    "build": "npm run build:frontend && tsc && electron-builder --config electron-builder.config.cjs",
+    "build:win": "npm run build:frontend && tsc && electron-builder --win --config electron-builder.config.cjs",
+    "build:mac": "npm run build:frontend && tsc && electron-builder --mac --config electron-builder.config.cjs",
+    "build:linux": "npm run build:frontend && tsc && electron-builder --linux --config electron-builder.config.cjs",
+    "rebuild": "electron-builder install-app-deps",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.9.0",
+    "electron-store": "^8.2.0",
+    "electron-updater": "^6.8.3",
+    "node-hid": "^3.3.0",
+    "node-thermal-printer": "^4.6.0",
+    "serialport": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.12.2",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.0.0",
+    "electron": "^42.0.1",
+    "electron-builder": "^26.8.1",
+    "rimraf": "^6.0.1",
+    "typescript": "~6.0.2",
+    "wait-on": "^9.0.1"
+  }
+}

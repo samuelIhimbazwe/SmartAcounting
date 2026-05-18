@@ -1,0 +1,28 @@
+import React from 'react';
+import {createNativeStackNavigator} from '@react-navigation/native-stack';
+import TillOpenScreen from '../screens/till/TillOpenScreen';
+import TillCloseScreen from '../screens/till/TillCloseScreen';
+
+export type TillStackParamList = {
+  TillOpen: undefined;
+  TillClose: undefined;
+};
+
+const Stack = createNativeStackNavigator<TillStackParamList>();
+
+export default function TillNavigator() {
+  return (
+    <Stack.Navigator initialRouteName="TillOpen">
+      <Stack.Screen
+        name="TillOpen"
+        component={TillOpenScreen}
+        options={{title: 'Till'}}
+      />
+      <Stack.Screen
+        name="TillClose"
+        component={TillCloseScreen}
+        options={{title: 'Close till'}}
+      />
+    </Stack.Navigator>
+  );
+}
