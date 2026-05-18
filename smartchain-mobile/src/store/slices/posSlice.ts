@@ -24,6 +24,9 @@ interface PosState {
   lastTransactionId: string | null;
   /** Manual barcode text field on checkout (Redux-only state). */
   barcodeInput: string;
+  openingFloat: number | null;
+  shiftStartTime: string | null;
+  cashierName: string | null;
 }
 
 const initialState: PosState = {
@@ -36,6 +39,9 @@ const initialState: PosState = {
   isProcessing: false,
   lastTransactionId: null,
   barcodeInput: '',
+  openingFloat: null,
+  shiftStartTime: null,
+  cashierName: null,
 };
 
 const posSlice = createSlice({
@@ -119,5 +125,6 @@ export const {
   setLastTransaction,
   clearCart,
   setBarcodeInput,
+  setShiftContext,
 } = posSlice.actions;
 export default posSlice.reducer;

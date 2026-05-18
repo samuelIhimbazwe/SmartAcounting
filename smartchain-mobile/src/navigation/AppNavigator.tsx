@@ -1,5 +1,5 @@
 import React from 'react';
-import {View} from 'react-native';
+import {Text, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -13,6 +13,7 @@ import StockNavigator from './StockNavigator';
 import TillNavigator from './TillNavigator';
 import OwnerDashboardScreen from '../screens/dashboard/OwnerDashboardScreen';
 import SettingsNavigator from './SettingsNavigator';
+import CopilotScreen from '../screens/copilot/CopilotScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -20,8 +21,39 @@ function tabIcon(name: string, color: string, size: number) {
   return <Icon name={name} color={color} size={Math.max(size, 24)} />;
 }
 
+function copilotTabIcon(color: string) {
+  return <Text style={{fontSize: 20, color}}>✨</Text>;
+}
+
+function resolveInitialRoute(
+  role: AppRole | null,
+  flags: {
+    showTill: boolean;
+    showDashboard: boolean;
+    showPos: boolean;
+  },
+): string {
+  if (
+    role === 'SALES_MANAGER' ||
+    role === 'ACCOUNTING_CONTROLLER'
+  ) {
+    return flags.showTill ? 'Till' : flags.showPos ? 'POS' : 'Copilot';
+  }
+  if (flags.showDashboard) {
+    return 'Dashboard';
+  }
+  if (flags.showPos) {
+    return 'POS';
+  }
+  if (flags.showTill) {
+    return 'Till';
+  }
+  return 'Copilot';
+}
+
 export default function AppNavigator() {
   const roles = useSelector((s: RootState) => s.auth.roles) as AppRole[];
+  const role = useSelector((s: RootState) => s.auth.role);
 
   const showPos = hasAnyRole(roles, 'CEO', 'SALES_MANAGER', 'OPS_MANAGER');
   const showStock = hasAnyRole(
@@ -40,11 +72,18 @@ export default function AppNavigator() {
   );
   const showDashboard = hasAnyRole(roles, 'CEO', 'CFO');
 
+  const initialRouteName = resolveInitialRoute(role, {
+    showTill,
+    showDashboard,
+    showPos,
+  });
+
   return (
     <SafeAreaView edges={['top']} style={{flex: 1}}>
       <SyncStatusBar />
       <View style={{flex: 1}}>
         <Tab.Navigator
+          initialRouteName={initialRouteName}
           screenOptions={{
             tabBarStyle: {minHeight: 56},
             tabBarItemStyle: {minHeight: 48},
@@ -87,6 +126,14 @@ export default function AppNavigator() {
               }}
             />
           ) : null}
+          <Tab.Screen
+            name="Copilot"
+            component={CopilotScreen}
+            options={{
+              tabBarIcon: p => copilotTabIcon(p.color),
+              tabBarLabel: 'Copilot',
+            }}
+          />
           <Tab.Screen
             name="Settings"
             component={SettingsNavigator}

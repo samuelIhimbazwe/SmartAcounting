@@ -107,6 +107,14 @@ export default function CheckoutScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.wrap}>
+      <Button
+        mode="outlined"
+        onPress={() => navigation.navigate('Returns')}
+        style={styles.field}
+        textColor="#DC2626"
+        contentStyle={styles.btnInner}>
+        Process return / refund
+      </Button>
       <Text style={[styles.section, styles.sectionTitle]}>Register & tender</Text>
       <TextInput
         label="POS register code"

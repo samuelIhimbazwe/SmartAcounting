@@ -52,6 +52,12 @@ export default function StockScreen() {
           Low stock report
         </Button>
       ) : null}
+      <Button
+        mode="contained"
+        onPress={() => navigation.navigate('StockCount')}
+        contentStyle={styles.btnInner}>
+        Stock count mode
+      </Button>
       <FlatList
         data={rows}
         keyExtractor={(_, i) => String(i)}
