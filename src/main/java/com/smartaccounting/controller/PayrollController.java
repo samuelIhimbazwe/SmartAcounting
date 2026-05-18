@@ -17,9 +17,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 @RestController
 @RequestMapping("/api/v1/hr/payroll")
@@ -74,7 +78,32 @@ public class PayrollController {
     public ResponseEntity<byte[]> getPayslip(
         @PathVariable UUID runId,
         @PathVariable UUID employeeId) {
-        return ResponseEntity.ok(payrollService.generatePayslip(runId, employeeId));
+        byte[] pdf = payrollService.generatePayslip(runId, employeeId);
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=\"payslip-" + runId + "-" + employeeId + ".pdf\"")
+            .header(HttpHeaders.CACHE_CONTROL, "no-store")
+            .contentType(MediaType.APPLICATION_PDF)
+            .body(pdf);
+    }
+
+    @GetMapping("/runs/{runId}/payslips")
+    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'HR_MANAGER', 'ACCOUNTING_CONTROLLER')")
+    public ResponseEntity<byte[]> downloadAllPayslips(@PathVariable UUID runId) throws IOException {
+        List<PayrollLine> lines = payrollService.getRunLines(runId);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (ZipOutputStream zip = new ZipOutputStream(baos)) {
+            for (PayrollLine line : lines) {
+                zip.putNextEntry(new ZipEntry("payslip-" + line.getEmployeeId() + ".pdf"));
+                zip.write(payrollService.generatePayslip(runId, line.getEmployeeId()));
+                zip.closeEntry();
+            }
+        }
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"payslips-" + runId + ".zip\"")
+            .header(HttpHeaders.CACHE_CONTROL, "no-store")
+            .contentType(MediaType.parseMediaType("application/zip"))
+            .body(baos.toByteArray());
     }
 
     @GetMapping("/runs/{runId}/paye-export")

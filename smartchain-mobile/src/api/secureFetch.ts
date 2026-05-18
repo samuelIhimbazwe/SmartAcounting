@@ -11,8 +11,13 @@ export async function secureApiCall(
     return fetch(url, options);
   }
 
+  const method = (options.method || 'GET').toUpperCase() as
+    | 'GET'
+    | 'POST'
+    | 'PUT'
+    | 'DELETE';
   const pinned = await pinnedFetch(url, {
-    method: options.method || 'GET',
+    method,
     headers: options.headers || {},
     body: options.body as string | undefined,
     sslPinning: {

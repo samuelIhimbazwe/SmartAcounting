@@ -1,4 +1,4 @@
-import React, {useState, useRef, useCallback} from 'react';
+import React, {useState, useRef, useCallback, useEffect} from 'react';
 import {
   View,
   Text,
@@ -60,7 +60,11 @@ export default function CopilotScreen() {
   const [messages, setMessages] = useState<CopilotMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [streamFallback, setStreamFallback] = useState(false);
   const listRef = useRef<FlatList>(null);
+  const stopStreamRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => () => stopStreamRef.current?.(), []);
 
   const {role, userName} = useSelector((s: RootState) => s.auth);
 
@@ -91,23 +95,29 @@ export default function CopilotScreen() {
       setMessages(prev => [...prev, userMessage, assistantMessage]);
       setInput('');
       setLoading(true);
-      setTimeout(() => listRef.current?.scrollToEnd(), 100);
+      setStreamFallback(false);
+      setTimeout(() => listRef.current?.scrollToEnd({animated: false}), 100);
 
       try {
         await copilotService.startRun(text.trim(), role || 'CEO', update => {
+          if (update.streamFallback) {
+            setStreamFallback(true);
+          }
+          const streaming = update.status === 'running';
           setMessages(prev =>
             prev.map(m =>
               m.id === assistantId
                 ? {
                     ...m,
                     content: update.content,
-                    isStreaming: false,
+                    isStreaming: streaming,
                     runId: update.runId,
+                    streamFallback: update.streamFallback,
                   }
                 : m,
             ),
           );
-          setTimeout(() => listRef.current?.scrollToEnd(), 100);
+          setTimeout(() => listRef.current?.scrollToEnd({animated: false}), 50);
         });
       } catch {
         setMessages(prev =>
@@ -135,20 +145,27 @@ export default function CopilotScreen() {
         styles.messageBubble,
         item.role === 'user' ? styles.userBubble : styles.assistantBubble,
       ]}>
-      {item.isStreaming ? (
+      <Text
+        style={[
+          styles.messageText,
+          item.role === 'user' ? styles.userText : styles.assistantText,
+        ]}>
+        {item.content}
+        {item.isStreaming ? (
+          <Text style={styles.cursor}>|</Text>
+        ) : null}
+      </Text>
+      {item.streamFallback && !item.isStreaming ? (
+        <Text style={styles.fallbackNote}>
+          Live streaming unavailable; showing full response
+        </Text>
+      ) : null}
+      {item.isStreaming && !item.content ? (
         <View style={styles.typingRow}>
           <ActivityIndicator size="small" color="#1B6FDB" />
           <Text style={styles.typingText}>Thinking...</Text>
         </View>
-      ) : (
-        <Text
-          style={[
-            styles.messageText,
-            item.role === 'user' ? styles.userText : styles.assistantText,
-          ]}>
-          {item.content}
-        </Text>
-      )}
+      ) : null}
       <Text style={styles.messageTime}>
         {item.timestamp.toLocaleTimeString('en-RW', {
           hour: '2-digit',
@@ -168,6 +185,11 @@ export default function CopilotScreen() {
         <Text style={styles.headerSubtitle}>
           Ask anything about your business
         </Text>
+        {streamFallback ? (
+          <Text style={styles.headerFallback}>
+            Live streaming unavailable; showing full response
+          </Text>
+        ) : null}
       </View>
 
       <FlatList
@@ -248,7 +270,10 @@ const styles = StyleSheet.create({
   userText: {color: '#FFFFFF'},
   assistantText: {color: '#0F172A'},
   messageTime: {fontSize: 11, marginTop: 4, color: '#94A3B8', alignSelf: 'flex-end'},
-  typingRow: {flexDirection: 'row', alignItems: 'center', gap: 8},
+  cursor: {color: '#1B6FDB', fontWeight: '700'},
+  fallbackNote: {fontSize: 11, color: '#94A3B8', marginTop: 6, fontStyle: 'italic'},
+  headerFallback: {fontSize: 11, color: '#FDE68A', marginTop: 6},
+  typingRow: {flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4},
   typingText: {fontSize: 14, color: '#64748B', fontStyle: 'italic'},
   emptyState: {padding: 24, alignItems: 'center'},
   emptyTitle: {fontSize: 22, fontWeight: '700', color: '#0F172A', marginBottom: 8},

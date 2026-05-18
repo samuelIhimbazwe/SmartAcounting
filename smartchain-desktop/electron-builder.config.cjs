@@ -33,8 +33,8 @@ const config = {
   publish: [
     {
       provider: 'github',
-      owner: 'smartchain',
-      repo: 'smartchain-desktop',
+      owner: 'samuelIhimbazwe',
+      repo: 'SmartAcounting',
       releaseType: 'release',
     },
   ],

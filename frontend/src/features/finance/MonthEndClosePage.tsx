@@ -27,10 +27,24 @@ export function MonthEndClosePage() {
     <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-4">
       <h1 className="text-2xl font-semibold">{t('nav.monthEndClose')}</h1>
       <p className="text-sm text-slate-600">{period}</p>
-      <div className="h-2 rounded-full bg-slate-200 overflow-hidden">
-        <div className="h-full bg-indigo-600 transition-all" style={{ width: `${pct}%` }} />
+      <div className="flex items-center gap-4">
+        <svg width="88" height="88" viewBox="0 0 88 88" aria-hidden>
+          <circle cx="44" cy="44" r="36" fill="none" stroke="#E2E8F0" strokeWidth="8" />
+          <circle
+            cx="44"
+            cy="44"
+            r="36"
+            fill="none"
+            stroke="#4F46E5"
+            strokeWidth="8"
+            strokeLinecap="round"
+            transform="rotate(-90 44 44)"
+            strokeDasharray={2 * Math.PI * 36}
+            strokeDashoffset={2 * Math.PI * 36 * (1 - pct / 100)}
+          />
+        </svg>
+        <p className="text-sm font-medium">{pct}% {t('pages.close.complete')}</p>
       </div>
-      <p className="text-sm">{pct}% {t('pages.close.complete')}</p>
       {error ? <p className="text-red-600 text-sm">{error}</p> : null}
       <ul className="space-y-2">
         {tasks.map((task) => (

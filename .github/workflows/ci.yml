@@ -64,6 +64,16 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run build
+      - name: i18n drift check
+        run: |
+          EN=$(sed -n '/^  en:/,/^  fr:/p' src/shared/i18n/resources.ts | wc -l)
+          FR=$(sed -n '/^  fr:/,/^};/p' src/shared/i18n/resources.ts | wc -l)
+          DIFF=$(( EN > FR ? EN - FR : FR - EN ))
+          echo "EN block lines: $EN | FR block lines: $FR | drift: $DIFF"
+          if [ "$DIFF" -gt 60 ]; then
+            echo "i18n drift too high — add missing FR translations"
+            exit 1
+          fi
       - run: npm run lint
         continue-on-error: true
 

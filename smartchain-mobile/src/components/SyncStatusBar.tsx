@@ -8,6 +8,7 @@ import {
   getPendingTransactions,
   syncPendingTransactions,
 } from '../services/offlineQueue';
+import {useSyncStatus} from '../hooks/useSyncStatus';
 
 /**
  * Status bar pinned to the top of the authenticated shell.
@@ -26,6 +27,7 @@ export function SyncStatusBar() {
 
   const accessToken = useSelector((s: RootState) => s.auth.accessToken);
   const roles = useSelector((s: RootState) => s.auth.roles) as AppRole[];
+  const serverSync = useSyncStatus(!!accessToken);
 
   const refreshPending = useCallback(async () => {
     try {
@@ -68,22 +70,55 @@ export function SyncStatusBar() {
     return () => unsubscribe();
   }, [accessToken, roles, refreshPending]);
 
-  if (isOnline && pendingCount === 0) return null;
+  const serverPending = serverSync?.pendingApprovals ?? 0;
+  const serverAlerts = serverSync?.unreadAlerts ?? 0;
+  const showServerBadges =
+    isOnline && (serverPending > 0 || serverAlerts > 0);
+  const showOfflineBar = !isOnline || pendingCount > 0 || syncing;
+
+  if (!showOfflineBar && !showServerBadges) return null;
 
   return (
-    <View style={[styles.bar, isOnline ? styles.syncing : styles.offline]}>
-      <Text style={styles.text}>
-        {syncing
-          ? `Syncing ${pendingCount} sale${pendingCount !== 1 ? 's' : ''}…`
-          : isOnline
-          ? 'Back online'
-          : `Offline — ${pendingCount} sale${pendingCount !== 1 ? 's' : ''} saved locally`}
-      </Text>
+    <View>
+      {showServerBadges ? (
+        <View style={styles.serverBar}>
+          {serverPending > 0 ? (
+            <Text style={styles.badgeText}>
+              {serverPending} approval{serverPending !== 1 ? 's' : ''}
+            </Text>
+          ) : null}
+          {serverAlerts > 0 ? (
+            <Text style={styles.badgeText}>
+              {serverAlerts} alert{serverAlerts !== 1 ? 's' : ''}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+      {showOfflineBar ? (
+        <View style={[styles.bar, isOnline ? styles.syncing : styles.offline]}>
+          <Text style={styles.text}>
+            {syncing
+              ? `Syncing ${pendingCount} sale${pendingCount !== 1 ? 's' : ''}…`
+              : isOnline
+                ? 'Back online'
+                : `Offline — ${pendingCount} sale${pendingCount !== 1 ? 's' : ''} saved locally`}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  serverBar: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 16,
+    backgroundColor: '#1E40AF',
+  },
+  badgeText: {color: '#FFFFFF', fontSize: 12, fontWeight: '600'},
   bar: {
     paddingVertical: 6,
     paddingHorizontal: 16,

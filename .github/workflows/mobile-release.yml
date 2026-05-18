@@ -1,0 +1,31 @@
+name: Mobile Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['mobile-v*']
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: smartchain-mobile
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert SSL cert present
+        run: |
+          CERT=android/app/src/main/assets/smartaccounting-cert.cer
+          if [ ! -f "$CERT" ] || [ ! -s "$CERT" ]; then
+            echo "SSL cert file missing or empty at $CERT"
+            echo "Generate from prod TLS cert and place at the path above."
+            exit 1
+          fi
+          echo "SSL cert present ($(wc -c < "$CERT") bytes)"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: smartchain-mobile/package-lock.json
+      - run: npm ci --legacy-peer-deps
+      - run: npx tsc --noEmit

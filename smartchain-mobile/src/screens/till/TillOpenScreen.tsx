@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -7,22 +7,24 @@ import {
   ScrollView,
   Alert,
   StyleSheet,
+  ActivityIndicator,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useDispatch, useSelector} from 'react-redux';
 import type {AppDispatch, RootState} from '../../store';
-import {apiClient} from '../../api/client';
+import {apiClient, isApiError} from '../../api/client';
 import {fetchTillExpected} from '../../api/retail';
+import {getCurrentTillSession, openTillSession} from '../../api/tillSessions';
 import {printerService} from '../../services/printer/BluetoothPrinterService';
 import {
+  setCurrentSessionId,
   setTillBusinessDate,
   setTillExpectedSnapshot,
   setTillRegisterCode,
 } from '../../store/slices/tillSlice';
 import {setShiftContext} from '../../store/slices/posSlice';
 import type {TillStackParamList} from '../../navigation/TillNavigator';
-import axios from 'axios';
 
 type Nav = NativeStackNavigationProp<TillStackParamList, 'TillOpen'>;
 
@@ -36,8 +38,51 @@ export default function TillOpenScreen() {
     printerService.isConnected(),
   );
   const [opening, setOpening] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
 
   const {userId, userName} = useSelector((s: RootState) => s.auth);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const session = await getCurrentTillSession();
+        dispatch(setCurrentSessionId(session.id));
+        dispatch(setTillRegisterCode(session.posRegisterCode));
+        dispatch(
+          setShiftContext({
+            posRegisterCode: session.posRegisterCode,
+            openingFloat: Number(session.openingFloat),
+            shiftStartTime: session.openedAt,
+            cashierName: userName || 'Cashier',
+          }),
+        );
+        navigation.getParent()?.navigate('POS', {screen: 'Checkout'});
+      } catch {
+        /* no open session — show open flow */
+      } finally {
+        setCheckingSession(false);
+      }
+    })();
+  }, [dispatch, navigation, userName]);
+
+  const goToPos = (
+    registerCode: string,
+    float: number,
+    sessionId: string,
+    shiftStartTime: string,
+    name: string,
+  ) => {
+    dispatch(setCurrentSessionId(sessionId));
+    dispatch(
+      setShiftContext({
+        posRegisterCode: registerCode,
+        openingFloat: float,
+        shiftStartTime,
+        cashierName: name,
+      }),
+    );
+    navigation.getParent()?.navigate('POS', {screen: 'Checkout'});
+  };
 
   const openTill = async () => {
     if (!floatAmount || Number.isNaN(Number(floatAmount))) {
@@ -65,32 +110,24 @@ export default function TillOpenScreen() {
             notes: `Shift start till ${tillCode}`,
           });
         } catch (attErr) {
-          if (!axios.isAxiosError(attErr) || attErr.response?.status !== 403) {
+          if (!isApiError(attErr) || attErr.status !== 403) {
             console.warn('Attendance record skipped:', attErr);
           }
         }
       }
 
-      dispatch(
-        setShiftContext({
-          posRegisterCode: tillCode,
-          openingFloat: Number(floatAmount),
-          shiftStartTime,
-          cashierName: name,
-        }),
-      );
+      const session = await openTillSession({
+        posRegisterCode: tillCode,
+        openingFloat: Number(floatAmount),
+      });
 
-      navigation.getParent()?.navigate('POS', {screen: 'Checkout'});
+      goToPos(tillCode, Number(floatAmount), session.id, shiftStartTime, name);
     } catch (error: unknown) {
-      const message =
-        axios.isAxiosError(error) && error.response?.data
-          ? String(
-              (error.response.data as {message?: string}).message ??
-                error.message,
-            )
-          : error instanceof Error
-            ? error.message
-            : 'Could not open till';
+      const message = isApiError(error)
+        ? String((error.body as {message?: string})?.message ?? error.message)
+        : error instanceof Error
+          ? error.message
+          : 'Could not open till';
       Alert.alert('Error', message);
     } finally {
       setOpening(false);
@@ -101,6 +138,15 @@ export default function TillOpenScreen() {
     navigation.getParent()?.navigate('Settings', {screen: 'PrinterSettings'});
     setTimeout(() => setPrinterConnected(printerService.isConnected()), 500);
   };
+
+  if (checkingSession) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator size="large" color="#1B6FDB" />
+        <Text style={styles.loadingText}>Checking till session…</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
@@ -198,6 +244,8 @@ export default function TillOpenScreen() {
 
 const styles = StyleSheet.create({
   container: {flex: 1, backgroundColor: '#F8FAFC', padding: 20},
+  loading: {flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12},
+  loadingText: {fontSize: 15, color: '#64748B'},
   title: {fontSize: 28, fontWeight: '700', color: '#0F172A', marginBottom: 4},
   subtitle: {fontSize: 15, color: '#64748B', marginBottom: 24},
   section: {marginBottom: 20},

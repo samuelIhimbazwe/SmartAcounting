@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Users } from 'lucide-react'
 import {
   approvePayrollRun,
@@ -9,6 +10,7 @@ import {
   type AttendanceSummary,
   type PayrollRun,
 } from '../../shared/api/hr'
+import { apiClient } from '../../shared/api/client'
 import { normalizeApiError } from '../../shared/api/errors'
 
 function currentPeriod() {
@@ -17,6 +19,7 @@ function currentPeriod() {
 }
 
 export function HrPayrollPage() {
+  const { t } = useTranslation()
   const [period, setPeriod] = useState(currentPeriod())
   const [summary, setSummary] = useState<AttendanceSummary | null>(null)
   const [runs, setRuns] = useState<PayrollRun[]>([])
@@ -55,6 +58,22 @@ export function HrPayrollPage() {
       setError(normalizeApiError(e).message)
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function onDownloadPayslips(runId: string) {
+    try {
+      const { data } = await apiClient.get<Blob>(`/api/v1/hr/payroll/runs/${runId}/payslips`, {
+        responseType: 'blob',
+      })
+      const url = URL.createObjectURL(data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `payslips-${runId}.zip`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      setError(normalizeApiError(e).message)
     }
   }
 
@@ -126,15 +145,44 @@ export function HrPayrollPage() {
                 <td className="px-3 py-2">
                   {run.totalGross != null ? `${run.totalGross.toLocaleString()} ${run.currencyCode ?? 'RWF'}` : '—'}
                 </td>
-                <td className="px-3 py-2 space-x-2">
+                <td className="px-3 py-2 space-x-2 flex flex-wrap gap-2">
                   {run.status === 'DRAFT' && (
-                    <button type="button" className="rounded border px-2 py-1 text-xs" onClick={() => void onApprove(run.id)}>
+                    <button
+                      type="button"
+                      data-testid="approve-run"
+                      className="rounded border px-2 py-1 text-xs"
+                      onClick={() => void onApprove(run.id)}
+                    >
                       Approve
                     </button>
                   )}
                   {run.status === 'APPROVED' && (
-                    <button type="button" className="rounded border px-2 py-1 text-xs" onClick={() => void onPost(run.id)}>
-                      Post to GL
+                    <>
+                      <button
+                        type="button"
+                        className="rounded border px-2 py-1 text-xs"
+                        onClick={() => void onPost(run.id)}
+                      >
+                        Post to GL
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="download-payslips"
+                        className="rounded border border-indigo-200 bg-indigo-50 px-2 py-1 text-xs text-indigo-800 hover:bg-indigo-100"
+                        onClick={() => void onDownloadPayslips(run.id)}
+                      >
+                        {t('pages.payroll.downloadAllPayslips')}
+                      </button>
+                    </>
+                  )}
+                  {run.status === 'POSTED' && (
+                    <button
+                      type="button"
+                      data-testid="download-payslips"
+                      className="rounded border border-indigo-200 bg-indigo-50 px-2 py-1 text-xs text-indigo-800"
+                      onClick={() => void onDownloadPayslips(run.id)}
+                    >
+                      {t('pages.payroll.downloadAllPayslips')}
                     </button>
                   )}
                 </td>

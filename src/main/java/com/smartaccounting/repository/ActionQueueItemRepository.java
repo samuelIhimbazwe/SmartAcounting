@@ -10,4 +10,6 @@ public interface ActionQueueItemRepository extends JpaRepository<ActionQueueItem
     List<ActionQueueItem> findByStatusOrderByCreatedAtAsc(String status, Pageable pageable);
     List<ActionQueueItem> findTop100ByApprovalStatusOrderByCreatedAtAsc(String approvalStatus);
     Optional<ActionQueueItem> findByIdAndTenantId(UUID id, UUID tenantId);
+
+    long countByTenantIdAndApprovalStatus(UUID tenantId, String approvalStatus);
 }
