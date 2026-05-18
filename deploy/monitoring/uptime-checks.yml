@@ -1,0 +1,18 @@
+# Provider-agnostic uptime checks (UptimeRobot / Better Uptime / etc.)
+checks:
+  - name: api-health
+    method: GET
+    url: /actuator/health
+    expect_status: 200
+    alert_after_minutes: 2
+  - name: copilot-provider-status
+    method: GET
+    url: /api/v1/ai/copilot/provider-status
+    expect_status: 200
+  - name: monitoring-login-smoke
+    method: POST
+    url: /api/v1/auth/login
+    body: { username: monitoring, password: "${MONITORING_PASSWORD}" }
+    headers: { X-Tenant-ID: "${MONITORING_TENANT_ID}" }
+    expect_status: 200
+    note: Use a dedicated monitoring tenant; do not use production CEO credentials.

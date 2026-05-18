@@ -41,12 +41,13 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         long count = incrementCounter(key);
 
         long limit = switch (endpoint) {
-            case "login" -> 12L;
+            case "login" -> 5L;
             case "mfa_challenge" -> 10L;
             default -> 30L;
         };
         if (count > limit) {
-            response.setHeader("Retry-After", "60");
+            long retrySeconds = "login".equals(endpoint) ? 900L : 60L;
+            response.setHeader("Retry-After", String.valueOf(retrySeconds));
             throw new RateLimitExceededException("Too many auth attempts. Try again later.");
         }
         filterChain.doFilter(request, response);
@@ -56,7 +57,8 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         try {
             Long count = redisTemplate.opsForValue().increment(key);
             if (count != null && count == 1) {
-                redisTemplate.expire(key, Duration.ofMinutes(1));
+                Duration ttl = key.contains(":login:") ? Duration.ofMinutes(15) : Duration.ofMinutes(1);
+                redisTemplate.expire(key, ttl);
             }
             return count == null ? 1L : count;
         } catch (RedisConnectionFailureException ex) {

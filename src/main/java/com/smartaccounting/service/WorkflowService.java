@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -48,6 +49,11 @@ public class WorkflowService {
         workflowRuleEngine.refreshCache();
         auditService.logAction("WORKFLOW_RULE_CREATED", "WORKFLOW_RULE", "{}", "{\"id\":\"" + rule.getId() + "\"}");
         return rule.getId();
+    }
+
+    @Transactional(readOnly = true)
+    public List<WorkflowRule> listRules() {
+        return workflowRuleRepository.findByTenantIdOrderByCreatedAtDesc(requireTenant());
     }
 
     private UUID requireTenant() {

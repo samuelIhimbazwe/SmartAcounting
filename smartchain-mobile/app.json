@@ -1,4 +1,14 @@
 {
-  "name": "HelloWorld",
-  "displayName": "HelloWorld"
+  "name": "SmartAccounting",
+  "displayName": "SmartAccounting",
+  "slug": "smartaccounting",
+  "version": "1.0.0",
+  "android": {
+    "package": "rw.smartaccounting.app",
+    "versionCode": 1
+  },
+  "ios": {
+    "bundleIdentifier": "rw.smartaccounting.app",
+    "buildNumber": "1"
+  }
 }

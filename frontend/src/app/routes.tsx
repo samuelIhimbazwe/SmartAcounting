@@ -24,6 +24,14 @@ import { BankReconciliationRoute } from '../features/finance/BankReconciliationR
 import { PurchaseOrdersRoute } from '../features/procurement/PurchaseOrdersRoute'
 import { HrPayrollRoute } from '../features/hr/HrPayrollRoute'
 import { EbmComplianceRoute } from '../features/compliance/EbmComplianceRoute'
+import {
+  AttendanceRoute,
+  DocumentsRoute,
+  FixedAssetsRoute,
+  MonthEndCloseRoute,
+  PaymentRunsRoute,
+  WorkflowRulesRoute,
+} from '../features/production/ProductionRoutes'
 
 export const appRoutes: RouteObject[] = [
   {
@@ -50,7 +58,12 @@ export const appRoutes: RouteObject[] = [
       { path: '/finance/bank-accounts', element: <BankReconciliationRoute /> },
       { path: '/procurement/purchase-orders', element: <PurchaseOrdersRoute /> },
       { path: '/hr/payroll', element: <HrPayrollRoute /> },
-      { path: '/hr/attendance', element: <HrPayrollRoute /> },
+      { path: '/hr/attendance', element: <AttendanceRoute /> },
+      { path: '/finance/payment-runs', element: <PaymentRunsRoute /> },
+      { path: '/finance/assets', element: <FixedAssetsRoute /> },
+      { path: '/finance/close', element: <MonthEndCloseRoute /> },
+      { path: '/admin/workflow-rules', element: <WorkflowRulesRoute /> },
+      { path: '/documents', element: <DocumentsRoute /> },
       { path: '/compliance/ebm', element: <EbmComplianceRoute /> },
       { path: '/settings', element: <SettingsRoute /> },
       { path: '/unauthorized', element: <UnauthorizedPage /> },

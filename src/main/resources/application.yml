@@ -69,6 +69,10 @@ logging:
   pattern:
     level: "corr=%X{correlationId:-na} tenant=%X{tenantId:-na} user=%X{userId:-na} %5p"
 
+smartchain:
+  fcm:
+    service-account-path: ${FCM_SERVICE_ACCOUNT_PATH:}
+
 smartaccounting:
   auth:
     demo-fallback-enabled: ${SMARTACCOUNTING_AUTH_DEMO_FALLBACK:true}

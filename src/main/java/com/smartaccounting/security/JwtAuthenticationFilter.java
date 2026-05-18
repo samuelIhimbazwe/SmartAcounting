@@ -26,9 +26,11 @@ import java.util.UUID;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
+    private final JwtRevocationService jwtRevocationService;
 
-    public JwtAuthenticationFilter(JwtService jwtService) {
+    public JwtAuthenticationFilter(JwtService jwtService, JwtRevocationService jwtRevocationService) {
         this.jwtService = jwtService;
+        this.jwtRevocationService = jwtRevocationService;
     }
 
     @Override
@@ -39,6 +41,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (token != null && !token.isEmpty()) {
             try {
                 Claims claims = jwtService.parse(token);
+                if (jwtRevocationService.isRevoked(claims.getId())) {
+                    SecurityContextHolder.clearContext();
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    return;
+                }
                 String username = claims.getSubject();
                 String tenantId = claims.get("tenantId", String.class);
                 String userId = claims.get("userId", String.class);

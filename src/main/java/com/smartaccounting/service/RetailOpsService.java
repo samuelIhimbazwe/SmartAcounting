@@ -52,6 +52,7 @@ public class RetailOpsService {
     private final PosProperties posProperties;
     private final LabelProperties labelProperties;
     private final AuditService auditService;
+    private final PushNotificationService pushNotificationService;
 
     public RetailOpsService(ProductRepository productRepository,
                             PosCatalogItemRepository posCatalogItemRepository,
@@ -61,7 +62,8 @@ public class RetailOpsService {
                             CurrencyService currencyService,
                             PosProperties posProperties,
                             LabelProperties labelProperties,
-                            AuditService auditService) {
+                            AuditService auditService,
+                            PushNotificationService pushNotificationService) {
         this.productRepository = productRepository;
         this.posCatalogItemRepository = posCatalogItemRepository;
         this.inventoryBatchRepository = inventoryBatchRepository;
@@ -71,6 +73,7 @@ public class RetailOpsService {
         this.posProperties = posProperties;
         this.labelProperties = labelProperties;
         this.auditService = auditService;
+        this.pushNotificationService = pushNotificationService;
     }
 
     @Transactional(readOnly = true)
@@ -187,6 +190,25 @@ public class RetailOpsService {
         }
 
         auditService.logAction("POS_TILL_CLOSED", "POS_TILL_CLOSE", "{}", "{\"id\":\"" + row.getId() + "\"}");
+
+        BigDecimal totalVariance = row.getVarianceCash().abs()
+            .add(row.getVarianceMomo().abs())
+            .add(row.getVarianceAirtel().abs())
+            .add(row.getVarianceCard().abs())
+            .add(row.getVarianceOnAccount().abs());
+        if (totalVariance.compareTo(new BigDecimal("0.01")) > 0) {
+            pushNotificationService.sendToRole(
+                tenant.toString(),
+                "ACCOUNTING_CONTROLLER",
+                "Till Variance",
+                "Till " + reg + " has a variance of "
+                    + totalVariance.setScale(2, RoundingMode.HALF_UP).toPlainString() + " FRW",
+                Map.of(
+                    "type", "TILL_VARIANCE",
+                    "route", "/till"
+                )
+            );
+        }
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("tillCloseId", row.getId());

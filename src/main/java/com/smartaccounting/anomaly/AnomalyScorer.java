@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartaccounting.entity.AnomalyCase;
 import com.smartaccounting.events.DomainEventPublisher;
 import com.smartaccounting.repository.AnomalyCaseRepository;
+import com.smartaccounting.service.PushNotificationService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -21,15 +22,18 @@ public class AnomalyScorer {
     private final AnomalyCaseRepository anomalyCaseRepository;
     private final DomainEventPublisher eventPublisher;
     private final ObjectMapper objectMapper;
+    private final PushNotificationService pushNotificationService;
 
     public AnomalyScorer(JdbcTemplate jdbcTemplate,
                          AnomalyCaseRepository anomalyCaseRepository,
                          DomainEventPublisher eventPublisher,
-                         ObjectMapper objectMapper) {
+                         ObjectMapper objectMapper,
+                         PushNotificationService pushNotificationService) {
         this.jdbcTemplate = jdbcTemplate;
         this.anomalyCaseRepository = anomalyCaseRepository;
         this.eventPublisher = eventPublisher;
         this.objectMapper = objectMapper;
+        this.pushNotificationService = pushNotificationService;
     }
 
     @Scheduled(fixedDelayString = "${smartaccounting.anomaly.scan-delay-ms:300000}")
@@ -84,6 +88,19 @@ public class AnomalyScorer {
                 "severity", c.getSeverity(),
                 "title", c.getTitle()
             ));
+        }
+        if ("CRITICAL".equals(c.getSeverity())) {
+            pushNotificationService.sendToRole(
+                tenant.toString(),
+                "CEO",
+                "Critical Alert",
+                c.getDetails() != null ? c.getDetails() : c.getTitle(),
+                Map.of(
+                    "type", "ANOMALY",
+                    "route", "/anomaly/cases",
+                    "anomalyId", c.getId().toString()
+                )
+            );
         }
     }
 }

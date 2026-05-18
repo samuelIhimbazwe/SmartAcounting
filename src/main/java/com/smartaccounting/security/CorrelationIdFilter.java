@@ -24,11 +24,13 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
             correlationId = UUID.randomUUID().toString();
         }
         MDC.put("correlationId", correlationId);
+        MDC.put("traceId", correlationId);
         response.setHeader(CORRELATION_ID_HEADER, correlationId);
         try {
             filterChain.doFilter(request, response);
         } finally {
             MDC.remove("correlationId");
+            MDC.remove("traceId");
         }
     }
 }

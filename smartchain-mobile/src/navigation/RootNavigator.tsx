@@ -1,5 +1,6 @@
 import React, {useEffect} from 'react';
 import {NavigationContainer} from '@react-navigation/native';
+import {navigationRef} from './navigationRef';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {useSelector} from 'react-redux';
 import type {RootState} from '../store';
@@ -32,7 +33,7 @@ export default function RootNavigator() {
   }, [token, tenantId, role]);
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator screenOptions={{headerShown: false}}>
         {token ? (
           <Stack.Screen name="App" component={AppNavigator} />

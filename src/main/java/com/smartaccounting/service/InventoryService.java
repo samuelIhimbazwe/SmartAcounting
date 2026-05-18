@@ -46,6 +46,7 @@ public class InventoryService {
     private final PosCatalogItemRepository posCatalogItemRepository;
     private final ProductRepository productRepository;
     private final NotificationService notificationService;
+    private final PushNotificationService pushNotificationService;
 
     public InventoryService(EventLogService eventLogService,
                             DomainEventPublisher eventPublisher,
@@ -55,7 +56,8 @@ public class InventoryService {
                             PosProperties posProperties,
                             PosCatalogItemRepository posCatalogItemRepository,
                             ProductRepository productRepository,
-                            NotificationService notificationService) {
+                            NotificationService notificationService,
+                            PushNotificationService pushNotificationService) {
         this.eventLogService = eventLogService;
         this.eventPublisher = eventPublisher;
         this.inventoryBatchRepository = inventoryBatchRepository;
@@ -65,6 +67,7 @@ public class InventoryService {
         this.posCatalogItemRepository = posCatalogItemRepository;
         this.productRepository = productRepository;
         this.notificationService = notificationService;
+        this.pushNotificationService = pushNotificationService;
     }
 
     @Transactional
@@ -371,6 +374,20 @@ public class InventoryService {
             } catch (Exception ex) {
                 log.warn("LOW_STOCK notification emit failed: {}", ex.getMessage());
             }
+            String productName = productRepository.findById(productId)
+                .map(Product::getName)
+                .orElse(barcodeLabel != null ? barcodeLabel : "Product");
+            pushNotificationService.sendToRole(
+                tenant.toString(),
+                "OPS_MANAGER",
+                "Low Stock Alert",
+                productName + " is below reorder point",
+                Map.of(
+                    "type", "LOW_STOCK",
+                    "route", "/stock",
+                    "productId", productId.toString()
+                )
+            );
         }
         return allocations;
     }

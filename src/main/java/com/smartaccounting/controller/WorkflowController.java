@@ -12,7 +12,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.smartaccounting.entity.WorkflowRule;
+
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -23,6 +26,12 @@ public class WorkflowController {
 
     public WorkflowController(WorkflowService workflowService) {
         this.workflowService = workflowService;
+    }
+
+    @GetMapping("/rules")
+    @PreAuthorize("hasRole('CEO') or hasRole('CFO')")
+    public List<WorkflowRule> listRules() {
+        return workflowService.listRules();
     }
 
     @PostMapping("/rules")

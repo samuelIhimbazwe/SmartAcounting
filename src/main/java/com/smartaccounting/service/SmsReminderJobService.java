@@ -19,13 +19,16 @@ public class SmsReminderJobService {
     private final InvoiceRepository invoiceRepository;
     private final SmsDispatchService smsDispatchService;
     private final AuditService auditService;
+    private final PushNotificationService pushNotificationService;
 
     public SmsReminderJobService(InvoiceRepository invoiceRepository,
                                  SmsDispatchService smsDispatchService,
-                                 AuditService auditService) {
+                                 AuditService auditService,
+                                 PushNotificationService pushNotificationService) {
         this.invoiceRepository = invoiceRepository;
         this.smsDispatchService = smsDispatchService;
         this.auditService = auditService;
+        this.pushNotificationService = pushNotificationService;
     }
 
     @Transactional
@@ -40,6 +43,22 @@ public class SmsReminderJobService {
                 continue;
             }
             long daysUntilDue = ChronoUnit.DAYS.between(today, invoice.getDueDate());
+            if (daysUntilDue < 0
+                && (invoice.getLastReminderSentDate() == null
+                    || !invoice.getLastReminderSentDate().equals(today))) {
+                pushNotificationService.sendToRole(
+                    tenantId.toString(),
+                    "SALES_MANAGER",
+                    "Overdue Payment",
+                    invoice.getCustomerName() + " — "
+                        + formatAmount(invoice.getAmount()) + " FRW overdue",
+                    Map.of(
+                        "type", "OVERDUE_AR",
+                        "route", "/credit-ledger"
+                    )
+                );
+                continue;
+            }
             long originalTermDays = ChronoUnit.DAYS.between(
                 invoice.getCreatedAt().atZone(java.time.ZoneOffset.UTC).toLocalDate(),
                 invoice.getDueDate()
@@ -121,6 +140,13 @@ public class SmsReminderJobService {
 
     private int normalizedReminderCount(Invoice invoice) {
         return invoice.getReminderCount() == null ? 0 : Math.max(0, invoice.getReminderCount());
+    }
+
+    private static String formatAmount(java.math.BigDecimal amount) {
+        if (amount == null) {
+            return "0";
+        }
+        return amount.setScale(0, java.math.RoundingMode.HALF_UP).toPlainString();
     }
 
     private UUID requireTenant() {

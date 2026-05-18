@@ -8,6 +8,7 @@ import {
   type LoginBody,
   type SessionPayload,
 } from '../../api/auth';
+import {setUserContext} from '../../services/crashReporting';
 
 export interface AuthState {
   accessToken: string | null;
@@ -82,6 +83,10 @@ function applySession(state: AuthState, session: SessionPayload) {
   state.role = pickPrimaryRole(session.roles);
   state.userName = session.userName;
   setItem('refreshToken', session.refreshToken);
+  const role = pickPrimaryRole(session.roles);
+  if (session.userId && session.tenantId && role) {
+    setUserContext(session.userId, session.tenantId, role);
+  }
 }
 
 export const loginWithPassword = createAsyncThunk<

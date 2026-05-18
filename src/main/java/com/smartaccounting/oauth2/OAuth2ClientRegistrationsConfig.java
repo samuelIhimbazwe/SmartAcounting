@@ -34,6 +34,9 @@ public class OAuth2ClientRegistrationsConfig {
         if (StringUtils.hasText(microsoftClientId) && StringUtils.hasText(microsoftClientSecret)) {
             registrations.add(microsoftRegistration(microsoftClientId, microsoftClientSecret));
         }
+        if (registrations.isEmpty()) {
+            return registrationId -> null;
+        }
         return new InMemoryClientRegistrationRepository(registrations);
     }
 

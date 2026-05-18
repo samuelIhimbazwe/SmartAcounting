@@ -2,10 +2,13 @@ package com.smartaccounting.controller;
 
 import com.smartaccounting.dto.NotificationEventRequest;
 import com.smartaccounting.dto.NotificationRuleRequest;
+import com.smartaccounting.dto.PushTokenRequest;
 import com.smartaccounting.entity.NotificationEvent;
 import com.smartaccounting.entity.NotificationRule;
 import com.smartaccounting.entity.NotificationSmsDeliveryLog;
 import com.smartaccounting.service.NotificationService;
+import com.smartaccounting.service.PushNotificationService;
+import com.smartaccounting.tenant.TenantContext;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -22,9 +25,25 @@ import java.util.UUID;
 @RequestMapping("/api/v1/notifications")
 public class NotificationController {
     private final NotificationService service;
+    private final PushNotificationService pushNotificationService;
 
-    public NotificationController(NotificationService service) {
+    public NotificationController(NotificationService service,
+                                  PushNotificationService pushNotificationService) {
         this.service = service;
+        this.pushNotificationService = pushNotificationService;
+    }
+
+    @PostMapping("/push-token")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Void> registerPushToken(@RequestBody @Valid PushTokenRequest request) {
+        UUID tenantId = TenantContext.tenantId();
+        UUID userId = TenantContext.userId();
+        if (tenantId == null || userId == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        pushNotificationService.registerToken(
+            tenantId, userId, request.getToken(), request.getPlatform(), request.getAppVersion());
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping("/rules")

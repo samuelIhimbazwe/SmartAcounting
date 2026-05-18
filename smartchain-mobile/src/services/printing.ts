@@ -1,21 +1,27 @@
-import {Platform} from 'react-native';
-import {printReceiptEscPos} from '../api/pos';
+import {Platform, Alert} from 'react-native';
+import {printerService} from './printer/BluetoothPrinterService';
 
 export async function printReceipt(transactionId: string): Promise<void> {
-  const data = await printReceiptEscPos(transactionId);
-  const escpos = data.escPos ?? '';
-
   if (Platform.OS === 'android') {
-    await printViaBluetooth(escpos);
-  } else {
-    await printViaAirPrint(escpos);
+    await printerService.printReceipt(transactionId);
+    return;
   }
+  Alert.alert(
+    'Printing',
+    'Bluetooth receipt printing is available on Android. Use the web app for iOS receipts.',
+  );
 }
 
-async function printViaBluetooth(escposData: string): Promise<void> {
-  console.log('Bluetooth ESC/POS payload length:', escposData.length);
-}
-
-async function printViaAirPrint(htmlOrText: string): Promise<void> {
-  console.log('AirPrint payload length:', htmlOrText.length);
+export async function printReceiptWithAlert(transactionId: string): Promise<void> {
+  try {
+    await printReceipt(transactionId);
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : 'Print failed';
+    Alert.alert(
+      'Print failed',
+      `${message}\n\nThe sale was recorded successfully.`,
+      [{text: 'OK'}],
+    );
+  }
 }

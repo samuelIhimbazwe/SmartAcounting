@@ -12,6 +12,7 @@ import PosNavigator from './PosNavigator';
 import StockNavigator from './StockNavigator';
 import TillNavigator from './TillNavigator';
 import OwnerDashboardScreen from '../screens/dashboard/OwnerDashboardScreen';
+import SettingsNavigator from './SettingsNavigator';
 
 const Tab = createBottomTabNavigator();
 
@@ -86,6 +87,13 @@ export default function AppNavigator() {
               }}
             />
           ) : null}
+          <Tab.Screen
+            name="Settings"
+            component={SettingsNavigator}
+            options={{
+              tabBarIcon: p => tabIcon('cog-outline', p.color, p.size),
+            }}
+          />
         </Tab.Navigator>
       </View>
     </SafeAreaView>

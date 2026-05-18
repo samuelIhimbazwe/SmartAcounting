@@ -2,7 +2,7 @@
 # Usage:
 #   cp .env.production.example .env.production
 #   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
-# Web: http://localhost  API health: http://localhost/api/actuator/health/readiness (via proxy)
+# Web: http://localhost  API: http://localhost/api/actuator/health/readiness
 
 services:
   postgres:
@@ -12,9 +12,21 @@ services:
       POSTGRES_USER: ${DB_USERNAME:-smartchain}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env.production}
       POSTGRES_DB: ${DB_NAME:-smartchain}
+    command: >
+      postgres
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=768MB
+      -c work_mem=4MB
+      -c maintenance_work_mem=64MB
+      -c wal_level=replica
+      -c archive_mode=on
+      -c log_min_duration_statement=1000
+      -c log_connections=on
     volumes:
       - smartchain-pgdata-prod:/var/lib/postgresql/data
       - ./docker/postgres/init-01-vector.sql:/docker-entrypoint-initdb.d/01-vector.sql
+      - ./scripts/backup-prod.sh:/scripts/backup-prod.sh:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U ${DB_USERNAME:-smartchain} -d ${DB_NAME:-smartchain}']
       interval: 5s
@@ -53,6 +65,7 @@ services:
       SMARTACCOUNTING_AI_FAIL_ON_MISSING_PROVIDER_KEYS: ${SMARTACCOUNTING_AI_FAIL_ON_MISSING_PROVIDER_KEYS:-true}
       MOBILE_MONEY_MTN_WEBHOOK_SECRET: ${MOBILE_MONEY_MTN_WEBHOOK_SECRET:-}
       MOBILE_MONEY_AIRTEL_WEBHOOK_SECRET: ${MOBILE_MONEY_AIRTEL_WEBHOOK_SECRET:-}
+      MOMO_ALLOWED_IPS: ${MOMO_ALLOWED_IPS:-}
       SMS_ENABLED: ${SMS_ENABLED:-false}
       SMS_PROVIDER_URL: ${SMS_PROVIDER_URL:-}
       SMS_BEARER_TOKEN: ${SMS_BEARER_TOKEN:-}
@@ -83,13 +96,31 @@ services:
       dockerfile: frontend/Dockerfile
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
     restart: unless-stopped
     ports:
       - "${WEB_PORT:-80}:80"
+      - "${WEB_TLS_PORT:-443}:443"
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - certbot-www:/var/www/certbot
+      - letsencrypt:/etc/letsencrypt:ro
     depends_on:
       api:
         condition: service_healthy
 
+  certbot:
+    build:
+      context: ./deploy/certbot
+    profiles: ["tls"]
+    volumes:
+      - certbot-www:/var/www/certbot
+      - letsencrypt:/etc/letsencrypt
+    entrypoint: /bin/sh
+    command: -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h; done"
+
 volumes:
   smartchain-pgdata-prod:
   smartchain-redis-prod:
+  certbot-www:
+  letsencrypt:

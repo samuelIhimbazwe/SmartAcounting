@@ -11,9 +11,22 @@ This document maps the eight-step production rollout to what is implemented in t
 | API container | `Dockerfile` (non-root, healthcheck) |
 | Static web + reverse proxy | `frontend/Dockerfile`, `deploy/nginx/nginx.conf` |
 | One-command prod start | `scripts/prod-up.ps1` |
-| DB backup script | `scripts/backup.sh` (cron on host; adjust container name) |
+| DB backup script | `scripts/backup-prod.sh`, `deploy/cron/backup.cron` |
+| Monitoring stack | `deploy/monitoring/docker-compose.monitoring.yml` |
+| Makefile targets | `Makefile` (`prod-up`, `smoke`, `backup`, …) |
 
-**You still provide:** TLS certificate (Let's Encrypt / load balancer), managed Postgres/Redis in cloud, DNS, firewall.
+**TLS (Let's Encrypt):**
+
+```bash
+docker compose -f docker-compose.prod.yml run --rm certbot certonly \
+  --webroot -w /var/www/certbot -d ${DOMAIN} --email ${ADMIN_EMAIL} --agree-tos
+# Render deploy/nginx/nginx-ssl.conf.template with DOMAIN, mount on nginx, expose 443
+docker compose -f docker-compose.prod.yml --profile tls up -d
+```
+
+Renewal: `deploy/certbot/renew.sh` (cron or certbot service profile `tls`).
+
+**You still provide:** managed Postgres/Redis in cloud, DNS, firewall.
 
 ```powershell
 copy .env.production.example .env.production

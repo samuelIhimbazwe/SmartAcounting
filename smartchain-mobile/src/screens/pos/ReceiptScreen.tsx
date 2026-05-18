@@ -3,7 +3,7 @@ import {StyleSheet, Text, View} from 'react-native';
 import {Button} from 'react-native-paper';
 import {useSelector} from 'react-redux';
 import type {RootState} from '../../store';
-import {printReceipt} from '../../services/printing';
+import {printReceiptWithAlert} from '../../services/printing';
 
 export default function ReceiptScreen() {
   const txId = useSelector((s: RootState) => s.pos.lastTransactionId);
@@ -12,11 +12,7 @@ export default function ReceiptScreen() {
     if (!txId) {
       return;
     }
-    try {
-      await printReceipt(txId);
-    } catch (e) {
-      console.warn(e);
-    }
+    await printReceiptWithAlert(txId);
   };
 
   return (

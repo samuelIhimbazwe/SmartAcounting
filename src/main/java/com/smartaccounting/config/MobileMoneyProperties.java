@@ -8,6 +8,7 @@ import java.util.UUID;
 public class MobileMoneyProperties {
     private String mtnWebhookSecret = "";
     private String airtelWebhookSecret = "";
+    private String mtnAllowedIps = "";
     private UUID webhookActorUserId = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
     public String getMtnWebhookSecret() {
@@ -24,6 +25,14 @@ public class MobileMoneyProperties {
 
     public void setAirtelWebhookSecret(String airtelWebhookSecret) {
         this.airtelWebhookSecret = airtelWebhookSecret;
+    }
+
+    public String getMtnAllowedIps() {
+        return mtnAllowedIps;
+    }
+
+    public void setMtnAllowedIps(String mtnAllowedIps) {
+        this.mtnAllowedIps = mtnAllowedIps;
     }
 
     public UUID getWebhookActorUserId() {

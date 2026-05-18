@@ -10,6 +10,7 @@ import com.smartaccounting.dto.RefreshRequest;
 import com.smartaccounting.service.OidcAuthService;
 import com.smartaccounting.signup.DbUserLoginValidator;
 import com.smartaccounting.signup.LoginIdentityService;
+import com.smartaccounting.security.JwtRevocationService;
 import com.smartaccounting.security.JwtService;
 import com.smartaccounting.security.MfaService;
 import com.smartaccounting.security.RefreshTokenService;
@@ -21,6 +22,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -37,6 +39,7 @@ public class AuthController {
     private final DbUserLoginValidator dbUserLoginValidator;
     private final OidcAuthService oidcAuthService;
     private final LoginIdentityService loginIdentityService;
+    private final JwtRevocationService jwtRevocationService;
 
     public AuthController(AuthenticationManager authenticationManager,
                           UserDetailsService userDetailsService,
@@ -45,7 +48,8 @@ public class AuthController {
                           MfaService mfaService,
                           DbUserLoginValidator dbUserLoginValidator,
                           OidcAuthService oidcAuthService,
-                          LoginIdentityService loginIdentityService) {
+                          LoginIdentityService loginIdentityService,
+                          JwtRevocationService jwtRevocationService) {
         this.authenticationManager = authenticationManager;
         this.userDetailsService = userDetailsService;
         this.jwtService = jwtService;
@@ -54,6 +58,7 @@ public class AuthController {
         this.dbUserLoginValidator = dbUserLoginValidator;
         this.oidcAuthService = oidcAuthService;
         this.loginIdentityService = loginIdentityService;
+        this.jwtRevocationService = jwtRevocationService;
     }
 
     @PostMapping("/oauth-login")
@@ -138,7 +143,16 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public void logout(@RequestBody @Valid RefreshRequest request) {
+    public void logout(@RequestBody @Valid RefreshRequest request,
+                       @RequestHeader(value = "Authorization", required = false) String authorization) {
         refreshTokenService.revoke(request.refreshToken());
+        if (authorization != null && authorization.startsWith("Bearer ")) {
+            try {
+                var claims = jwtService.parse(authorization.substring(7).trim());
+                jwtRevocationService.revoke(claims.getId(), claims.getExpiration());
+            } catch (RuntimeException ignored) {
+                // access token already invalid
+            }
+        }
     }
 }

@@ -4,14 +4,17 @@ import com.smartaccounting.oauth2.CookieOAuth2AuthorizationRequestRepository;
 import com.smartaccounting.oauth2.OAuth2AuthenticationFailureHandler;
 import com.smartaccounting.oauth2.OAuth2AuthenticationSuccessHandler;
 import com.smartaccounting.oauth2.SmartChainOAuth2UserService;
+import com.smartaccounting.security.ApiKeyScopeAuthorizationFilter;
 import com.smartaccounting.security.AuthRateLimitFilter;
 import com.smartaccounting.security.ApiKeyAuthenticationFilter;
 import com.smartaccounting.security.ApiVersionDeprecationFilter;
 import com.smartaccounting.security.CorrelationIdFilter;
 import com.smartaccounting.security.JwtAuthenticationFilter;
+import com.smartaccounting.security.PublicApiRateLimitFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.Customizer;
@@ -39,8 +42,11 @@ public class SecurityConfig {
         JwtAuthenticationFilter jwtAuthenticationFilter,
         CorrelationIdFilter correlationIdFilter,
         AuthRateLimitFilter authRateLimitFilter,
+        PublicApiRateLimitFilter publicApiRateLimitFilter,
         ApiKeyAuthenticationFilter apiKeyAuthenticationFilter,
+        ApiKeyScopeAuthorizationFilter apiKeyScopeAuthorizationFilter,
         ApiVersionDeprecationFilter apiVersionDeprecationFilter,
+        Environment environment,
         ClientRegistrationRepository clientRegistrationRepository,
         CookieOAuth2AuthorizationRequestRepository oauth2AuthorizationRequestRepository,
         OAuth2AuthenticationSuccessHandler oauth2SuccessHandler,
@@ -49,7 +55,11 @@ public class SecurityConfig {
     ) throws Exception {
         http
             .cors(Customizer.withDefaults())
-            .csrf(csrf -> csrf.disable())
+            .csrf(csrf -> csrf.disable());
+        if (java.util.Arrays.asList(environment.getActiveProfiles()).contains("prod")) {
+            ProdSecurityHeadersConfig.applyProdHeaders(http);
+        }
+        http
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/health", "/actuator/health/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
@@ -72,9 +82,11 @@ public class SecurityConfig {
             )
             .addFilterBefore(correlationIdFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterAfter(apiVersionDeprecationFilter, CorrelationIdFilter.class)
-            .addFilterAfter(authRateLimitFilter, CorrelationIdFilter.class)
+            .addFilterAfter(publicApiRateLimitFilter, CorrelationIdFilter.class)
+            .addFilterAfter(authRateLimitFilter, PublicApiRateLimitFilter.class)
             .addFilterAfter(apiKeyAuthenticationFilter, AuthRateLimitFilter.class)
-            .addFilterAfter(jwtAuthenticationFilter, AuthRateLimitFilter.class);
+            .addFilterAfter(apiKeyScopeAuthorizationFilter, ApiKeyAuthenticationFilter.class)
+            .addFilterAfter(jwtAuthenticationFilter, ApiKeyScopeAuthorizationFilter.class);
 
         if (hasOAuth2Clients(clientRegistrationRepository)) {
             http.oauth2Login(oauth -> oauth

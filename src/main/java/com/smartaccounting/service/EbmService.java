@@ -1,5 +1,6 @@
 package com.smartaccounting.service;
 
+import com.smartaccounting.compliance.EbmAuditService;
 import com.smartaccounting.dto.EbmApiResponse;
 import com.smartaccounting.dto.EbmComplianceReport;
 import com.smartaccounting.dto.EbmConfigRequest;
@@ -34,11 +35,15 @@ public class EbmService {
 
     private final EbmConfigRepository ebmConfigRepository;
     private final EbmReceiptRepository ebmReceiptRepository;
+    private final EbmAuditService ebmAuditService;
     private final RestClient restClient = RestClient.create();
 
-    public EbmService(EbmConfigRepository ebmConfigRepository, EbmReceiptRepository ebmReceiptRepository) {
+    public EbmService(EbmConfigRepository ebmConfigRepository,
+                      EbmReceiptRepository ebmReceiptRepository,
+                      EbmAuditService ebmAuditService) {
         this.ebmConfigRepository = ebmConfigRepository;
         this.ebmReceiptRepository = ebmReceiptRepository;
+        this.ebmAuditService = ebmAuditService;
     }
 
     @Async
@@ -180,13 +185,20 @@ public class EbmService {
             "grossAmount", receipt.getGrossAmount(),
             "currency", receipt.getCurrencyCode()
         );
-        return restClient.post()
-            .uri(config.getEbmApiUrl() + "/receipts")
-            .header("X-API-Key", config.getEbmApiKey() != null ? config.getEbmApiKey() : "")
-            .contentType(MediaType.APPLICATION_JSON)
-            .body(payload)
-            .retrieve()
-            .body(EbmApiResponse.class);
+        try {
+            EbmApiResponse response = restClient.post()
+                .uri(config.getEbmApiUrl() + "/receipts")
+                .header("X-API-Key", config.getEbmApiKey() != null ? config.getEbmApiKey() : "")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(payload)
+                .retrieve()
+                .body(EbmApiResponse.class);
+            ebmAuditService.record(receipt.getTenantId(), receipt.getId(), payload, response, "SUCCESS", null);
+            return response;
+        } catch (Exception ex) {
+            ebmAuditService.record(receipt.getTenantId(), receipt.getId(), payload, null, "FAILED", ex.getMessage());
+            throw ex;
+        }
     }
 
     private UUID requireTenant() {

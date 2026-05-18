@@ -1,0 +1,1 @@
+0 2 * * * /opt/smartaccounting/scripts/backup-prod.sh >> /var/log/smartaccounting-backup.log 2>&1

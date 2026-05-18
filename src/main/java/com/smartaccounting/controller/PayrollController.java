@@ -3,8 +3,11 @@ package com.smartaccounting.controller;
 import com.smartaccounting.dto.PayrollRunDetail;
 import com.smartaccounting.entity.PayrollLine;
 import com.smartaccounting.entity.PayrollRun;
+import com.smartaccounting.compliance.PayrollFilingService;
 import com.smartaccounting.service.PayrollService;
 import com.smartaccounting.tenant.TenantContext;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,9 +25,11 @@ import java.util.UUID;
 @RequestMapping("/api/v1/hr/payroll")
 public class PayrollController {
     private final PayrollService payrollService;
+    private final PayrollFilingService payrollFilingService;
 
-    public PayrollController(PayrollService payrollService) {
+    public PayrollController(PayrollService payrollService, PayrollFilingService payrollFilingService) {
         this.payrollService = payrollService;
+        this.payrollFilingService = payrollFilingService;
     }
 
     @PostMapping("/runs")
@@ -70,6 +75,16 @@ public class PayrollController {
         @PathVariable UUID runId,
         @PathVariable UUID employeeId) {
         return ResponseEntity.ok(payrollService.generatePayslip(runId, employeeId));
+    }
+
+    @GetMapping("/runs/{runId}/paye-export")
+    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'HR_MANAGER', 'ACCOUNTING_CONTROLLER')")
+    public ResponseEntity<byte[]> payeExport(@PathVariable UUID runId) {
+        byte[] csv = payrollFilingService.exportPayeCsv(runId);
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=paye-" + runId + ".csv")
+            .contentType(MediaType.parseMediaType("text/csv"))
+            .body(csv);
     }
 
     private UUID currentUserId() {

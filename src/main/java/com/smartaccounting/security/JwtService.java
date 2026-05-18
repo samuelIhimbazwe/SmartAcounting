@@ -21,6 +21,7 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -54,8 +55,10 @@ public class JwtService {
             .map(GrantedAuthority::getAuthority)
             .collect(Collectors.toSet());
         SecretKey activeKey = Keys.hmacShaKeyFor(resolveActiveSecret().getBytes(StandardCharsets.UTF_8));
+        String jti = UUID.randomUUID().toString();
         return Jwts.builder()
             .header().add("kid", currentKid).and()
+            .id(jti)
             .subject(userDetails.getUsername())
             .issuedAt(Date.from(now))
             .expiration(Date.from(expiresAt))

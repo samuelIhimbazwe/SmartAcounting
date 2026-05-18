@@ -1,4 +1,7 @@
 import React from 'react';
+import {initCrashReporting} from './src/services/crashReporting';
+
+initCrashReporting();
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {Provider} from 'react-redux';
