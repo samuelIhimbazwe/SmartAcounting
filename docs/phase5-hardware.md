@@ -41,6 +41,6 @@ npx tsc --noEmit
 
 ### Jest “4 skipped” in local runs
 
-All four skips come from `__tests__/staging.apiContract.test.ts` when `STAGING_API_URL` is unset (and two more cases skip without `CONTRACT_*` creds). That is **staging environment**, not missing hardware — expected on a dev laptop. CI runs them when secrets are configured. There are no hardware-dependent `it.skip` tests in the mobile suite; physical printer/scanner checks use [phase5-hardware.md](./phase5-hardware.md) manual checklist instead.
+All four skips come from `__tests__/staging.apiContract.test.ts` when `STAGING_API_URL` is unset (and two cases skip without `CONTRACT_*` creds). Each skip is annotated **not HARDWARE_REQUIRED** and **not a logic TODO** — contract logic is implemented. Physical printer/scanner checks use the manual checklist below; there are no `it.skip` hardware tests in Jest.
 
 Coverage baseline: [phase5-coverage-baseline.txt](./phase5-coverage-baseline.txt).

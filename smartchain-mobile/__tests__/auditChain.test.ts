@@ -49,42 +49,34 @@ describe('auditChain', () => {
   });
 
   it('hash chain stays valid across mixed event types', () => {
+    let previousHash = GENESIS_HASH;
     const buildEntry = (
-      action: string,
-      entityId: string,
       entityType: string,
-      previousHash: string,
+      entityId: string,
+      action: string,
       timestamp: string,
-    ) =>
-      appendAuditEntry(previousHash, {
+    ) => {
+      const entry = appendAuditEntry(previousHash, {
         entityType,
         entityId,
         action,
         actorId: 'manager-1',
         timestamp,
       });
+      previousHash = entry.hash;
+      return entry;
+    };
 
-    const sale1 = buildEntry(
-      'POS_CHECKOUT',
-      'sale-1',
-      'SALE',
-      GENESIS_HASH,
-      '2026-05-19T10:00:00.000Z',
-    );
-    const drawer = buildEntry(
-      'CASH_DRAWER_OPEN',
-      'drawer-1',
-      'TILL',
-      sale1.hash,
-      '2026-05-19T10:05:00.000Z',
-    );
-    const sale2 = buildEntry(
-      'POS_CHECKOUT',
-      'sale-2',
-      'SALE',
-      drawer.hash,
-      '2026-05-19T10:10:00.000Z',
-    );
-    expect(verifyAuditChain([sale1, drawer, sale2])).toBe(true);
+    const entries = [
+      buildEntry('SALE', 'sale-1', 'POS_CHECKOUT', '2026-05-19T10:00:00.000Z'),
+      buildEntry(
+        'TILL',
+        'drawer-1',
+        'CASH_DRAWER_OPEN',
+        '2026-05-19T10:05:00.000Z',
+      ),
+      buildEntry('SALE', 'sale-2', 'POS_CHECKOUT', '2026-05-19T10:10:00.000Z'),
+    ];
+    expect(verifyAuditChain(entries)).toBe(true);
   });
 });

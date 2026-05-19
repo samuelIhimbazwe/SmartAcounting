@@ -1,9 +1,8 @@
 /**
  * Live staging API contract checks for mobile-critical endpoints.
  *
- * NOT a device/E2E test — runs in Node/Jest against a real staging URL.
- * The whole suite is skipped when STAGING_API_URL is unset (local dev default).
- * Individual login/session cases also skip when CONTRACT_* creds are missing.
+ * Skips in local Jest (4 tests) are STAGING_ENV_REQUIRED — not hardware, not logic TODOs.
+ * Logic is implemented; run with STAGING_API_URL and CONTRACT_* (see below).
  *
  * To run locally or in CI:
  *   STAGING_API_URL=https://staging.example.com/api/v1
@@ -20,8 +19,7 @@ const creds = {
 };
 const hasCreds = Object.values(creds).every(v => v.length > 0);
 
-// STAGING_ENV_REQUIRED: whole suite skipped when STAGING_API_URL is unset (local default).
-// Not hardware — run in CI or locally with staging URL + CONTRACT_* creds (see file header).
+/** Not HARDWARE_REQUIRED — needs live staging URL (see docs/mobile-phase-gates.md gate 3). */
 const describeStaging = hasStaging ? describe : describe.skip;
 
 async function api(
@@ -42,18 +40,20 @@ async function api(
 }
 
 describeStaging('staging API contract (mobile)', () => {
+  // Not HARDWARE_REQUIRED — skipped when STAGING_API_URL unset (suite-level, test 1 of 4)
   it('actuator health is reachable', async () => {
     const root = base!.replace(/\/api\/v1$/, '');
     const res = await fetch(`${root}/actuator/health`);
     expect(res.ok).toBe(true);
   });
 
+  // Not HARDWARE_REQUIRED — skipped when STAGING_API_URL unset (suite-level, test 2 of 4)
   it('till-sessions/current requires auth', async () => {
     const res = await api('/pos/till-sessions/current');
     expect([401, 403]).toContain(res.status);
   });
 
-  // STAGING_ENV_REQUIRED: needs CONTRACT_USERNAME, CONTRACT_PASSWORD, CONTRACT_TENANT_ID, CONTRACT_USER_ID
+  // Not HARDWARE_REQUIRED — not logic TODO; needs CONTRACT_* env (test 3 of 4)
   (hasCreds ? it : it.skip)('login returns access and refresh tokens', async () => {
     const mfa = await api('/auth/mfa/challenge', {
       method: 'POST',
@@ -78,7 +78,7 @@ describeStaging('staging API contract (mobile)', () => {
     expect(typeof body.refreshToken).toBe('string');
   });
 
-  // STAGING_ENV_REQUIRED: same CONTRACT_* env vars as login case above
+  // Not HARDWARE_REQUIRED — not logic TODO; needs CONTRACT_* env (test 4 of 4)
   (hasCreds ? it : it.skip)('authenticated till-sessions/current returns JSON object', async () => {
     const mfa = await api('/auth/mfa/challenge', {
       method: 'POST',
