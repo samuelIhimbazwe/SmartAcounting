@@ -61,3 +61,9 @@ jest.mock('react-native-toast-message', () => ({
   __esModule: true,
   default: () => null,
 }));
+
+jest.mock('react-native-qrcode-svg', () => {
+  const React = require('react');
+  const {View} = require('react-native');
+  return () => React.createElement(View, {testID: 'mock-qrcode'});
+});

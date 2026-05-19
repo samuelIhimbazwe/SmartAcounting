@@ -14,6 +14,9 @@ module.exports = {
     'src/pricing/priceListPick.ts',
     'src/pricing/resolveCheckoutPrice.ts',
     'src/pricing/loyalty.ts',
+    'src/fiscal/vatEngine.ts',
+    'src/fiscal/auditChain.ts',
+    'src/services/efd.ts',
   ],
   // Phased ratchet (global, scoped files in collectCoverageFrom):
   //   Phase 2: 38 / 27  |  Phase 3: 43 / 32  |  Phase 4: 55 / 40

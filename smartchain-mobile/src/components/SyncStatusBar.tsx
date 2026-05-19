@@ -9,6 +9,10 @@ import {
   getPendingTransactions,
   syncPendingTransactions,
 } from '../services/offlineQueue';
+import {
+  getPendingEfdCount,
+  retryPendingEfdSubmissions,
+} from '../services/efd';
 import {useSyncStatus} from '../hooks/useSyncStatus';
 
 export function SyncStatusBar() {
@@ -17,6 +21,7 @@ export function SyncStatusBar() {
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [lastItemError, setLastItemError] = useState<string | null>(null);
+  const [efdPending, setEfdPending] = useState(0);
 
   const accessToken = useSelector((s: RootState) => s.auth.accessToken);
   const roles = useSelector((s: RootState) => s.auth.roles) as AppRole[];
@@ -28,9 +33,11 @@ export function SyncStatusBar() {
       setPendingCount(pending.length);
       const err = pending.find(p => p.lastError)?.lastError;
       setLastItemError(err ?? null);
+      setEfdPending(await getPendingEfdCount());
     } catch {
       setPendingCount(0);
       setLastItemError(null);
+      setEfdPending(0);
     }
   }, []);
 
@@ -58,6 +65,8 @@ export function SyncStatusBar() {
       try {
         const result = await syncPendingTransactions(roles);
         setPendingCount(prev => Math.max(0, prev - result.synced));
+        await retryPendingEfdSubmissions(true);
+        setEfdPending(await getPendingEfdCount());
       } finally {
         setSyncing(false);
         await refreshPending();
@@ -70,7 +79,8 @@ export function SyncStatusBar() {
   const serverAlerts = serverSync?.unreadAlerts ?? 0;
   const showServerBadges =
     isOnline && (serverPending > 0 || serverAlerts > 0);
-  const showOfflineBar = !isOnline || pendingCount > 0 || syncing;
+  const showOfflineBar =
+    !isOnline || pendingCount > 0 || efdPending > 0 || syncing;
 
   if (!showOfflineBar && !showServerBadges) {
     return null;
@@ -83,6 +93,10 @@ export function SyncStatusBar() {
         ? t('sync.syncError', {message: lastItemError.slice(0, 80)})
         : t('sync.backOnline')
       : t('sync.offline', {count: pendingCount});
+  const efdNote =
+    efdPending > 0
+      ? ` · ${t('fiscal.efdPending', {count: efdPending, defaultValue: '{{count}} EFD pending'})}`
+      : '';
 
   return (
     <View>
@@ -102,7 +116,10 @@ export function SyncStatusBar() {
       ) : null}
       {showOfflineBar ? (
         <View style={[styles.bar, isOnline ? styles.syncing : styles.offline]}>
-          <Text style={styles.text}>{statusText}</Text>
+          <Text style={styles.text}>
+            {statusText}
+            {efdNote}
+          </Text>
         </View>
       ) : null}
     </View>

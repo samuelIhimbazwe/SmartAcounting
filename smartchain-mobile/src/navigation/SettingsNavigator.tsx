@@ -5,8 +5,17 @@ import {SettingsHomeScreen} from '../screens/settings/SettingsHomeScreen';
 import {LanguageSettingsScreen} from '../screens/settings/LanguageSettingsScreen';
 import {PrinterSettingsScreen} from '../screens/settings/PrinterSettingsScreen';
 import {LocationSettingsScreen} from '../screens/settings/LocationSettingsScreen';
+import AuditLogScreen from '../screens/audit/AuditLogScreen';
 
-const Stack = createNativeStackNavigator();
+export type SettingsStackParamList = {
+  SettingsHome: undefined;
+  LanguageSettings: undefined;
+  PrinterSettings: undefined;
+  LocationSettings: undefined;
+  AuditLog: undefined;
+};
+
+const Stack = createNativeStackNavigator<SettingsStackParamList>();
 
 export default function SettingsNavigator() {
   const {t} = useTranslation();
@@ -31,6 +40,11 @@ export default function SettingsNavigator() {
         name="LocationSettings"
         component={LocationSettingsScreen}
         options={{title: t('locations.switchLocation')}}
+      />
+      <Stack.Screen
+        name="AuditLog"
+        component={AuditLogScreen}
+        options={{title: t('audit.title')}}
       />
     </Stack.Navigator>
   );

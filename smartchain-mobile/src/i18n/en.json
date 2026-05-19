@@ -322,5 +322,28 @@
   },
   "printing": {
     "failed": "Print failed"
+  },
+  "fiscal": {
+    "subtotalExVat": "Subtotal (ex VAT)",
+    "vat": "VAT",
+    "vatExempt": "VAT exempt",
+    "signature": "Fiscal signature",
+    "qrCode": "Fiscal QR",
+    "rraLogo": "RRA",
+    "efdPending": "{{count}} EFD pending",
+    "printXReport": "Print X-report (mid-day)",
+    "xReportTitle": "X-Report (Mid-Day)",
+    "zReportTitle": "Z-Report (End of day)",
+    "xReportHint": "Session stays open — totals are not reset."
+  },
+  "audit": {
+    "title": "Fiscal audit log",
+    "filterAction": "Action type",
+    "filterFrom": "From date",
+    "filterTo": "To date",
+    "applyFilters": "Apply filters",
+    "exportCsv": "Export CSV",
+    "exportTitle": "Audit log export",
+    "empty": "No audit entries"
   }
 }

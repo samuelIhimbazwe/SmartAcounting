@@ -17,6 +17,7 @@ import {
   setDiscount,
   setLastTransaction,
   setLastReceiptLines,
+  setLastFiscal,
   setPosRegisterCode,
   setProcessing,
   setSessionCurrency,
@@ -54,6 +55,12 @@ import {
   type TenderType,
 } from '../../utils/tenderValidation';
 import {testIds} from '../../e2e/testIds';
+import {
+  DEFAULT_RWANDA_VAT,
+  summarizeCart,
+} from '../../fiscal/vatEngine';
+import {submitSaleToEfd} from '../../services/efd';
+import {recordFiscalAudit} from '../../fiscal/auditLogRepository';
 
 type Nav = NativeStackNavigationProp<PosStackParamList, 'Checkout'>;
 
@@ -80,6 +87,7 @@ export default function CheckoutScreen() {
   const tenderLines = useSelector((s: RootState) => s.pos.tenderLines);
   const online = useSelector((s: RootState) => s.network.online);
   const roles = useSelector((s: RootState) => s.auth.roles) as AppRole[];
+  const userId = useSelector((s: RootState) => s.auth.userId);
 
   const showOnAccount =
     canUseOnAccountTender(roles) && (selectedCustomer?.creditLimit ?? 0) > 0;
@@ -107,6 +115,16 @@ export default function CheckoutScreen() {
     [subtotal, discount, promotionDiscount, loyaltyDiscount],
   );
   const tenderSum = useMemo(() => sumTenderLines(tenderLines), [tenderLines]);
+  const taxExempt = selectedCustomer?.taxExempt ?? false;
+  const vatSummary = useMemo(
+    () =>
+      summarizeCart(
+        cart.map(c => c.lineTotal),
+        DEFAULT_RWANDA_VAT,
+        taxExempt,
+      ),
+    [cart, taxExempt],
+  );
 
   const tenderLabel = (type: TenderType) => {
     const map: Record<TenderType, string> = {
@@ -222,7 +240,48 @@ export default function CheckoutScreen() {
         const res = await postCheckout(body);
         const sid = res?.salesOrderId;
         if (sid != null) {
-          dispatch(setLastTransaction(String(sid)));
+          const orderId = String(sid);
+          dispatch(setLastTransaction(orderId));
+          const netAmount = Number(res?.netAmount ?? vatSummary.subtotalExVat);
+          const vatAmount = Number(res?.vatAmount ?? vatSummary.totalVat);
+          const fiscalSignature = res?.fiscalSignature
+            ? String(res.fiscalSignature)
+            : undefined;
+          const fiscalQrData = res?.fiscalQrData
+            ? String(res.fiscalQrData)
+            : undefined;
+          const efd = await submitSaleToEfd(
+            {
+              salesOrderId: orderId,
+              grossAmount: total,
+              vatAmount,
+              currencyCode: sessionCurrency,
+              taxExempt,
+              lines: cart.map(c => ({
+                name: c.name,
+                qty: c.quantity,
+                unitPrice: c.unitPrice,
+                vat: 0,
+              })),
+            },
+            true,
+          );
+          await recordFiscalAudit({
+            entityType: 'SALE',
+            entityId: orderId,
+            action: 'POS_CHECKOUT',
+            actorId: userId ?? 'unknown',
+          });
+          dispatch(
+            setLastFiscal({
+              fiscalSignature:
+                fiscalSignature ?? efd.fiscalSignature ?? null,
+              fiscalQrData: fiscalQrData ?? efd.fiscalQrData ?? null,
+              netAmount,
+              vatAmount,
+              taxExempt,
+            }),
+          );
         }
         for (const item of cart) {
           if (item.variantId && item.batchNumber) {
@@ -528,6 +587,15 @@ export default function CheckoutScreen() {
       <View style={styles.footer}>
         <Text style={styles.bodyMedium}>
           {t('pos.subtotal')} {formatMoney(subtotal, sessionCurrency)}
+        </Text>
+        <Text style={styles.bodyMedium}>
+          {t('fiscal.subtotalExVat', 'Subtotal (ex VAT)')}{' '}
+          {formatMoney(vatSummary.subtotalExVat, sessionCurrency)}
+        </Text>
+        <Text style={styles.bodyMedium}>
+          {taxExempt
+            ? t('fiscal.vatExempt', 'VAT: exempt')
+            : `${t('fiscal.vat', 'VAT')} ${formatMoney(vatSummary.totalVat, sessionCurrency)}`}
         </Text>
         <Text style={styles.bodyMedium}>
           {t('pos.discount')} {discount}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState} from 'react';
 import {ScrollView, StyleSheet, Text} from 'react-native';
 import {Button, TextInput} from 'react-native-paper';
 import Toast from 'react-native-toast-message';
@@ -16,12 +16,17 @@ import {closeTillSession} from '../../api/tillSessions';
 import {queueOfflineTillClose} from '../../services/offlineQueue';
 import {isApiError} from '../../api/client';
 import {testIds} from '../../e2e/testIds';
+import {fetchZReportPreview, postZReport} from '../../api/reports';
+import {recordFiscalAudit} from '../../fiscal/auditLogRepository';
 
 export default function TillCloseScreen() {
   const {t} = useTranslation();
   const dispatch = useDispatch<AppDispatch>();
   const till = useSelector((s: RootState) => s.till);
+  const cashierName = useSelector((s: RootState) => s.pos.cashierName);
   const online = useSelector((s: RootState) => s.network.online);
+  const userId = useSelector((s: RootState) => s.auth.userId);
+  const [zPreview, setZPreview] = useState<string | null>(null);
 
   const submit = async () => {
     const sessionId = till.currentSessionId;
@@ -49,9 +54,28 @@ export default function TillCloseScreen() {
 
     try {
       if (online) {
+        const preview = await fetchZReportPreview(
+          sessionId,
+          'Z',
+          closingCash,
+          cashierName ?? undefined,
+        );
+        setZPreview(JSON.stringify(preview, null, 2));
+        await postZReport({
+          tillSessionId: sessionId,
+          reportType: 'Z',
+          closingCash,
+          cashierName: cashierName ?? undefined,
+        });
         await closeTillSession(sessionId, {
           closingCash,
           notes: till.notes?.trim() || undefined,
+        });
+        await recordFiscalAudit({
+          entityType: 'TILL_SESSION',
+          entityId: sessionId,
+          action: 'TILL_CLOSE',
+          actorId: userId ?? 'unknown',
         });
         try {
           await postTillClose(retailBody);
@@ -87,6 +111,11 @@ export default function TillCloseScreen() {
   return (
     <ScrollView contentContainerStyle={styles.wrap}>
       <Text style={styles.h}>{t('till.closeTitle')}</Text>
+      {zPreview ? (
+        <Text selectable style={styles.preview}>
+          {zPreview}
+        </Text>
+      ) : null}
       {!till.currentSessionId ? (
         <Text style={styles.warn}>{t('till.noSession')}</Text>
       ) : null}
@@ -152,4 +181,5 @@ const styles = StyleSheet.create({
   wrap: {padding: 16, gap: 8},
   field: {marginBottom: 4},
   btnInner: {minHeight: 48},
+  preview: {fontFamily: 'monospace', fontSize: 11, marginBottom: 12},
 });

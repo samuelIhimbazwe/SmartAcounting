@@ -20,6 +20,8 @@ import {PriceListLine} from './models/PriceListLine';
 import {PromotionCache} from './models/PromotionCache';
 import {LayawayOrder} from './models/LayawayOrder';
 import {SalesQuote} from './models/SalesQuote';
+import {EfdSubmission} from './models/EfdSubmission';
+import {FiscalAuditLog} from './models/FiscalAuditLog';
 
 const adapter = new SQLiteAdapter({
   schema,
@@ -49,5 +51,7 @@ export const database = new Database({
     PromotionCache,
     LayawayOrder,
     SalesQuote,
+    EfdSubmission,
+    FiscalAuditLog,
   ],
 });

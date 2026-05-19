@@ -4,12 +4,14 @@ import TillOpenScreen from '../screens/till/TillOpenScreen';
 import TillCloseScreen from '../screens/till/TillCloseScreen';
 import ShiftManagementScreen from '../screens/till/ShiftManagementScreen';
 import FloorViewScreen from '../screens/till/FloorViewScreen';
+import FiscalReportScreen from '../screens/fiscal/FiscalReportScreen';
 
 export type TillStackParamList = {
   TillOpen: undefined;
   TillClose: undefined;
   Shifts: undefined;
   FloorView: undefined;
+  FiscalReport: {tillSessionId: string; reportType: 'X' | 'Z'};
 };
 
 const Stack = createNativeStackNavigator<TillStackParamList>();
@@ -36,6 +38,11 @@ export default function TillNavigator() {
         name="FloorView"
         component={FloorViewScreen}
         options={{title: 'Floor view'}}
+      />
+      <Stack.Screen
+        name="FiscalReport"
+        component={FiscalReportScreen}
+        options={{title: 'Report'}}
       />
     </Stack.Navigator>
   );

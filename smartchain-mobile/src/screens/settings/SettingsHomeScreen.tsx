@@ -4,18 +4,25 @@ import {Button, List} from 'react-native-paper';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useTranslation} from 'react-i18next';
+import {useSelector} from 'react-redux';
+import type {RootState} from '../../store';
+import type {AppRole} from '../../utils/roles';
+import {canViewFiscalAudit} from '../../utils/roles';
 
 type SettingsStackParamList = {
   SettingsHome: undefined;
   LanguageSettings: undefined;
   PrinterSettings: undefined;
   LocationSettings: undefined;
+  AuditLog: undefined;
 };
 
 export function SettingsHomeScreen() {
   const {t} = useTranslation();
   const navigation =
     useNavigation<NativeStackNavigationProp<SettingsStackParamList>>();
+  const roles = useSelector((s: RootState) => s.auth.roles) as AppRole[];
+  const showAudit = canViewFiscalAudit(roles);
 
   return (
     <View style={styles.wrap}>
@@ -37,6 +44,13 @@ export function SettingsHomeScreen() {
           left={props => <List.Icon {...props} icon="map-marker" />}
           onPress={() => navigation.navigate('LocationSettings')}
         />
+        {showAudit ? (
+          <List.Item
+            title={t('audit.title')}
+            left={props => <List.Icon {...props} icon="shield-check" />}
+            onPress={() => navigation.navigate('AuditLog')}
+          />
+        ) : null}
       </List.Section>
       <Button mode="text" onPress={() => navigation.goBack()}>
         {t('common.cancel')}

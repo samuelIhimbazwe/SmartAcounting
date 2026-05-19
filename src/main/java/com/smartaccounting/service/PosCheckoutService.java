@@ -10,6 +10,8 @@ import com.smartaccounting.dto.PosOutOfStockAttemptRequest;
 import com.smartaccounting.dto.PosTenderRequest;
 import com.smartaccounting.dto.PromotionCartItem;
 import com.smartaccounting.entity.FinanceCustomer;
+import com.smartaccounting.entity.TaxConfig;
+import com.smartaccounting.entity.TillSession;
 import com.smartaccounting.entity.PosCatalogItem;
 import com.smartaccounting.entity.PosPaymentTender;
 import com.smartaccounting.entity.PosSaleLine;
@@ -20,6 +22,7 @@ import com.smartaccounting.repository.PosCatalogItemRepository;
 import com.smartaccounting.repository.PosPaymentTenderRepository;
 import com.smartaccounting.repository.PosSaleLineRepository;
 import com.smartaccounting.repository.SalesOrderRepository;
+import com.smartaccounting.repository.TillSessionRepository;
 import com.smartaccounting.tenant.TenantContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,6 +63,9 @@ public class PosCheckoutService {
     private final PriceListService priceListService;
     private final CustomerRetailService customerRetailService;
     private final LocationService locationService;
+    private final TaxConfigService taxConfigService;
+    private final RraEfdService rraEfdService;
+    private final TillSessionRepository tillSessionRepository;
 
     public PosCheckoutService(PosCatalogItemRepository catalogRepository,
                               SalesOrderRepository salesOrderRepository,
@@ -76,7 +82,10 @@ public class PosCheckoutService {
                               PromotionService promotionService,
                               PriceListService priceListService,
                               CustomerRetailService customerRetailService,
-                              LocationService locationService) {
+                              LocationService locationService,
+                              TaxConfigService taxConfigService,
+                              RraEfdService rraEfdService,
+                              TillSessionRepository tillSessionRepository) {
         this.catalogRepository = catalogRepository;
         this.salesOrderRepository = salesOrderRepository;
         this.saleLineRepository = saleLineRepository;
@@ -93,6 +102,9 @@ public class PosCheckoutService {
         this.priceListService = priceListService;
         this.customerRetailService = customerRetailService;
         this.locationService = locationService;
+        this.taxConfigService = taxConfigService;
+        this.rraEfdService = rraEfdService;
+        this.tillSessionRepository = tillSessionRepository;
     }
 
     @Transactional(readOnly = true)
@@ -144,8 +156,12 @@ public class PosCheckoutService {
             customerPriceListId = linkedCustomer.getPriceListId();
         }
         UUID locationId = locationService.resolveContextLocationId();
+        boolean taxExempt = linkedCustomer != null && linkedCustomer.isTaxExempt();
+        UUID tillSessionId = resolveOpenTillSessionId(tenant);
 
         BigDecimal subtotal = BigDecimal.ZERO;
+        BigDecimal orderNet = BigDecimal.ZERO;
+        BigDecimal orderVat = BigDecimal.ZERO;
         UUID orderId = UUID.randomUUID();
         List<PromotionCartItem> cartItems = new ArrayList<>();
 
@@ -162,6 +178,8 @@ public class PosCheckoutService {
         order.setPosRegisterCode(req.posRegisterCode());
         order.setCreatedAt(Instant.now());
         order.setTotalAmount(BigDecimal.ZERO);
+        order.setTaxExemptSale(taxExempt);
+        order.setTillSessionId(tillSessionId);
         salesOrderRepository.save(order);
 
         for (PosCheckoutLineRequest lineReq : req.lines()) {
@@ -184,6 +202,8 @@ public class PosCheckoutService {
                 ? unitNative
                 : currencyService.convertAmount(unitNative, catCur, currency).setScale(2, RoundingMode.HALF_UP);
             BigDecimal lineTotal = unit.multiply(qty).setScale(2, RoundingMode.HALF_UP);
+            TaxConfig taxConfig = taxConfigService.resolveForProduct(productId, locationId);
+            TaxConfigService.LineVatSplit vatSplit = taxConfigService.calculateLineVat(lineTotal, taxConfig, taxExempt);
 
             PosSaleLine sl = new PosSaleLine();
             sl.setId(UUID.randomUUID());
@@ -195,6 +215,8 @@ public class PosCheckoutService {
             sl.setQuantity(qty);
             sl.setUnitPrice(unit);
             sl.setLineTotal(lineTotal);
+            sl.setNetAmount(vatSplit.net());
+            sl.setVatAmount(vatSplit.vat());
             sl.setProductIdSnapshot(lineReq.productId() != null ? lineReq.productId() : cat.getProductId());
             sl.setVariantId(lineReq.variantId());
             sl.setSerialNumber(lineReq.serialNumber());
@@ -202,6 +224,8 @@ public class PosCheckoutService {
             saleLineRepository.save(sl);
 
             subtotal = subtotal.add(lineTotal);
+            orderNet = orderNet.add(vatSplit.net());
+            orderVat = orderVat.add(vatSplit.vat());
             UUID promoProductId = productId;
             if (promoProductId != null) {
                 cartItems.add(new PromotionCartItem(
@@ -230,6 +254,17 @@ public class PosCheckoutService {
             customerRetailService.redeemLoyaltyPoints(linkedCustomer, req.loyaltyPointsRedeemed());
         }
         BigDecimal total = subtotal.subtract(discountAmount).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+        if (taxExempt) {
+            order.setNetAmount(total);
+            order.setVatAmount(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+        } else if (discountAmount.signum() > 0 && subtotal.signum() > 0) {
+            var adjusted = posVatService.calculateVat(total);
+            order.setNetAmount(adjusted.netAmount());
+            order.setVatAmount(adjusted.vatAmount());
+        } else {
+            order.setNetAmount(orderNet.setScale(2, RoundingMode.HALF_UP));
+            order.setVatAmount(orderVat.setScale(2, RoundingMode.HALF_UP));
+        }
 
         order.setTotalAmount(total);
         salesOrderRepository.save(order);
@@ -356,13 +391,21 @@ public class PosCheckoutService {
         ));
         auditService.logAction("POS_CHECKOUT", "SALES_ORDER", "{}", "{\"id\":\"" + orderId + "\"}");
 
-        var vatResult = posVatService.calculateVat(total);
-        ebmService.submitToEbm(
-            tenant.toString(),
+        Map<String, String> fiscal = taxExempt
+            ? Map.of()
+            : rraEfdService.mockFiscalPayload(orderId, total, order.getVatAmount());
+        if (!fiscal.isEmpty()) {
+            order.setFiscalSignature(fiscal.get("fiscalSignature"));
+            order.setFiscalQrData(fiscal.get("fiscalQrData"));
+            salesOrderRepository.save(order);
+        }
+        rraEfdService.submitSaleAsync(
+            tenant,
             orderId.toString(),
             total,
-            vatResult.vatAmount(),
-            currency
+            order.getVatAmount() != null ? order.getVatAmount() : BigDecimal.ZERO,
+            currency,
+            taxExempt
         );
 
         if (appliedPromotionId != null) {
@@ -420,6 +463,11 @@ public class PosCheckoutService {
         out.put("currencyCode", currency);
         out.put("receiptText", receipt.get("text"));
         out.put("receiptHtml", receipt.get("html"));
+        out.put("netAmount", order.getNetAmount());
+        out.put("vatAmount", order.getVatAmount());
+        out.put("taxExempt", taxExempt);
+        out.put("fiscalSignature", order.getFiscalSignature());
+        out.put("fiscalQrData", order.getFiscalQrData());
         return out;
     }
 
@@ -458,7 +506,20 @@ public class PosCheckoutService {
                 .append(currency).append(" = ").append(l.getLineTotal()).append("\n");
         }
         text.append("--------------------------------\n");
+        if (order.getNetAmount() != null) {
+            text.append("Subtotal (ex VAT): ").append(order.getNetAmount()).append(" ").append(currency).append("\n");
+        }
+        if (order.getVatAmount() != null) {
+            text.append("VAT: ").append(order.getVatAmount()).append(" ").append(currency);
+            if (order.isTaxExemptSale()) {
+                text.append(" (EXEMPT)");
+            }
+            text.append("\n");
+        }
         text.append("TOTAL: ").append(order.getTotalAmount()).append(" ").append(currency).append("\n");
+        if (order.getFiscalSignature() != null) {
+            text.append("Fiscal sig: ").append(order.getFiscalSignature()).append("\n");
+        }
         text.append("Payments:\n");
         for (PosPaymentTender t : tenders) {
             text.append("  ").append(tenderLabel(t.getTenderType())).append(": ").append(t.getAmount()).append(" ").append(currency);
@@ -536,6 +597,16 @@ public class PosCheckoutService {
             row.setLineTotal(lineTotalForRow);
             saleLineRepository.save(row);
         }
+    }
+
+    private UUID resolveOpenTillSessionId(UUID tenant) {
+        UUID userId = TenantContext.userId();
+        if (userId == null) {
+            return null;
+        }
+        return tillSessionRepository.findByTenantIdAndCashierIdAndStatus(tenant, userId, "OPEN")
+            .map(TillSession::getId)
+            .orElse(null);
     }
 
     private UUID requireTenant() {

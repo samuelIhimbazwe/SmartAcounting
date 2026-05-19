@@ -31,6 +31,7 @@ export type SelectedCustomer = {
   creditBalance: number;
   loyaltyPoints: number;
   loyaltyEnabled: boolean;
+  taxExempt?: boolean;
 };
 
 export type PromotionDiscountLine = {
@@ -53,6 +54,11 @@ interface PosState {
   isProcessing: boolean;
   lastTransactionId: string | null;
   lastReceiptLines: CartItem[];
+  lastFiscalSignature: string | null;
+  lastFiscalQrData: string | null;
+  lastNetAmount: number;
+  lastVatAmount: number;
+  lastTaxExempt: boolean;
   barcodeInput: string;
   openingFloat: number | null;
   shiftStartTime: string | null;
@@ -74,6 +80,11 @@ const initialState: PosState = {
   isProcessing: false,
   lastTransactionId: null,
   lastReceiptLines: [],
+  lastFiscalSignature: null,
+  lastFiscalQrData: null,
+  lastNetAmount: 0,
+  lastVatAmount: 0,
+  lastTaxExempt: false,
   barcodeInput: '',
   openingFloat: null,
   shiftStartTime: null,
@@ -189,6 +200,28 @@ const posSlice = createSlice({
     setLastReceiptLines: (state, action: PayloadAction<CartItem[]>) => {
       state.lastReceiptLines = action.payload;
     },
+    setLastFiscal: (
+      state,
+      action: PayloadAction<{
+        fiscalSignature?: string | null;
+        fiscalQrData?: string | null;
+        netAmount?: number;
+        vatAmount?: number;
+        taxExempt?: boolean;
+      }>,
+    ) => {
+      state.lastFiscalSignature = action.payload.fiscalSignature ?? null;
+      state.lastFiscalQrData = action.payload.fiscalQrData ?? null;
+      if (action.payload.netAmount != null) {
+        state.lastNetAmount = action.payload.netAmount;
+      }
+      if (action.payload.vatAmount != null) {
+        state.lastVatAmount = action.payload.vatAmount;
+      }
+      if (action.payload.taxExempt != null) {
+        state.lastTaxExempt = action.payload.taxExempt;
+      }
+    },
     loadCartFromQuote: (
       state,
       action: PayloadAction<{
@@ -289,6 +322,7 @@ export const {
   setProcessing,
   setLastTransaction,
   setLastReceiptLines,
+  setLastFiscal,
   loadCartFromQuote,
   clearCart,
   setBarcodeInput,

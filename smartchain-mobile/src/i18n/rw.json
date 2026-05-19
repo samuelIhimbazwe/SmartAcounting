@@ -315,6 +315,29 @@
     "printFailedBody": "{{message}}\n\nThe sale was recorded successfully."
   },
   "printing": {
-    "failed": "Print failed"
+    "failed": "Gucapira byanze"
+  },
+  "fiscal": {
+    "subtotalExVat": "Igiteranyo (nticyarimo TVA)",
+    "vat": "TVA",
+    "vatExempt": "TVA irahinduka",
+    "signature": "Umukono wa fiskale",
+    "qrCode": "QR ya fiskale",
+    "rraLogo": "RRA",
+    "efdPending": "EFD {{count}} zitegereje",
+    "printXReport": "Raporo X (hagati y'umunsi)",
+    "xReportTitle": "Raporo X (hagati y'umunsi)",
+    "zReportTitle": "Raporo Z (impera y'umunsi)",
+    "xReportHint": "Isomo rirakomeza — ibarura ntiryasubizwa."
+  },
+  "audit": {
+    "title": "Inyandiko y'igenzura ya fiskale",
+    "filterAction": "Ubwoko bw'igikorwa",
+    "filterFrom": "Itariki yo gutangira",
+    "filterTo": "Itariki yo kurangiza",
+    "applyFilters": "Shyira mu bikorwa",
+    "exportCsv": "Kohereza CSV",
+    "exportTitle": "Kohereza inyandiko",
+    "empty": "Nta nyandiko"
   }
 }

@@ -1,7 +1,7 @@
 import {appSchema, tableSchema} from '@nozbe/watermelondb';
 
 export const schema = appSchema({
-  version: 6,
+  version: 7,
   tables: [
     tableSchema({
       name: 'offline_transactions',
@@ -164,6 +164,7 @@ export const schema = appSchema({
         {name: 'credit_balance', type: 'number'},
         {name: 'loyalty_points', type: 'number'},
         {name: 'loyalty_enabled', type: 'boolean'},
+        {name: 'tax_exempt', type: 'boolean'},
         {name: 'notes', type: 'string', isOptional: true},
         {name: 'deleted_at', type: 'string', isOptional: true},
       ],
@@ -257,6 +258,65 @@ export const schema = appSchema({
         {name: 'expiry_date', type: 'string', isOptional: true},
         {name: 'cart_json', type: 'string'},
         {name: 'needs_sync', type: 'boolean'},
+      ],
+    }),
+    tableSchema({
+      name: 'efd_submissions',
+      columns: [
+        {name: 'sales_order_id', type: 'string', isIndexed: true},
+        {name: 'payload_json', type: 'string'},
+        {name: 'status', type: 'string'},
+        {name: 'fiscal_signature', type: 'string', isOptional: true},
+        {name: 'fiscal_qr_data', type: 'string', isOptional: true},
+        {name: 'retry_count', type: 'number'},
+        {name: 'last_error', type: 'string', isOptional: true},
+        {name: 'saved_at', type: 'string'},
+        {name: 'confirmed_at', type: 'string', isOptional: true},
+      ],
+    }),
+    tableSchema({
+      name: 'fiscal_audit_log',
+      columns: [
+        {name: 'entity_type', type: 'string'},
+        {name: 'entity_id', type: 'string'},
+        {name: 'action', type: 'string'},
+        {name: 'actor_id', type: 'string'},
+        {name: 'timestamp', type: 'string'},
+        {name: 'previous_hash', type: 'string'},
+        {name: 'hash', type: 'string'},
+      ],
+    }),
+    tableSchema({
+      name: 'z_reports_local',
+      columns: [
+        {name: 'till_session_id', type: 'string', isIndexed: true},
+        {name: 'report_type', type: 'string'},
+        {name: 'payload_json', type: 'string'},
+        {name: 'reprint_locked', type: 'boolean'},
+        {name: 'saved_at', type: 'string'},
+      ],
+    }),
+    tableSchema({
+      name: 'receipt_configs_local',
+      columns: [
+        {name: 'business_name', type: 'string'},
+        {name: 'business_tin', type: 'string'},
+        {name: 'logo_base64', type: 'string', isOptional: true},
+        {name: 'footer_text', type: 'string'},
+        {name: 'show_vat_breakdown', type: 'boolean'},
+        {name: 'paper_width_mm', type: 'number'},
+      ],
+    }),
+    tableSchema({
+      name: 'tax_configs_cache',
+      columns: [
+        {name: 'server_id', type: 'string'},
+        {name: 'name', type: 'string'},
+        {name: 'rate', type: 'number'},
+        {name: 'type', type: 'string'},
+        {name: 'applies_to', type: 'string'},
+        {name: 'category_code', type: 'string', isOptional: true},
+        {name: 'is_active', type: 'boolean'},
       ],
     }),
   ],

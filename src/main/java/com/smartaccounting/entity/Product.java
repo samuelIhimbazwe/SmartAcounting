@@ -16,6 +16,7 @@ public class Product {
     private String sku;
     private String unit;
     private String barcode;
+    private UUID taxConfigId;
     private Instant createdAt;
 
     public UUID getId() { return id; }
@@ -30,6 +31,8 @@ public class Product {
     public void setUnit(String unit) { this.unit = unit; }
     public String getBarcode() { return barcode; }
     public void setBarcode(String barcode) { this.barcode = barcode; }
+    public UUID getTaxConfigId() { return taxConfigId; }
+    public void setTaxConfigId(UUID taxConfigId) { this.taxConfigId = taxConfigId; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
 }

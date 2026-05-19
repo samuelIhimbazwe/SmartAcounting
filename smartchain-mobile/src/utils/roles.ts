@@ -88,6 +88,20 @@ export function canManageProcurement(roles: AppRole[]): boolean {
   return hasAnyRole(roles, 'CEO', 'CFO', 'OPS_MANAGER');
 }
 
+export function canPrintXReport(roles: AppRole[]): boolean {
+  return hasAnyRole(
+    roles,
+    'CEO',
+    'CFO',
+    'OPS_MANAGER',
+    'ACCOUNTING_CONTROLLER',
+  );
+}
+
+export function canViewFiscalAudit(roles: AppRole[]): boolean {
+  return hasAnyRole(roles, 'CEO', 'ACCOUNTING_CONTROLLER');
+}
+
 export function canUseOnAccountTender(roles: AppRole[]): boolean {
   return hasAnyRole(
     roles,

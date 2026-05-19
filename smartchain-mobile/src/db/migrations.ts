@@ -282,5 +282,73 @@ export default schemaMigrations({
         }),
       ],
     },
+    {
+      toVersion: 7,
+      steps: [
+        addColumns({
+          table: 'customers',
+          columns: [{name: 'tax_exempt', type: 'boolean', isOptional: true}],
+        }),
+        createTable({
+          name: 'efd_submissions',
+          columns: [
+            {name: 'sales_order_id', type: 'string', isIndexed: true},
+            {name: 'payload_json', type: 'string'},
+            {name: 'status', type: 'string'},
+            {name: 'fiscal_signature', type: 'string', isOptional: true},
+            {name: 'fiscal_qr_data', type: 'string', isOptional: true},
+            {name: 'retry_count', type: 'number'},
+            {name: 'last_error', type: 'string', isOptional: true},
+            {name: 'saved_at', type: 'string'},
+            {name: 'confirmed_at', type: 'string', isOptional: true},
+          ],
+        }),
+        createTable({
+          name: 'fiscal_audit_log',
+          columns: [
+            {name: 'entity_type', type: 'string'},
+            {name: 'entity_id', type: 'string'},
+            {name: 'action', type: 'string'},
+            {name: 'actor_id', type: 'string'},
+            {name: 'timestamp', type: 'string'},
+            {name: 'previous_hash', type: 'string'},
+            {name: 'hash', type: 'string'},
+          ],
+        }),
+        createTable({
+          name: 'z_reports_local',
+          columns: [
+            {name: 'till_session_id', type: 'string', isIndexed: true},
+            {name: 'report_type', type: 'string'},
+            {name: 'payload_json', type: 'string'},
+            {name: 'reprint_locked', type: 'boolean'},
+            {name: 'saved_at', type: 'string'},
+          ],
+        }),
+        createTable({
+          name: 'receipt_configs_local',
+          columns: [
+            {name: 'business_name', type: 'string'},
+            {name: 'business_tin', type: 'string'},
+            {name: 'logo_base64', type: 'string', isOptional: true},
+            {name: 'footer_text', type: 'string'},
+            {name: 'show_vat_breakdown', type: 'boolean'},
+            {name: 'paper_width_mm', type: 'number'},
+          ],
+        }),
+        createTable({
+          name: 'tax_configs_cache',
+          columns: [
+            {name: 'server_id', type: 'string'},
+            {name: 'name', type: 'string'},
+            {name: 'rate', type: 'number'},
+            {name: 'type', type: 'string'},
+            {name: 'applies_to', type: 'string'},
+            {name: 'category_code', type: 'string', isOptional: true},
+            {name: 'is_active', type: 'boolean'},
+          ],
+        }),
+      ],
+    },
   ],
 });

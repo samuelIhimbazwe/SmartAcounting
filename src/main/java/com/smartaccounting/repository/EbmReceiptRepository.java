@@ -12,6 +12,10 @@ import java.util.UUID;
 
 public interface EbmReceiptRepository extends JpaRepository<EbmReceipt, UUID> {
     Optional<EbmReceipt> findByIdAndTenantId(UUID id, UUID tenantId);
+
+    Optional<EbmReceipt> findByTenantIdAndPosTransactionId(UUID tenantId, String posTransactionId);
+
+    long countByTenantIdAndStatus(UUID tenantId, String status);
     Page<EbmReceipt> findByTenantIdAndStatusOrderByCreatedAtDesc(UUID tenantId, String status, Pageable pageable);
     Page<EbmReceipt> findByTenantIdOrderByCreatedAtDesc(UUID tenantId, Pageable pageable);
     List<EbmReceipt> findByStatusAndRetryCountLessThan(String status, int retryCount);

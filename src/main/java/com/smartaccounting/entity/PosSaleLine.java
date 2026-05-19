@@ -19,6 +19,8 @@ public class PosSaleLine {
     private BigDecimal quantity;
     private BigDecimal unitPrice;
     private BigDecimal lineTotal;
+    private BigDecimal netAmount;
+    private BigDecimal vatAmount;
     private UUID inventoryBatchId;
     private BigDecimal costPrice;
     private UUID productIdSnapshot;
@@ -44,6 +46,10 @@ public class PosSaleLine {
     public void setUnitPrice(BigDecimal unitPrice) { this.unitPrice = unitPrice; }
     public BigDecimal getLineTotal() { return lineTotal; }
     public void setLineTotal(BigDecimal lineTotal) { this.lineTotal = lineTotal; }
+    public BigDecimal getNetAmount() { return netAmount; }
+    public void setNetAmount(BigDecimal netAmount) { this.netAmount = netAmount; }
+    public BigDecimal getVatAmount() { return vatAmount; }
+    public void setVatAmount(BigDecimal vatAmount) { this.vatAmount = vatAmount; }
     public UUID getInventoryBatchId() { return inventoryBatchId; }
     public void setInventoryBatchId(UUID inventoryBatchId) { this.inventoryBatchId = inventoryBatchId; }
     public BigDecimal getCostPrice() { return costPrice; }

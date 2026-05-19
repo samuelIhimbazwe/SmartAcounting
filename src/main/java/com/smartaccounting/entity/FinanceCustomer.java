@@ -25,6 +25,7 @@ public class FinanceCustomer {
     private Integer loyaltyPoints;
     private Boolean loyaltyEnabled;
     private String notes;
+    private boolean taxExempt;
     private BigDecimal badDebtRiskScore;
     private Instant createdAt;
     private Instant updatedAt;
@@ -56,6 +57,8 @@ public class FinanceCustomer {
     public void setLoyaltyEnabled(Boolean loyaltyEnabled) { this.loyaltyEnabled = loyaltyEnabled; }
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
+    public boolean isTaxExempt() { return taxExempt; }
+    public void setTaxExempt(boolean taxExempt) { this.taxExempt = taxExempt; }
     public BigDecimal getBadDebtRiskScore() { return badDebtRiskScore; }
     public void setBadDebtRiskScore(BigDecimal badDebtRiskScore) { this.badDebtRiskScore = badDebtRiskScore; }
     public Instant getCreatedAt() { return createdAt; }

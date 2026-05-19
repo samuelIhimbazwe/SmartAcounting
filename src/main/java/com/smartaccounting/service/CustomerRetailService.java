@@ -288,6 +288,7 @@ public class CustomerRetailService {
         m.put("creditBalance", c.getCreditBalance());
         m.put("loyaltyPoints", c.getLoyaltyPoints());
         m.put("loyaltyEnabled", c.getLoyaltyEnabled());
+        m.put("taxExempt", c.isTaxExempt());
         m.put("notes", c.getNotes());
         m.putAll(creditAlert(c.getId()));
         return m;

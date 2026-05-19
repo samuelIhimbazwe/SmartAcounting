@@ -314,6 +314,29 @@
     "printFailedBody": "{{message}}\n\nThe sale was recorded successfully."
   },
   "printing": {
-    "failed": "Print failed"
+    "failed": "Échec impression"
+  },
+  "fiscal": {
+    "subtotalExVat": "Sous-total HT",
+    "vat": "TVA",
+    "vatExempt": "TVA exonérée",
+    "signature": "Signature fiscale",
+    "qrCode": "QR fiscal",
+    "rraLogo": "RRA",
+    "efdPending": "{{count}} EFD en attente",
+    "printXReport": "Rapport X (mi-journée)",
+    "xReportTitle": "Rapport X (mi-journée)",
+    "zReportTitle": "Rapport Z (fin de journée)",
+    "xReportHint": "La session reste ouverte — les totaux ne sont pas réinitialisés."
+  },
+  "audit": {
+    "title": "Journal d'audit fiscal",
+    "filterAction": "Type d'action",
+    "filterFrom": "Date début",
+    "filterTo": "Date fin",
+    "applyFilters": "Appliquer",
+    "exportCsv": "Exporter CSV",
+    "exportTitle": "Export journal",
+    "empty": "Aucune entrée"
   }
 }

@@ -21,7 +21,7 @@ import {
   suspendTillSession,
 } from '../../api/tillSessions';
 import {fetchRegisters, type RegisterDto} from '../../api/locations';
-import {canManageTillSession} from '../../utils/roles';
+import {canManageTillSession, canPrintXReport} from '../../utils/roles';
 import type {AppRole} from '../../utils/roles';
 import {clearTillSession} from '../../store/slices/tillSlice';
 import {useTranslation} from 'react-i18next';
@@ -62,6 +62,7 @@ export default function TillOpenScreen() {
   const {t} = useTranslation();
   const appRoles = roles as AppRole[];
   const canSuspend = canManageTillSession(appRoles);
+  const showXReport = canPrintXReport(appRoles);
 
   useEffect(() => {
     void (async () => {
@@ -226,6 +227,18 @@ export default function TillOpenScreen() {
           onPress={() => navigation.navigate('TillClose')}>
           <Text style={styles.linkButtonText}>{t('till.closeTitle')}</Text>
         </TouchableOpacity>
+        {showXReport ? (
+          <TouchableOpacity
+            style={styles.linkButton}
+            onPress={() =>
+              navigation.navigate('FiscalReport', {
+                tillSessionId: activeSessionId,
+                reportType: 'X',
+              })
+            }>
+            <Text style={styles.linkButtonText}>{t('fiscal.printXReport')}</Text>
+          </TouchableOpacity>
+        ) : null}
         {canSuspend ? (
           <TouchableOpacity
             style={[styles.suspendButton, suspending && styles.openButtonDisabled]}

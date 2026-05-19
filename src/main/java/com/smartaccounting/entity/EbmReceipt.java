@@ -29,6 +29,7 @@ public class EbmReceipt {
     private Instant submittedAt;
     private Instant confirmedAt;
     private Integer retryCount;
+    private String fiscalQrData;
     private Instant createdAt;
 
     public UUID getId() { return id; }
@@ -63,6 +64,8 @@ public class EbmReceipt {
     public void setConfirmedAt(Instant confirmedAt) { this.confirmedAt = confirmedAt; }
     public Integer getRetryCount() { return retryCount; }
     public void setRetryCount(Integer retryCount) { this.retryCount = retryCount; }
+    public String getFiscalQrData() { return fiscalQrData; }
+    public void setFiscalQrData(String fiscalQrData) { this.fiscalQrData = fiscalQrData; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
 }
