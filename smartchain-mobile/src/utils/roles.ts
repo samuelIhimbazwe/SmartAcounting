@@ -6,7 +6,9 @@ export type AppRole =
   | 'OPS_MANAGER'
   | 'HR_MANAGER'
   | 'MARKETING_MANAGER'
-  | 'ACCOUNTING_CONTROLLER';
+  | 'ACCOUNTING_CONTROLLER'
+  | 'CASHIER'
+  | 'POS_OPERATOR';
 
 const ROLE_PREFIX = 'ROLE_';
 
@@ -23,6 +25,8 @@ export function normalizeRole(authority: string): AppRole | null {
     HR_MANAGER: 'HR_MANAGER',
     MARKETING_MANAGER: 'MARKETING_MANAGER',
     ACCOUNTING_CONTROLLER: 'ACCOUNTING_CONTROLLER',
+    CASHIER: 'CASHIER',
+    POS_OPERATOR: 'POS_OPERATOR',
   };
   return map[raw] ?? null;
 }
@@ -47,10 +51,62 @@ export function roleDashboardPath(role: AppRole): string {
     HR_MANAGER: 'hr',
     MARKETING_MANAGER: 'marketing',
     ACCOUNTING_CONTROLLER: 'accounting',
+    CASHIER: 'sales',
+    POS_OPERATOR: 'sales',
   };
   return m[role];
 }
 
 export function hasAnyRole(roles: AppRole[], ...need: AppRole[]): boolean {
   return need.some(r => roles.includes(r));
+}
+
+export function isCashierRole(role: AppRole | null): boolean {
+  return role === 'CASHIER' || role === 'POS_OPERATOR';
+}
+
+export function isCashierShell(roles: AppRole[]): boolean {
+  return roles.some(r => r === 'CASHIER' || r === 'POS_OPERATOR');
+}
+
+export function canManageTillSession(roles: AppRole[]): boolean {
+  return hasAnyRole(
+    roles,
+    'CEO',
+    'CFO',
+    'OPS_MANAGER',
+    'SALES_MANAGER',
+    'ACCOUNTING_CONTROLLER',
+  );
+}
+
+export function canUseOnAccountTender(roles: AppRole[]): boolean {
+  return hasAnyRole(
+    roles,
+    'CEO',
+    'CFO',
+    'SALES_MANAGER',
+    'ACCOUNTING_CONTROLLER',
+    'OPS_MANAGER',
+  );
+}
+
+export function pickPrimaryRole(roles: AppRole[]): AppRole | null {
+  const order: AppRole[] = [
+    'CEO',
+    'CFO',
+    'OPS_MANAGER',
+    'SALES_MANAGER',
+    'ACCOUNTING_CONTROLLER',
+    'HR_MANAGER',
+    'MARKETING_MANAGER',
+    'CASHIER',
+    'POS_OPERATOR',
+  ];
+  for (const r of order) {
+    if (roles.includes(r)) {
+      return r;
+    }
+  }
+  return roles[0] ?? null;
 }

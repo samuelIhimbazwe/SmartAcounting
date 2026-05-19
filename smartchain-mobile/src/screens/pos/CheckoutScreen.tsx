@@ -4,20 +4,24 @@ import {Button, Card, TextInput} from 'react-native-paper';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import Toast from 'react-native-toast-message';
+import {useTranslation} from 'react-i18next';
 import {useDispatch, useSelector} from 'react-redux';
 import type {AppDispatch, RootState} from '../../store';
 import {
+  addTenderLine,
   clearCart,
   removeFromCart,
+  removeTenderLine,
   setBarcodeInput,
   setCustomer,
   setDiscount,
   setLastTransaction,
   setPosRegisterCode,
-  setTenderType,
   setProcessing,
   setSessionCurrency,
   updateQuantity,
+  updateTenderLine,
+  setTenderLineType,
 } from '../../store/slices/posSlice';
 import type {PosStackParamList} from '../../navigation/PosNavigator';
 import {useBarcode} from '../../hooks/useBarcode';
@@ -25,11 +29,22 @@ import {useWakeLock} from '../../hooks/useWakeLock';
 import {postCheckout} from '../../api/pos';
 import {queueOfflineCheckout} from '../../services/offlineQueue';
 import {formatMoney} from '../../utils/currency';
+import type {AppRole} from '../../utils/roles';
+import {canUseOnAccountTender} from '../../utils/roles';
+import {
+  cartTotal,
+  sumTenderLines,
+  validateTendersForTotal,
+  type TenderType,
+} from '../../utils/tenderValidation';
 
 type Nav = NativeStackNavigationProp<PosStackParamList, 'Checkout'>;
 
+const BASE_TENDERS: TenderType[] = ['CASH', 'MOMO', 'AIRTEL_MONEY', 'CARD'];
+
 export default function CheckoutScreen() {
   useWakeLock();
+  const {t} = useTranslation();
   const navigation = useNavigation<Nav>();
   const dispatch = useDispatch<AppDispatch>();
   const {lookupAndAddProduct} = useBarcode();
@@ -41,23 +56,52 @@ export default function CheckoutScreen() {
   const posRegisterCode = useSelector((s: RootState) => s.pos.posRegisterCode);
   const barcodeInput = useSelector((s: RootState) => s.pos.barcodeInput);
   const processing = useSelector((s: RootState) => s.pos.isProcessing);
-  const tenderType = useSelector((s: RootState) => s.pos.tenderType);
+  const tenderLines = useSelector((s: RootState) => s.pos.tenderLines);
   const online = useSelector((s: RootState) => s.network.online);
+  const roles = useSelector((s: RootState) => s.auth.roles) as AppRole[];
+
+  const showOnAccount = canUseOnAccountTender(roles);
+  const tenderOptions = showOnAccount
+    ? [...BASE_TENDERS, 'ON_ACCOUNT' as TenderType]
+    : BASE_TENDERS;
 
   const subtotal = useMemo(
     () => cart.reduce((a, b) => a + b.lineTotal, 0),
     [cart],
   );
-  const total = useMemo(
-    () => Math.max(0, subtotal - discount),
-    [subtotal, discount],
-  );
+  const total = useMemo(() => cartTotal(subtotal, discount), [subtotal, discount]);
+  const tenderSum = useMemo(() => sumTenderLines(tenderLines), [tenderLines]);
+
+  const tenderLabel = (type: TenderType) => {
+    const map: Record<TenderType, string> = {
+      CASH: t('pos.tenderCash'),
+      MOMO: t('pos.tenderMomo'),
+      AIRTEL_MONEY: t('pos.tenderAirtel'),
+      CARD: t('pos.tenderCard'),
+      ON_ACCOUNT: t('pos.tenderOnAccount'),
+    };
+    return map[type];
+  };
 
   const submitCheckout = async () => {
     if (cart.length === 0) {
-      Toast.show({type: 'error', text1: 'Cart is empty'});
+      Toast.show({type: 'error', text1: t('pos.cartEmpty')});
       return;
     }
+
+    const validation = validateTendersForTotal(tenderLines, total);
+    if (!validation.ok) {
+      Toast.show({
+        type: 'error',
+        text1:
+          validation.error === 'underpaid'
+            ? t('pos.tenderUnderpaid')
+            : t('pos.cartEmpty'),
+      });
+      return;
+    }
+
+    const hasOnAccount = tenderLines.some(l => l.tenderType === 'ON_ACCOUNT');
     const lines = cart.map(i => ({
       barcode: i.barcode,
       quantity: Math.max(0.001, Number(i.quantity.toFixed(4))),
@@ -67,16 +111,17 @@ export default function CheckoutScreen() {
       currencyCode: sessionCurrency,
       posRegisterCode,
       lines,
-      tenders: [
-        {
-          tenderType,
-          amount: Number(total.toFixed(2)),
-          reference: null as string | null,
-        },
-      ],
-      onAccountCustomerName: null,
-      managerOverride: false,
+      tenders: tenderLines
+        .filter(l => l.amount > 0)
+        .map(l => ({
+          tenderType: l.tenderType,
+          amount: Number(l.amount.toFixed(2)),
+          reference: l.reference ?? null,
+        })),
+      onAccountCustomerName: hasOnAccount ? customerName?.trim() || null : null,
+      managerOverride: hasOnAccount,
     };
+
     try {
       dispatch(setProcessing(true));
       if (online) {
@@ -85,21 +130,18 @@ export default function CheckoutScreen() {
         if (sid != null) {
           dispatch(setLastTransaction(String(sid)));
         }
-        Toast.show({type: 'success', text1: 'Sale completed'});
+        Toast.show({type: 'success', text1: t('pos.saleCompleted')});
         dispatch(clearCart());
         navigation.navigate('Receipt');
       } else {
         await queueOfflineCheckout(body);
-        Toast.show({
-          type: 'info',
-          text1: 'Saved offline — will sync when online',
-        });
+        Toast.show({type: 'info', text1: t('pos.savedOffline')});
         dispatch(clearCart());
       }
     } catch (e: unknown) {
       Toast.show({
         type: 'error',
-        text1: 'Checkout failed',
+        text1: t('pos.checkoutFailed'),
         text2: e instanceof Error ? e.message : undefined,
       });
     } finally {
@@ -115,13 +157,15 @@ export default function CheckoutScreen() {
         style={styles.field}
         textColor="#DC2626"
         contentStyle={styles.btnInner}>
-        Process return / refund
+        {t('pos.processReturn')}
       </Button>
-      <Text style={[styles.section, styles.sectionTitle]}>Register & tender</Text>
+      <Text style={[styles.section, styles.sectionTitle]}>
+        {t('pos.registerTender')}
+      </Text>
       <TextInput
-        label="POS register code"
+        label={t('pos.registerCode')}
         value={posRegisterCode}
-        onChangeText={t => dispatch(setPosRegisterCode(t))}
+        onChangeText={v => dispatch(setPosRegisterCode(v))}
         style={styles.field}
       />
       <View style={styles.row}>
@@ -140,27 +184,79 @@ export default function CheckoutScreen() {
           USD
         </Button>
       </View>
-      <Text style={[styles.section, styles.sectionTitle]}>Payment method</Text>
+
+      <Text style={[styles.section, styles.sectionTitle]}>
+        {t('pos.paymentMethod')}
+      </Text>
+      {tenderLines.map((line, index) => (
+        <View key={`${line.tenderType}-${index}`} style={styles.tenderRow}>
+          <View style={styles.tenderChips}>
+            {tenderOptions.map(tt => (
+              <Button
+                key={tt}
+                compact
+                mode={line.tenderType === tt ? 'contained' : 'outlined'}
+                onPress={() =>
+                  dispatch(setTenderLineType({index, tenderType: tt}))
+                }
+                style={styles.chipBtn}
+                contentStyle={styles.btnInner}>
+                {tenderLabel(tt)}
+              </Button>
+            ))}
+          </View>
+          <TextInput
+            label={t('pos.tenderAmount')}
+            keyboardType="decimal-pad"
+            value={line.amount ? String(line.amount) : ''}
+            onChangeText={v =>
+              dispatch(
+                updateTenderLine({
+                  index,
+                  amount: parseFloat(v) || 0,
+                }),
+              )
+            }
+            style={styles.field}
+          />
+          {tenderLines.length > 1 ? (
+            <Button onPress={() => dispatch(removeTenderLine(index))}>
+              Remove line
+            </Button>
+          ) : null}
+        </View>
+      ))}
       <View style={styles.row}>
-        {(['CASH', 'MOMO', 'CARD'] as const).map(t => (
-          <Button
-            key={t}
-            mode={tenderType === t ? 'contained' : 'outlined'}
-            onPress={() => dispatch(setTenderType(t))}
-            style={styles.currencyBtn}
-            contentStyle={styles.btnInner}>
-            {t}
-          </Button>
-        ))}
+        {tenderOptions.map(tt => {
+          const used = tenderLines.some(l => l.tenderType === tt);
+          if (used) {
+            return null;
+          }
+          return (
+            <Button
+              key={tt}
+              mode="outlined"
+              onPress={() => dispatch(addTenderLine(tt))}
+              style={styles.currencyBtn}
+              contentStyle={styles.btnInner}>
+              + {tenderLabel(tt)}
+            </Button>
+          );
+        })}
       </View>
+      <Text style={styles.bodyMedium}>
+        {t('pos.tenderTotal')}: {formatMoney(tenderSum, sessionCurrency)} /{' '}
+        {t('pos.saleTotal')}: {formatMoney(total, sessionCurrency)}
+      </Text>
+
       <TextInput
-        label="Customer name (optional)"
+        label={t('pos.customerOptional')}
         value={customerName ?? ''}
-        onChangeText={t =>
+        onChangeText={v =>
           dispatch(
             setCustomer(
-              t.trim()
-                ? {customerId: 'WALK_IN', customerName: t.trim()}
+              v.trim()
+                ? {customerId: 'WALK_IN', customerName: v.trim()}
                 : null,
             ),
           )
@@ -168,18 +264,20 @@ export default function CheckoutScreen() {
         style={styles.field}
       />
       <TextInput
-        label="Discount (same currency)"
+        label={t('pos.discount')}
         keyboardType="decimal-pad"
         value={discount ? String(discount) : ''}
-        onChangeText={t => dispatch(setDiscount(parseFloat(t) || 0))}
+        onChangeText={v => dispatch(setDiscount(parseFloat(v) || 0))}
         style={styles.field}
       />
-      <Text style={[styles.section, styles.sectionTitle]}>Scan or enter barcode</Text>
+      <Text style={[styles.section, styles.sectionTitle]}>
+        {t('pos.scanBarcode')}
+      </Text>
       <View style={styles.row}>
         <TextInput
-          label="Barcode"
+          label={t('pos.barcode')}
           value={barcodeInput}
-          onChangeText={t => dispatch(setBarcodeInput(t))}
+          onChangeText={v => dispatch(setBarcodeInput(v))}
           style={[styles.field, {flex: 1}]}
           onSubmitEditing={() => {
             if (barcodeInput.trim()) {
@@ -221,11 +319,11 @@ export default function CheckoutScreen() {
                 dense
                 keyboardType="decimal-pad"
                 value={String(item.quantity)}
-                onChangeText={t =>
+                onChangeText={v =>
                   dispatch(
                     updateQuantity({
                       catalogItemId: item.catalogItemId,
-                      quantity: Math.max(0.001, parseFloat(t) || 0.001),
+                      quantity: Math.max(0.001, parseFloat(v) || 0.001),
                     }),
                   )
                 }
@@ -251,10 +349,10 @@ export default function CheckoutScreen() {
         <Button
           mode="contained"
           loading={processing}
-          disabled={processing}
+          disabled={processing || tenderSum + 0.001 < total}
           onPress={() => void submitCheckout()}
           contentStyle={styles.btnInner}>
-          {online ? 'Complete sale' : 'Queue offline sale'}
+          {online ? t('pos.completeSale') : t('pos.savedOffline')}
         </Button>
       </View>
     </ScrollView>
@@ -265,8 +363,11 @@ const styles = StyleSheet.create({
   wrap: {flex: 1, padding: 12},
   section: {marginTop: 8, marginBottom: 4},
   field: {marginBottom: 8},
-  row: {flexDirection: 'row', alignItems: 'center', gap: 8},
-  currencyBtn: {flex: 1},
+  row: {flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap'},
+  currencyBtn: {flex: 1, minWidth: 80},
+  chipBtn: {marginRight: 4, marginBottom: 4},
+  tenderRow: {marginBottom: 12},
+  tenderChips: {flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: 8},
   addBtn: {justifyContent: 'center'},
   btnInner: {minHeight: 48},
   card: {marginBottom: 8},

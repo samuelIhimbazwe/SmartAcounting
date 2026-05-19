@@ -4,19 +4,31 @@ import {Button, TextInput} from 'react-native-paper';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useDispatch, useSelector} from 'react-redux';
+import {useTranslation} from 'react-i18next';
 import type {AppDispatch, RootState} from '../../store';
-import {loginWithPassword, updateLoginForm} from '../../store/slices/authSlice';
+import {
+  loginWithPassword,
+  restoreSessionFromRefresh,
+  updateLoginForm,
+} from '../../store/slices/authSlice';
 import type {AuthStackParamList} from '../../navigation/AuthNavigator';
+import {
+  isBiometricUnlockEnabled,
+  loadRefreshTokenWithBiometric,
+} from '../../services/biometricUnlock';
 
 type Nav = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
 export default function LoginScreen() {
+  const {t} = useTranslation();
   const navigation = useNavigation<Nav>();
   const dispatch = useDispatch<AppDispatch>();
   const pendingId = useSelector((s: RootState) => s.auth.pendingMfaChallengeId);
   const loading = useSelector((s: RootState) => s.auth.isLoading);
   const error = useSelector((s: RootState) => s.auth.error);
   const form = useSelector((s: RootState) => s.auth.loginForm);
+  const accessToken = useSelector((s: RootState) => s.auth.accessToken);
+  const refreshToken = useSelector((s: RootState) => s.auth.refreshToken);
 
   useEffect(() => {
     if (pendingId) {
@@ -24,34 +36,61 @@ export default function LoginScreen() {
     }
   }, [pendingId, navigation]);
 
+  useEffect(() => {
+    if (!accessToken && isBiometricUnlockEnabled()) {
+      void (async () => {
+        const stored = await loadRefreshTokenWithBiometric();
+        if (stored) {
+          await dispatch(restoreSessionFromRefresh(stored));
+        }
+      })();
+    }
+  }, [accessToken, dispatch]);
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>SmartAccounting</Text>
+      <Text style={styles.title}>{t('auth.appName')}</Text>
+      {isBiometricUnlockEnabled() ? (
+        <Button
+          mode="outlined"
+          style={styles.field}
+          loading={loading}
+          onPress={() => {
+            void (async () => {
+              const stored = await loadRefreshTokenWithBiometric();
+              if (stored) {
+                await dispatch(restoreSessionFromRefresh(stored));
+              }
+            })();
+          }}>
+          {t('auth.biometricPrompt')}
+        </Button>
+      ) : null}
       <TextInput
-        label="Username"
+        label={t('auth.username')}
         value={form.username}
-        onChangeText={t => dispatch(updateLoginForm({username: t}))}
+        onChangeText={v => dispatch(updateLoginForm({username: v}))}
         autoCapitalize="none"
         style={styles.field}
       />
       <TextInput
-        label="Password"
+        label={t('auth.password')}
         value={form.password}
-        onChangeText={t => dispatch(updateLoginForm({password: t}))}
+        onChangeText={v => dispatch(updateLoginForm({password: v}))}
         secureTextEntry
         style={styles.field}
       />
       <TextInput
-        label="Tenant ID"
+        label={t('auth.tenantId')}
         value={form.tenantId}
-        onChangeText={t => dispatch(updateLoginForm({tenantId: t}))}
+        onChangeText={v => dispatch(updateLoginForm({tenantId: v}))}
         autoCapitalize="none"
         style={styles.field}
       />
       <TextInput
-        label="User ID"
+        label={t('auth.userId')}
         value={form.userId}
-        onChangeText={t => dispatch(updateLoginForm({userId: t}))}
+        onChangeText={v => dispatch(updateLoginForm({userId: v}))}
         autoCapitalize="none"
         style={styles.field}
       />
@@ -63,7 +102,7 @@ export default function LoginScreen() {
         onPress={() => dispatch(loginWithPassword())}
         style={styles.button}
         contentStyle={styles.buttonInner}>
-        Sign in
+        {t('auth.signIn')}
       </Button>
     </View>
   );

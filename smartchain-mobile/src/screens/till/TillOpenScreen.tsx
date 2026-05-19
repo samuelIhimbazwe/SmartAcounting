@@ -15,7 +15,15 @@ import {useDispatch, useSelector} from 'react-redux';
 import type {AppDispatch, RootState} from '../../store';
 import {apiClient, isApiError} from '../../api/client';
 import {fetchTillExpected} from '../../api/retail';
-import {getCurrentTillSession, openTillSession} from '../../api/tillSessions';
+import {
+  getCurrentTillSession,
+  openTillSession,
+  suspendTillSession,
+} from '../../api/tillSessions';
+import {canManageTillSession} from '../../utils/roles';
+import type {AppRole} from '../../utils/roles';
+import {clearTillSession} from '../../store/slices/tillSlice';
+import {useTranslation} from 'react-i18next';
 import {printerService} from '../../services/printer/BluetoothPrinterService';
 import {
   setCurrentSessionId,
@@ -40,7 +48,13 @@ export default function TillOpenScreen() {
   const [opening, setOpening] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
 
-  const {userId, userName} = useSelector((s: RootState) => s.auth);
+  const {userId, userName, roles} = useSelector((s: RootState) => s.auth);
+  const currentSessionId = useSelector((s: RootState) => s.till.currentSessionId);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [suspending, setSuspending] = useState(false);
+  const {t} = useTranslation();
+  const appRoles = roles as AppRole[];
+  const canSuspend = canManageTillSession(appRoles);
 
   useEffect(() => {
     void (async () => {
@@ -56,14 +70,14 @@ export default function TillOpenScreen() {
             cashierName: userName || 'Cashier',
           }),
         );
-        navigation.getParent()?.navigate('POS', {screen: 'Checkout'});
+        setActiveSessionId(session.id);
       } catch {
         /* no open session — show open flow */
       } finally {
         setCheckingSession(false);
       }
     })();
-  }, [dispatch, navigation, userName]);
+  }, [dispatch, userName]);
 
   const goToPos = (
     registerCode: string,
@@ -139,12 +153,62 @@ export default function TillOpenScreen() {
     setTimeout(() => setPrinterConnected(printerService.isConnected()), 500);
   };
 
+  const suspendSession = async () => {
+    const sid = currentSessionId || activeSessionId;
+    if (!sid) {
+      return;
+    }
+    setSuspending(true);
+    try {
+      await suspendTillSession(sid);
+      dispatch(clearTillSession());
+      setActiveSessionId(null);
+      Alert.alert(t('common.success'), t('till.suspended'));
+    } catch (error: unknown) {
+      const message = isApiError(error)
+        ? String((error.body as {message?: string})?.message ?? error.message)
+        : t('till.suspendFailed');
+      Alert.alert(t('common.error'), message);
+    } finally {
+      setSuspending(false);
+    }
+  };
+
   if (checkingSession) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator size="large" color="#1B6FDB" />
         <Text style={styles.loadingText}>Checking till session…</Text>
       </View>
+    );
+  }
+
+  if (activeSessionId) {
+    return (
+      <ScrollView style={styles.container}>
+        <Text style={styles.title}>{t('till.openTitle')}</Text>
+        <Text style={styles.subtitle}>Till session is open</Text>
+        <TouchableOpacity
+          style={styles.openButton}
+          onPress={() =>
+            navigation.getParent()?.navigate('POS', {screen: 'Checkout'})
+          }>
+          <Text style={styles.openButtonText}>Continue to POS</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.linkButton}
+          onPress={() => navigation.navigate('TillClose')}>
+          <Text style={styles.linkButtonText}>{t('till.closeTitle')}</Text>
+        </TouchableOpacity>
+        {canSuspend ? (
+          <TouchableOpacity
+            style={[styles.suspendButton, suspending && styles.openButtonDisabled]}
+            onPress={() => void suspendSession()}
+            disabled={suspending}>
+            <Text style={styles.suspendButtonText}>{t('till.suspend')}</Text>
+          </TouchableOpacity>
+        ) : null}
+      </ScrollView>
     );
   }
 
@@ -292,4 +356,12 @@ const styles = StyleSheet.create({
   openButtonText: {color: '#FFFFFF', fontSize: 18, fontWeight: '700'},
   linkButton: {alignItems: 'center', marginBottom: 12},
   linkButtonText: {color: '#1B6FDB', fontWeight: '600', fontSize: 15},
+  suspendButton: {
+    backgroundColor: '#D97706',
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  suspendButtonText: {color: '#FFFFFF', fontSize: 16, fontWeight: '600'},
 });

@@ -24,6 +24,7 @@ export function SyncStatusBar() {
   const [isOnline, setIsOnline] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
+  const [lastItemError, setLastItemError] = useState<string | null>(null);
 
   const accessToken = useSelector((s: RootState) => s.auth.accessToken);
   const roles = useSelector((s: RootState) => s.auth.roles) as AppRole[];
@@ -33,6 +34,8 @@ export function SyncStatusBar() {
     try {
       const pending = await getPendingTransactions();
       setPendingCount(pending.length);
+      const err = pending.find(p => p.lastError)?.lastError;
+      setLastItemError(err ?? null);
     } catch {
       setPendingCount(0);
     }
@@ -98,10 +101,12 @@ export function SyncStatusBar() {
         <View style={[styles.bar, isOnline ? styles.syncing : styles.offline]}>
           <Text style={styles.text}>
             {syncing
-              ? `Syncing ${pendingCount} sale${pendingCount !== 1 ? 's' : ''}…`
+              ? `Syncing ${pendingCount} item${pendingCount !== 1 ? 's' : ''}…`
               : isOnline
-                ? 'Back online'
-                : `Offline — ${pendingCount} sale${pendingCount !== 1 ? 's' : ''} saved locally`}
+                ? lastItemError
+                  ? `Sync error: ${lastItemError.slice(0, 80)}`
+                  : 'Back online'
+                : `Offline — ${pendingCount} item${pendingCount !== 1 ? 's' : ''} queued`}
           </Text>
         </View>
       ) : null}

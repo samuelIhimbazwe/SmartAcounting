@@ -22,6 +22,15 @@ jobs:
             exit 1
           fi
           echo "SSL cert present ($(wc -c < "$CERT") bytes)"
+      - name: Assert google-services.json present
+        run: |
+          GSF=android/app/google-services.json
+          if [ ! -f "$GSF" ] || [ ! -s "$GSF" ]; then
+            echo "google-services.json missing or empty at $GSF"
+            echo "Download from Firebase console — do not commit secrets to public repos."
+            exit 1
+          fi
+          echo "google-services.json present"
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -29,3 +38,12 @@ jobs:
           cache-dependency-path: smartchain-mobile/package-lock.json
       - run: npm ci --legacy-peer-deps
       - run: npx tsc --noEmit
+      - run: npm test -- --passWithNoTests
+      - name: Maestro smoke (optional)
+        continue-on-error: true
+        run: |
+          if command -v maestro >/dev/null 2>&1; then
+            maestro test ../e2e/smoke.yaml
+          else
+            echo "Maestro not installed — skipping smoke flow"
+          fi

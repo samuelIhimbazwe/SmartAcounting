@@ -1,5 +1,6 @@
+import axios from 'axios';
 import {jwtDecode} from 'jwt-decode';
-import {apiClient} from './client';
+import {apiClient, BASE_URL} from './client';
 import type {AppRole} from '../utils/roles';
 import {normalizeRoles} from '../utils/roles';
 
@@ -67,4 +68,12 @@ export async function postLogin(body: LoginBody): Promise<SessionPayload> {
 
 export async function postLogout(refreshToken: string): Promise<void> {
   await apiClient.post('/auth/logout', {refreshToken});
+}
+
+/** Token refresh — axios only (not routed through pinned apiCall). */
+export async function postRefresh(refreshToken: string): Promise<SessionPayload> {
+  const {data} = await axios.post<AuthResponseDto>(`${BASE_URL}/auth/refresh`, {
+    refreshToken,
+  });
+  return sessionFromTokenPair(data.token, data.refreshToken);
 }

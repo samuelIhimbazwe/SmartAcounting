@@ -64,12 +64,26 @@ const tillSlice = createSlice({
     ) => {
       state.tillExpectedSnapshot = action.payload;
     },
-    resetTillForm: () => ({...initialState, businessDate: today()}),
+    clearTillSession: state => {
+      state.currentSessionId = null;
+    },
+    resetTillForm: state => {
+      state.currentSessionId = null;
+      state.businessDate = today();
+      state.countedCash = '0';
+      state.countedMomo = '0';
+      state.countedAirtel = '0';
+      state.countedCard = '0';
+      state.countedOnAccount = '0';
+      state.notes = '';
+      state.tillExpectedSnapshot = null;
+    },
   },
 });
 
 export const {
   setCurrentSessionId,
+  clearTillSession,
   setTillBusinessDate,
   setTillRegisterCode,
   setTillCounts,

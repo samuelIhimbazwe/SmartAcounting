@@ -5,6 +5,7 @@ import {
   postLogin,
   postMfaChallenge,
   postLogout,
+  postRefresh,
   type LoginBody,
   type SessionPayload,
 } from '../../api/auth';
@@ -56,23 +57,7 @@ export const authInitialState: AuthState = {
   },
 };
 
-function pickPrimaryRole(roles: AppRole[]): AppRole | null {
-  const order: AppRole[] = [
-    'CEO',
-    'CFO',
-    'OPS_MANAGER',
-    'SALES_MANAGER',
-    'ACCOUNTING_CONTROLLER',
-    'HR_MANAGER',
-    'MARKETING_MANAGER',
-  ];
-  for (const r of order) {
-    if (roles.includes(r)) {
-      return r;
-    }
-  }
-  return roles[0] ?? null;
-}
+import {pickPrimaryRole as resolvePrimaryRole} from '../../utils/roles';
 
 function applySession(state: AuthState, session: SessionPayload) {
   state.accessToken = session.accessToken;
@@ -80,10 +65,10 @@ function applySession(state: AuthState, session: SessionPayload) {
   state.tenantId = session.tenantId;
   state.userId = session.userId;
   state.roles = session.roles;
-  state.role = pickPrimaryRole(session.roles);
+  state.role = resolvePrimaryRole(session.roles);
   state.userName = session.userName;
   setItem('refreshToken', session.refreshToken);
-  const role = pickPrimaryRole(session.roles);
+  const role = resolvePrimaryRole(session.roles);
   if (session.userId && session.tenantId && role) {
     setUserContext(session.userId, session.tenantId, role);
   }
@@ -123,6 +108,11 @@ export const loginWithOtp = createAsyncThunk<
     otpCode: payload.otpCode,
   });
 });
+
+export const restoreSessionFromRefresh = createAsyncThunk<
+  SessionPayload,
+  string
+>('auth/restoreSessionFromRefresh', async refreshToken => postRefresh(refreshToken));
 
 export const logoutAsync = createAsyncThunk(
   'auth/logoutAsync',
@@ -225,6 +215,18 @@ const authSlice = createSlice({
       .addCase(loginWithOtp.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.error.message || 'MFA login failed';
+      })
+      .addCase(restoreSessionFromRefresh.pending, state => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(restoreSessionFromRefresh.fulfilled, (state, action) => {
+        state.isLoading = false;
+        applySession(state, action.payload);
+      })
+      .addCase(restoreSessionFromRefresh.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.error.message || 'Biometric unlock failed';
       });
   },
 });

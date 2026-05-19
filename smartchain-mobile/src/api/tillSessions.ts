@@ -36,6 +36,15 @@ export async function closeTillSession(
 ): Promise<TillSessionDto> {
   return apiCall<TillSessionDto>(`/pos/till-sessions/${sessionId}/close`, {
     method: 'PATCH',
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      closingCash: body.closingCash,
+      notes: body.notes,
+    }),
+  });
+}
+
+export async function suspendTillSession(sessionId: string): Promise<TillSessionDto> {
+  return apiCall<TillSessionDto>(`/pos/till-sessions/${sessionId}/suspend`, {
+    method: 'PATCH',
   });
 }

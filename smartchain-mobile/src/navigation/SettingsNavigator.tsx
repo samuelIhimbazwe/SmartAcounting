@@ -1,16 +1,30 @@
 import React from 'react';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
+import {useTranslation} from 'react-i18next';
+import {SettingsHomeScreen} from '../screens/settings/SettingsHomeScreen';
+import {LanguageSettingsScreen} from '../screens/settings/LanguageSettingsScreen';
 import {PrinterSettingsScreen} from '../screens/settings/PrinterSettingsScreen';
 
 const Stack = createNativeStackNavigator();
 
 export default function SettingsNavigator() {
+  const {t} = useTranslation();
   return (
     <Stack.Navigator>
       <Stack.Screen
+        name="SettingsHome"
+        component={SettingsHomeScreen}
+        options={{title: t('settings.title')}}
+      />
+      <Stack.Screen
+        name="LanguageSettings"
+        component={LanguageSettingsScreen}
+        options={{title: t('settings.language')}}
+      />
+      <Stack.Screen
         name="PrinterSettings"
         component={PrinterSettingsScreen}
-        options={{title: 'Receipt printer'}}
+        options={{title: t('settings.printer')}}
       />
     </Stack.Navigator>
   );

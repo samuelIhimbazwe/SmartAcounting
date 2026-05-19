@@ -1,0 +1,22 @@
+appId: com.smartaccounting.mobile
+---
+- launchApp
+- tapOn: "Username"
+- inputText: "${MAESTRO_USERNAME}"
+- tapOn: "Password"
+- inputText: "${MAESTRO_PASSWORD}"
+- tapOn: "Sign in"
+- tapOn: "Till"
+- tapOn: "Opening float"
+- inputText: "50000"
+- tapOn: "Open Till"
+- tapOn: "POS"
+- tapOn: "Barcode"
+- inputText: "TEST-SKU-001"
+- tapOn: "Add"
+- tapOn: "Cash"
+- tapOn: "Complete sale"
+- tapOn: "Print receipt"
+- tapOn: "Till"
+- tapOn: "Close till"
+- tapOn: "Submit till close"

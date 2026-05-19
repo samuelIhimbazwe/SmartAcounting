@@ -1,112 +1,187 @@
 import {v4 as uuidv4} from 'uuid';
 import {database} from '../db';
-import {OfflineTransaction} from '../db/models/OfflineTransaction';
+import {
+  OfflineTransaction,
+  type OfflineOperationType,
+} from '../db/models/OfflineTransaction';
 import {postSyncFlush, postSyncQueue} from '../api/sync';
+import {apiClient, apiCall, isApiError} from '../api/client';
+import {closeTillSession} from '../api/tillSessions';
+import {postTillClose} from '../api/retail';
 import {getDeviceId} from '../utils/deviceId';
 import type {AppRole} from '../utils/roles';
 
-/**
- * Mobile offline queue.
- *
- * Wire format is identical across web, desktop and mobile: the backend's
- * `POST /api/v1/sync/queue` accepts a JSON array of `SyncOperationRequest`:
- *
- *   {
- *     deviceId:        UUID,
- *     idempotencyKey:  UUID,
- *     operationType:   "POS_SALE",
- *     entityType:      "POS_CHECKOUT",
- *     payload:         {...},
- *     lamportClock:    epoch-ms,
- *     conflictPolicy:  "LAST_WRITE_WINS"
- *   }
- *
- * The idempotency key lives in the *body*, not in an HTTP header — the
- * backend's `SyncService` reads it from the DTO. A globally unique UUID
- * generated with `uuid` (backed by `react-native-get-random-values`) gives
- * us replay-safety on retry.
- *
- * Records are retried up to 5 times; `retryCount` is incremented on each
- * failure. Beyond that they remain in WatermelonDB for operator inspection.
- */
-
 const MAX_RETRIES = 5;
 
-/** POS checkout JSON matching backend PosCheckoutRequest (camelCase). */
+let lastSyncError: string | null = null;
+
+export function getLastSyncError(): string | null {
+  return lastSyncError;
+}
+
+export function clearLastSyncError(): void {
+  lastSyncError = null;
+}
+
+async function enqueue(
+  operationType: OfflineOperationType,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const idempotencyKey = uuidv4();
+  await database.write(async () => {
+    await database.get<OfflineTransaction>('offline_transactions').create(rec => {
+      rec.operationType = operationType;
+      rec.payloadJson = JSON.stringify(payload);
+      rec.idempotencyKey = idempotencyKey;
+      rec.savedAt = new Date().toISOString();
+      rec.synced = false;
+      rec.retryCount = 0;
+      rec.lastError = undefined;
+    });
+  });
+}
+
 export type PosCheckoutPayload = Record<string, unknown>;
 
 export async function queueOfflineCheckout(
   checkoutPayload: PosCheckoutPayload,
 ): Promise<void> {
-  const idempotencyKey = uuidv4();
-  await database.write(async () => {
-    await database.get<OfflineTransaction>('offline_transactions').create(rec => {
-      rec.payloadJson = JSON.stringify(checkoutPayload);
-      rec.idempotencyKey = idempotencyKey;
-      rec.savedAt = new Date().toISOString();
-      rec.synced = false;
-      rec.retryCount = 0;
-    });
-  });
+  await enqueue('POS_CHECKOUT', checkoutPayload);
 }
 
-/** All pending (unsynced) records still under the retry cap. */
+export async function queueOfflineReturn(
+  returnPayload: Record<string, unknown>,
+): Promise<void> {
+  await enqueue('POS_RETURN', returnPayload);
+}
+
+export async function queueOfflineStockCount(
+  stockCountPayload: Record<string, unknown>,
+): Promise<void> {
+  await enqueue('STOCK_COUNT', stockCountPayload);
+}
+
+export async function queueOfflineTillClose(
+  payload: Record<string, unknown>,
+): Promise<void> {
+  await enqueue('TILL_CLOSE', payload);
+}
+
 export async function getPendingTransactions(): Promise<OfflineTransaction[]> {
   const all = await database
     .get<OfflineTransaction>('offline_transactions')
     .query()
     .fetch();
-  return all.filter(t => !t.synced && t.retryCount < MAX_RETRIES);
+  return all
+    .filter(t => !t.synced && t.retryCount < MAX_RETRIES)
+    .sort((a, b) => a.savedAt.localeCompare(b.savedAt));
 }
 
 function buildSyncOperation(record: OfflineTransaction) {
-  const checkoutPayload = JSON.parse(record.payloadJson) as PosCheckoutPayload;
+  const payload = JSON.parse(record.payloadJson) as Record<string, unknown>;
   return {
     deviceId: getDeviceId(),
     idempotencyKey: record.idempotencyKey,
-    operationType: 'POS_SALE',
-    entityType: 'POS_CHECKOUT',
-    payload: checkoutPayload,
+    operationType:
+      record.operationType === 'POS_CHECKOUT' ? 'POS_SALE' : record.operationType,
+    entityType: record.operationType,
+    payload,
     lamportClock: Date.now(),
     conflictPolicy: 'LAST_WRITE_WINS',
   };
+}
+
+async function processRecord(record: OfflineTransaction): Promise<void> {
+  const payload = JSON.parse(record.payloadJson) as Record<string, unknown>;
+  const headers = {'X-Idempotency-Key': record.idempotencyKey};
+
+  switch (record.operationType) {
+    case 'POS_CHECKOUT':
+      await postSyncQueue([buildSyncOperation(record)]);
+      return;
+    case 'POS_RETURN':
+      await apiCall('/pos/returns', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        headers,
+      });
+      return;
+    case 'STOCK_COUNT': {
+      const adjustments = (payload.adjustments as Array<Record<string, unknown>>) ?? [];
+      for (const adj of adjustments) {
+        if (Number(adj.variance) > 0) {
+          await apiCall('/inventory/receive', {
+            method: 'POST',
+            body: JSON.stringify(adj.receiveBody),
+            headers,
+          });
+        } else {
+          await apiCall('/inventory/shrinkage', {
+            method: 'POST',
+            body: JSON.stringify(adj.shrinkageBody),
+            headers,
+          });
+        }
+      }
+      return;
+    }
+    case 'TILL_CLOSE': {
+      const sessionId = String(payload.sessionId);
+      await apiCall(`/pos/till-sessions/${sessionId}/close`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          closingCash: payload.closingCash,
+          notes: payload.notes,
+        }),
+        headers,
+      });
+      if (payload.retailBody) {
+        await apiCall('/retail/till/close', {
+          method: 'POST',
+          body: JSON.stringify(payload.retailBody),
+          headers,
+        });
+      }
+      return;
+    }
+    default:
+      throw new Error(`Unknown operation ${record.operationType}`);
+  }
 }
 
 function canFlushSync(roles: AppRole[]): boolean {
   return roles.includes('CEO') || roles.includes('OPS_MANAGER');
 }
 
-/**
- * Drain pending transactions to the backend.
- *
- * - On success, the record is marked `synced = true`.
- * - On failure (network or server), `retryCount` is incremented; once a
- *   record hits `MAX_RETRIES` it stays put for manual review.
- * - After any successful pushes, `/sync/flush` is fired (it is role-gated to
- *   CEO/OPS_MANAGER so cashiers skip it).
- */
 export async function syncPendingTransactions(
   roles: AppRole[],
 ): Promise<{synced: number; failed: number}> {
   const unsynced = await getPendingTransactions();
-
   let synced = 0;
   let failed = 0;
+  lastSyncError = null;
 
   for (const record of unsynced) {
     try {
-      const op = buildSyncOperation(record);
-      await postSyncQueue([op]);
+      await processRecord(record);
       await database.write(async () => {
         await record.update(r => {
           r.synced = true;
+          r.lastError = undefined;
         });
       });
       synced += 1;
-    } catch {
+    } catch (e: unknown) {
+      const message = isApiError(e)
+        ? String((e.body as {message?: string})?.message ?? e.message)
+        : e instanceof Error
+          ? e.message
+          : 'Sync failed';
+      lastSyncError = message;
       await database.write(async () => {
         await record.update(r => {
           r.retryCount += 1;
+          r.lastError = message;
         });
       });
       failed += 1;
@@ -117,7 +192,7 @@ export async function syncPendingTransactions(
     try {
       await postSyncFlush();
     } catch {
-      /* flush requires CEO/OPS — ignore 403 for cashiers, transient otherwise */
+      /* optional */
     }
   }
 

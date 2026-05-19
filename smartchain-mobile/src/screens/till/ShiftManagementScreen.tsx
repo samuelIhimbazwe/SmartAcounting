@@ -1,7 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import {View, Text, FlatList, StyleSheet, RefreshControl} from 'react-native';
-import {apiClient} from '../../api/client';
-import axios from 'axios';
+import {apiClient, isApiError} from '../../api/client';
 
 interface ShiftRow {
   id: string;
@@ -23,8 +22,8 @@ export default function ShiftManagementScreen() {
       setShifts(data);
     } catch (e) {
       setError(
-        axios.isAxiosError(e)
-          ? e.response?.status === 403
+        isApiError(e)
+          ? e.status === 403
             ? 'Shift list requires HR or manager role.'
             : e.message
           : 'Failed to load shifts',

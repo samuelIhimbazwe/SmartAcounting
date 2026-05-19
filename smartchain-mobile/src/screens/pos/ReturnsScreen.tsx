@@ -11,10 +11,10 @@ import {
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSelector} from 'react-redux';
-import {apiClient} from '../../api/client';
+import {apiClient, isApiError} from '../../api/client';
 import type {RootState} from '../../store';
 import type {PosStackParamList} from '../../navigation/PosNavigator';
-import axios from 'axios';
+import {queueOfflineReturn} from '../../services/offlineQueue';
 
 const RETURN_REASONS = [
   'DAMAGED',
@@ -44,6 +44,7 @@ interface ReturnLineForm {
 export default function ReturnsScreen() {
   const navigation = useNavigation<Nav>();
   const posRegisterCode = useSelector((s: RootState) => s.pos.posRegisterCode);
+  const online = useSelector((s: RootState) => s.network.online);
   const [originalRef, setOriginalRef] = useState('');
   const [reason, setReason] = useState('DAMAGED');
   const [refundMethod, setRefundMethod] = useState('CASH');
@@ -85,45 +86,48 @@ export default function ReturnsScreen() {
 
   const doSubmit = async () => {
     setSubmitting(true);
+    const body = {
+      originalTransactionId: originalRef.trim() || null,
+      reason,
+      refundMethod,
+      tillCode: posRegisterCode || 'REG-01',
+      lines: items.map(i => ({
+        productId: i.productId.trim() || '00000000-0000-0000-0000-000000000001',
+        sku: i.sku.trim() || 'RETURN',
+        productName: i.productName.trim(),
+        quantity: Number(i.quantity),
+        unitPrice: Number(i.unitPrice),
+        restock: reason !== 'DAMAGED' && reason !== 'EXPIRED',
+        condition:
+          reason === 'DAMAGED'
+            ? 'DAMAGED'
+            : reason === 'EXPIRED'
+              ? 'EXPIRED'
+              : 'RESALEABLE',
+      })),
+    };
     try {
-      await apiClient.post('/pos/returns', {
-        originalTransactionId: originalRef.trim() || null,
-        reason,
-        refundMethod,
-        tillCode: posRegisterCode || 'REG-01',
-        lines: items.map(i => ({
-          productId: i.productId.trim() || '00000000-0000-0000-0000-000000000001',
-          sku: i.sku.trim() || 'RETURN',
-          productName: i.productName.trim(),
-          quantity: Number(i.quantity),
-          unitPrice: Number(i.unitPrice),
-          restock: reason !== 'DAMAGED' && reason !== 'EXPIRED',
-          condition:
-            reason === 'DAMAGED'
-              ? 'DAMAGED'
-              : reason === 'EXPIRED'
-                ? 'EXPIRED'
-                : 'RESALEABLE',
-        })),
-      });
+      if (online) {
+        await apiClient.post('/pos/returns', body);
+      } else {
+        await queueOfflineReturn(body);
+      }
 
       Alert.alert(
-        'Return processed',
-        `Refund of ${totalRefund.toLocaleString()} FRW processed successfully.`,
+        online ? 'Return processed' : 'Return queued',
+        online
+          ? `Refund of ${totalRefund.toLocaleString()} FRW processed successfully.`
+          : 'Return saved offline — will sync when online.',
         [{text: 'OK', onPress: () => navigation.goBack()}],
       );
     } catch (error: unknown) {
       let msg = 'Return failed';
-      if (axios.isAxiosError(error)) {
-        if (error.response?.status === 403) {
+      if (isApiError(error)) {
+        if (error.status === 403) {
           msg =
             'This return requires manager approval. A manager has been notified.';
-        } else if (error.response?.data) {
-          msg = String(
-            (error.response.data as {message?: string}).message ?? error.message,
-          );
         } else {
-          msg = error.message;
+          msg = String((error.body as {message?: string})?.message ?? error.message);
         }
       } else if (error instanceof Error) {
         msg = error.message;

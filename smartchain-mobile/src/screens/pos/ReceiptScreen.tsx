@@ -1,11 +1,13 @@
 import React from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import {Platform, Share, StyleSheet, Text, View} from 'react-native';
 import {Button} from 'react-native-paper';
+import {useTranslation} from 'react-i18next';
 import {useSelector} from 'react-redux';
 import type {RootState} from '../../store';
 import {printReceiptWithAlert} from '../../services/printing';
 
 export default function ReceiptScreen() {
+  const {t} = useTranslation();
   const txId = useSelector((s: RootState) => s.pos.lastTransactionId);
 
   const onPrint = async () => {
@@ -15,9 +17,19 @@ export default function ReceiptScreen() {
     await printReceiptWithAlert(txId);
   };
 
+  const onShare = async () => {
+    if (!txId) {
+      return;
+    }
+    await Share.share({
+      title: t('receipt.title'),
+      message: `${t('receipt.title')}: ${txId}`,
+    });
+  };
+
   return (
     <View style={styles.wrap}>
-      <Text style={styles.title}>Last transaction</Text>
+      <Text style={styles.title}>{t('receipt.title')}</Text>
       <Text selectable style={styles.mono}>
         {txId ?? '—'}
       </Text>
@@ -26,8 +38,17 @@ export default function ReceiptScreen() {
         disabled={!txId}
         onPress={() => void onPrint()}
         contentStyle={styles.btnInner}>
-        Print receipt
+        {t('receipt.print')}
       </Button>
+      {Platform.OS === 'ios' ? (
+        <Button
+          mode="outlined"
+          disabled={!txId}
+          onPress={() => void onShare()}
+          contentStyle={styles.btnInner}>
+          {t('receipt.shareIos')}
+        </Button>
+      ) : null}
     </View>
   );
 }

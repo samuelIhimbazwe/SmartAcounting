@@ -8,8 +8,10 @@ import {
   Alert,
   StyleSheet,
 } from 'react-native';
-import {apiClient} from '../../api/client';
-import axios from 'axios';
+import {useSelector} from 'react-redux';
+import {apiClient, isApiError} from '../../api/client';
+import type {RootState} from '../../store';
+import {queueOfflineStockCount} from '../../services/offlineQueue';
 
 interface CountItem {
   productId: string;
@@ -22,6 +24,7 @@ interface CountItem {
 }
 
 export default function StockCountScreen() {
+  const online = useSelector((s: RootState) => s.network.online);
   const [items, setItems] = useState<CountItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -52,15 +55,11 @@ export default function StockCountScreen() {
         })),
       );
     } catch (error: unknown) {
-      const message =
-        axios.isAxiosError(error) && error.response?.data
-          ? String(
-              (error.response.data as {message?: string}).message ??
-                error.message,
-            )
-          : error instanceof Error
-            ? error.message
-            : 'Failed to load inventory';
+      const message = isApiError(error)
+        ? String((error.body as {message?: string})?.message ?? error.message)
+        : error instanceof Error
+          ? error.message
+          : 'Failed to load inventory';
       Alert.alert('Error', message);
     } finally {
       setLoading(false);
@@ -112,20 +111,24 @@ export default function StockCountScreen() {
         i => i.counted && i.variance !== null && i.variance !== 0,
       );
       const today = new Date().toISOString().split('T')[0];
-
-      for (const adj of adjustments) {
+      const queuedAdjustments = adjustments.map(adj => {
         if (adj.variance! > 0) {
-          await apiClient.post('/inventory/receive', {
-            productId: adj.productId,
-            quantity: adj.variance,
-            location,
-            costPrice: 0,
-            supplierRef: 'STOCK_COUNT',
-            lotCode: null,
-            expiryDate: null,
-          });
-        } else {
-          await apiClient.post('/inventory/shrinkage', {
+          return {
+            variance: adj.variance,
+            receiveBody: {
+              productId: adj.productId,
+              quantity: adj.variance,
+              location,
+              costPrice: 0,
+              supplierRef: 'STOCK_COUNT',
+              lotCode: null,
+              expiryDate: null,
+            },
+          };
+        }
+        return {
+          variance: adj.variance,
+          shrinkageBody: {
             productId: adj.productId,
             sku: adj.sku,
             productName: adj.name,
@@ -135,7 +138,25 @@ export default function StockCountScreen() {
             location,
             incidentDate: today,
             notes: 'Stock count adjustment — shortage',
-          });
+          },
+        };
+      });
+
+      if (!online) {
+        await queueOfflineStockCount({adjustments: queuedAdjustments});
+        Alert.alert(
+          'Count queued',
+          `${adjustments.length} adjustments saved offline`,
+          [{text: 'OK', onPress: () => void loadInventory()}],
+        );
+        return;
+      }
+
+      for (const adj of queuedAdjustments) {
+        if (Number(adj.variance) > 0) {
+          await apiClient.post('/inventory/receive', adj.receiveBody);
+        } else {
+          await apiClient.post('/inventory/shrinkage', adj.shrinkageBody);
         }
       }
 
@@ -145,15 +166,11 @@ export default function StockCountScreen() {
         [{text: 'OK', onPress: () => void loadInventory()}],
       );
     } catch (error: unknown) {
-      const message =
-        axios.isAxiosError(error) && error.response?.data
-          ? String(
-              (error.response.data as {message?: string}).message ??
-                error.message,
-            )
-          : error instanceof Error
-            ? error.message
-            : 'Submit failed';
+      const message = isApiError(error)
+        ? String((error.body as {message?: string})?.message ?? error.message)
+        : error instanceof Error
+          ? error.message
+          : 'Submit failed';
       Alert.alert('Error', message);
     } finally {
       setSubmitting(false);

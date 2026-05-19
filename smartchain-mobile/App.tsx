@@ -1,5 +1,6 @@
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 import {initCrashReporting} from './src/services/crashReporting';
+import {initI18n} from './src/i18n';
 
 initCrashReporting();
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
@@ -25,6 +26,13 @@ function Gatekeeper() {
 }
 
 export default function App(): React.JSX.Element {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    void initI18n().finally(() => setReady(true));
+  }, []);
+  if (!ready) {
+    return null;
+  }
   return (
     <GestureHandlerRootView style={{flex: 1}}>
       <SafeAreaProvider>

@@ -6,7 +6,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {useSelector} from 'react-redux';
 import type {RootState} from '../store';
 import type {AppRole} from '../utils/roles';
-import {hasAnyRole} from '../utils/roles';
+import {hasAnyRole, isCashierShell} from '../utils/roles';
 import {SyncStatusBar} from '../components/SyncStatusBar';
 import PosNavigator from './PosNavigator';
 import StockNavigator from './StockNavigator';
@@ -21,18 +21,18 @@ function tabIcon(name: string, color: string, size: number) {
   return <Icon name={name} color={color} size={Math.max(size, 24)} />;
 }
 
-function copilotTabIcon(color: string) {
-  return <Text style={{fontSize: 20, color}}>✨</Text>;
-}
-
 function resolveInitialRoute(
   role: AppRole | null,
   flags: {
     showTill: boolean;
     showDashboard: boolean;
     showPos: boolean;
+    cashierShell: boolean;
   },
 ): string {
+  if (flags.cashierShell || role === 'CASHIER' || role === 'POS_OPERATOR') {
+    return 'Till';
+  }
   if (
     role === 'SALES_MANAGER' ||
     role === 'ACCOUNTING_CONTROLLER'
@@ -54,28 +54,40 @@ function resolveInitialRoute(
 export default function AppNavigator() {
   const roles = useSelector((s: RootState) => s.auth.roles) as AppRole[];
   const role = useSelector((s: RootState) => s.auth.role);
+  const cashierShell = isCashierShell(roles);
 
-  const showPos = hasAnyRole(roles, 'CEO', 'SALES_MANAGER', 'OPS_MANAGER');
-  const showStock = hasAnyRole(
-    roles,
-    'CEO',
-    'SALES_MANAGER',
-    'OPS_MANAGER',
-    'ACCOUNTING_CONTROLLER',
-  );
-  const showTill = hasAnyRole(
-    roles,
-    'CEO',
-    'SALES_MANAGER',
-    'OPS_MANAGER',
-    'ACCOUNTING_CONTROLLER',
-  );
-  const showDashboard = hasAnyRole(roles, 'CEO', 'CFO');
+  const showPos =
+    cashierShell ||
+    hasAnyRole(roles, 'CEO', 'SALES_MANAGER', 'OPS_MANAGER', 'CASHIER', 'POS_OPERATOR');
+  const showStock =
+    !cashierShell &&
+    hasAnyRole(
+      roles,
+      'CEO',
+      'SALES_MANAGER',
+      'OPS_MANAGER',
+      'ACCOUNTING_CONTROLLER',
+    );
+  const showTill =
+    cashierShell ||
+    hasAnyRole(
+      roles,
+      'CEO',
+      'SALES_MANAGER',
+      'OPS_MANAGER',
+      'ACCOUNTING_CONTROLLER',
+      'CASHIER',
+      'POS_OPERATOR',
+    );
+  const showDashboard =
+    !cashierShell && hasAnyRole(roles, 'CEO', 'CFO');
+  const showCopilot = !cashierShell;
 
   const initialRouteName = resolveInitialRoute(role, {
     showTill,
     showDashboard,
     showPos,
+    cashierShell,
   });
 
   return (
@@ -89,6 +101,15 @@ export default function AppNavigator() {
             tabBarItemStyle: {minHeight: 48},
             headerShown: false,
           }}>
+          {showTill ? (
+            <Tab.Screen
+              name="Till"
+              component={TillNavigator}
+              options={{
+                tabBarIcon: p => tabIcon('cash-multiple', p.color, p.size),
+              }}
+            />
+          ) : null}
           {showPos ? (
             <Tab.Screen
               name="POS"
@@ -107,15 +128,6 @@ export default function AppNavigator() {
               }}
             />
           ) : null}
-          {showTill ? (
-            <Tab.Screen
-              name="Till"
-              component={TillNavigator}
-              options={{
-                tabBarIcon: p => tabIcon('cash-multiple', p.color, p.size),
-              }}
-            />
-          ) : null}
           {showDashboard ? (
             <Tab.Screen
               name="Dashboard"
@@ -126,14 +138,18 @@ export default function AppNavigator() {
               }}
             />
           ) : null}
-          <Tab.Screen
-            name="Copilot"
-            component={CopilotScreen}
-            options={{
-              tabBarIcon: p => copilotTabIcon(p.color),
-              tabBarLabel: 'Copilot',
-            }}
-          />
+          {showCopilot ? (
+            <Tab.Screen
+              name="Copilot"
+              component={CopilotScreen}
+              options={{
+                tabBarIcon: p => (
+                  <Text style={{fontSize: 20, color: p.color}}>✨</Text>
+                ),
+                tabBarLabel: 'Copilot',
+              }}
+            />
+          ) : null}
           <Tab.Screen
             name="Settings"
             component={SettingsNavigator}

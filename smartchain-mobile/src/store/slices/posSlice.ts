@@ -1,4 +1,5 @@
 import {createSlice, PayloadAction} from '@reduxjs/toolkit';
+import type {TenderLine, TenderType} from '../../utils/tenderValidation';
 
 export interface CartItem {
   catalogItemId: string;
@@ -22,12 +23,11 @@ interface PosState {
   posRegisterCode: string;
   isProcessing: boolean;
   lastTransactionId: string | null;
-  /** Manual barcode text field on checkout (Redux-only state). */
   barcodeInput: string;
   openingFloat: number | null;
   shiftStartTime: string | null;
   cashierName: string | null;
-  tenderType: 'CASH' | 'MOMO' | 'CARD';
+  tenderLines: TenderLine[];
 }
 
 const initialState: PosState = {
@@ -43,7 +43,7 @@ const initialState: PosState = {
   openingFloat: null,
   shiftStartTime: null,
   cashierName: null,
-  tenderType: 'CASH',
+  tenderLines: [{tenderType: 'CASH', amount: 0}],
 };
 
 const posSlice = createSlice({
@@ -108,15 +108,39 @@ const posSlice = createSlice({
       state.customerName = null;
       state.isProcessing = false;
       state.barcodeInput = '';
+      state.tenderLines = [{tenderType: 'CASH', amount: 0}];
     },
     setBarcodeInput: (state, action: PayloadAction<string>) => {
       state.barcodeInput = action.payload;
     },
-    setTenderType: (
+    setTenderLines: (state, action: PayloadAction<TenderLine[]>) => {
+      state.tenderLines = action.payload;
+    },
+    addTenderLine: (state, action: PayloadAction<TenderType>) => {
+      state.tenderLines.push({tenderType: action.payload, amount: 0});
+    },
+    updateTenderLine: (
       state,
-      action: PayloadAction<'CASH' | 'MOMO' | 'CARD'>,
+      action: PayloadAction<{index: number; amount: number}>,
     ) => {
-      state.tenderType = action.payload;
+      const line = state.tenderLines[action.payload.index];
+      if (line) {
+        line.amount = action.payload.amount;
+      }
+    },
+    removeTenderLine: (state, action: PayloadAction<number>) => {
+      if (state.tenderLines.length > 1) {
+        state.tenderLines.splice(action.payload, 1);
+      }
+    },
+    setTenderLineType: (
+      state,
+      action: PayloadAction<{index: number; tenderType: TenderType}>,
+    ) => {
+      const line = state.tenderLines[action.payload.index];
+      if (line) {
+        line.tenderType = action.payload.tenderType;
+      }
     },
     setShiftContext: (
       state,
@@ -148,6 +172,10 @@ export const {
   clearCart,
   setBarcodeInput,
   setShiftContext,
-  setTenderType,
+  setTenderLines,
+  addTenderLine,
+  updateTenderLine,
+  removeTenderLine,
+  setTenderLineType,
 } = posSlice.actions;
 export default posSlice.reducer;

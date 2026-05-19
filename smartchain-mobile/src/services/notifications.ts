@@ -4,6 +4,7 @@ import DeviceInfo from 'react-native-device-info';
 import Toast from 'react-native-toast-message';
 import {apiClient} from '../api/client';
 import {navigateFromPushRoute} from '../navigation/pushNavigation';
+import type {AppRole} from '../utils/roles';
 
 export async function registerPushNotifications(): Promise<void> {
   try {
@@ -37,13 +38,13 @@ export async function registerPushNotifications(): Promise<void> {
     messaging().onNotificationOpenedApp(remoteMessage => {
       const route = remoteMessage.data?.route;
       if (route && typeof route === 'string') {
-        navigateFromPushRoute(route);
+        navigateFromPushRoute(route, pushRoles());
       }
     });
 
     const initial = await messaging().getInitialNotification();
     if (initial?.data?.route && typeof initial.data.route === 'string') {
-      navigateFromPushRoute(initial.data.route);
+      navigateFromPushRoute(initial.data.route, pushRoles());
     }
   } catch (e) {
     console.warn('Push notifications unavailable:', e);
@@ -61,9 +62,14 @@ function showInAppNotification(
     text2: body,
     onPress: () => {
       if (route) {
-        navigateFromPushRoute(route);
+        navigateFromPushRoute(route, pushRoles());
       }
     },
     visibilityTime: 5000,
   });
+}
+
+function pushRoles(): AppRole[] {
+  const {store} = require('../store') as typeof import('../store');
+  return store.getState().auth.roles as AppRole[];
 }

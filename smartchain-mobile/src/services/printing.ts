@@ -8,7 +8,7 @@ export async function printReceipt(transactionId: string): Promise<void> {
   }
   Alert.alert(
     'Printing',
-    'Bluetooth receipt printing is available on Android. Use the web app for iOS receipts.',
+    'Bluetooth printing is Android-only. Use AirPrint from the receipt screen.',
   );
 }
 

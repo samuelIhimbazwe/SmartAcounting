@@ -16,6 +16,9 @@ import {
   copilotService,
   CopilotMessage,
 } from '../../services/copilot/MobileCopilotService';
+import {streamCopilotAgent} from '../../services/copilot/streamCopilotAgent';
+import {approveCopilotAction, rejectCopilotAction} from '../../api/copilot';
+import {useTranslation} from 'react-i18next';
 
 const SUGGESTIONS: Record<string, string[]> = {
   CEO: [
@@ -56,17 +59,30 @@ const SUGGESTIONS: Record<string, string[]> = {
   ],
 };
 
+type PendingApproval = {
+  approvalId: string;
+  description: string;
+};
+
 export default function CopilotScreen() {
+  const {t} = useTranslation();
   const [messages, setMessages] = useState<CopilotMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [agentMode, setAgentMode] = useState(false);
   const [streamFallback, setStreamFallback] = useState(false);
+  const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(
+    null,
+  );
+  const [approvalBusy, setApprovalBusy] = useState(false);
   const listRef = useRef<FlatList>(null);
   const stopStreamRef = useRef<(() => void) | null>(null);
 
   useEffect(() => () => stopStreamRef.current?.(), []);
 
-  const {role, userName} = useSelector((s: RootState) => s.auth);
+  const {role, userName, accessToken, tenantId, userId} = useSelector(
+    (s: RootState) => s.auth,
+  );
 
   const suggestions = SUGGESTIONS[role || 'CEO'] ?? SUGGESTIONS.CEO;
 
@@ -99,6 +115,70 @@ export default function CopilotScreen() {
       setTimeout(() => listRef.current?.scrollToEnd({animated: false}), 100);
 
       try {
+        if (agentMode && accessToken) {
+          stopStreamRef.current = streamCopilotAgent(
+            text.trim(),
+            role || 'CEO',
+            accessToken,
+            tenantId,
+            userId,
+            evt => {
+              if (evt.event === 'step') {
+                const payload = evt.data;
+                const status = String(payload.status ?? '');
+                if (status === 'PENDING_APPROVAL' || payload.approvalRequired) {
+                  setPendingApproval({
+                    approvalId: String(
+                      payload.approvalId ?? payload.approval_id ?? '',
+                    ),
+                    description: String(
+                      payload.actionDescription ??
+                        payload.description ??
+                        'Action requires approval',
+                    ),
+                  });
+                }
+                const stepText = String(payload.message ?? payload.summary ?? '');
+                if (stepText) {
+                  setMessages(prev =>
+                    prev.map(m =>
+                      m.id === assistantId
+                        ? {...m, content: `${m.content}\n${stepText}`.trim()}
+                        : m,
+                    ),
+                  );
+                }
+              }
+              if (evt.event === 'token' || evt.event === 'message') {
+                const chunk = String(evt.data.token ?? evt.data.text ?? '');
+                if (chunk) {
+                  setMessages(prev =>
+                    prev.map(m =>
+                      m.id === assistantId
+                        ? {...m, content: m.content + chunk}
+                        : m,
+                    ),
+                  );
+                }
+              }
+            },
+            () => {
+              stopStreamRef.current = null;
+              setMessages(prev =>
+                prev.map(m =>
+                  m.id === assistantId ? {...m, isStreaming: false} : m,
+                ),
+              );
+              setLoading(false);
+            },
+            () => {
+              stopStreamRef.current = null;
+              setLoading(false);
+            },
+          );
+          return;
+        }
+
         await copilotService.startRun(text.trim(), role || 'CEO', update => {
           if (update.streamFallback) {
             setStreamFallback(true);
@@ -136,8 +216,25 @@ export default function CopilotScreen() {
         setLoading(false);
       }
     },
-    [loading, role],
+    [loading, role, agentMode, accessToken, tenantId, userId],
   );
+
+  const resolveApproval = async (approved: boolean) => {
+    if (!pendingApproval?.approvalId) {
+      return;
+    }
+    setApprovalBusy(true);
+    try {
+      if (approved) {
+        await approveCopilotAction(pendingApproval.approvalId);
+      } else {
+        await rejectCopilotAction(pendingApproval.approvalId);
+      }
+      setPendingApproval(null);
+    } finally {
+      setApprovalBusy(false);
+    }
+  };
 
   const renderMessage = ({item}: {item: CopilotMessage}) => (
     <View
@@ -221,6 +318,40 @@ export default function CopilotScreen() {
         }
       />
 
+      {pendingApproval ? (
+        <View style={styles.approvalCard}>
+          <Text style={styles.approvalTitle}>{t('copilot.approvalWaiting')}</Text>
+          <Text style={styles.approvalBody}>{pendingApproval.description}</Text>
+          <View style={styles.approvalActions}>
+            <TouchableOpacity
+              style={[styles.approvalBtn, styles.approveBtn]}
+              disabled={approvalBusy}
+              onPress={() => void resolveApproval(true)}>
+              <Text style={styles.approvalBtnText}>{t('copilot.approve')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.approvalBtn, styles.rejectBtn]}
+              disabled={approvalBusy}
+              onPress={() => void resolveApproval(false)}>
+              <Text style={styles.approvalBtnText}>{t('copilot.reject')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
+
+      <View style={styles.modeRow}>
+        <TouchableOpacity
+          style={[styles.modeChip, !agentMode && styles.modeChipActive]}
+          onPress={() => setAgentMode(false)}>
+          <Text style={styles.modeChipText}>{t('copilot.queryMode')}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.modeChip, agentMode && styles.modeChipActive]}
+          onPress={() => setAgentMode(true)}>
+          <Text style={styles.modeChipText}>{t('copilot.agentMode')}</Text>
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.inputRow}>
         <TextInput
           style={styles.input}
@@ -242,7 +373,9 @@ export default function CopilotScreen() {
           {loading ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
-            <Text style={styles.sendButtonText}>Send</Text>
+            <Text style={styles.sendButtonText}>
+              {agentMode ? t('copilot.runAgent') : t('copilot.send')}
+            </Text>
           )}
         </TouchableOpacity>
       </View>
@@ -331,4 +464,36 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {backgroundColor: '#93C5FD'},
   sendButtonText: {color: '#FFFFFF', fontWeight: '600', fontSize: 15},
+  modeRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    backgroundColor: '#FFFFFF',
+  },
+  modeChip: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+  },
+  modeChipActive: {backgroundColor: '#DBEAFE', borderColor: '#1B6FDB'},
+  modeChipText: {fontSize: 13, fontWeight: '600', color: '#1E40AF'},
+  approvalCard: {
+    margin: 12,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  approvalTitle: {fontWeight: '700', marginBottom: 6, color: '#92400E'},
+  approvalBody: {color: '#78350F', marginBottom: 10},
+  approvalActions: {flexDirection: 'row', gap: 8},
+  approvalBtn: {flex: 1, padding: 10, borderRadius: 8, alignItems: 'center'},
+  approveBtn: {backgroundColor: '#16A34A'},
+  rejectBtn: {backgroundColor: '#DC2626'},
+  approvalBtnText: {color: '#FFFFFF', fontWeight: '600'},
 });
