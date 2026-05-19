@@ -15,6 +15,7 @@
 
 ```bash
 cd smartchain-mobile
+npm ci --legacy-peer-deps   # required: see docs/mobile-npm-install.md
 npm run test:coverage
 ```
 

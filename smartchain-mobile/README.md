@@ -1,4 +1,14 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+SmartAccounting mobile POS (React Native 0.76).
+
+## Install dependencies
+
+```bash
+npm install --legacy-peer-deps
+```
+
+`npm install` without flags may fail with a **peer dependency** error on `react-native-get-random-values@2` (it expects RN ≥ 0.81). This repo ships `.npmrc` with `legacy-peer-deps=true` so a plain `npm install` usually works; CI and scripts still pass `--legacy-peer-deps` explicitly.
+
+See [../docs/mobile-npm-install.md](../docs/mobile-npm-install.md) and [../CONTRIBUTING.md](../CONTRIBUTING.md).
 
 # Getting Started
 

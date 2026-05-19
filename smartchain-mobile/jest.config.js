@@ -17,6 +17,8 @@ module.exports = {
     'src/fiscal/vatEngine.ts',
     'src/fiscal/auditChain.ts',
     'src/services/efd.ts',
+    'src/hardware/pluParser.ts',
+    'src/hardware/escpos.ts',
   ],
   // Phased ratchet (global, scoped files in collectCoverageFrom):
   //   Phase 2: 38 / 27  |  Phase 3: 43 / 32  |  Phase 4: 55 / 40

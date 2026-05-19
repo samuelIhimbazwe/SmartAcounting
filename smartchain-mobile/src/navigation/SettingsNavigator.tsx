@@ -6,11 +6,13 @@ import {LanguageSettingsScreen} from '../screens/settings/LanguageSettingsScreen
 import {PrinterSettingsScreen} from '../screens/settings/PrinterSettingsScreen';
 import {LocationSettingsScreen} from '../screens/settings/LocationSettingsScreen';
 import AuditLogScreen from '../screens/audit/AuditLogScreen';
+import {PosHardwareSettingsScreen} from '../screens/settings/PosHardwareSettingsScreen';
 
 export type SettingsStackParamList = {
   SettingsHome: undefined;
   LanguageSettings: undefined;
   PrinterSettings: undefined;
+  PosHardware: undefined;
   LocationSettings: undefined;
   AuditLog: undefined;
 };
@@ -35,6 +37,11 @@ export default function SettingsNavigator() {
         name="PrinterSettings"
         component={PrinterSettingsScreen}
         options={{title: t('settings.printer')}}
+      />
+      <Stack.Screen
+        name="PosHardware"
+        component={PosHardwareSettingsScreen}
+        options={{title: t('hardware.posTitle')}}
       />
       <Stack.Screen
         name="LocationSettings"

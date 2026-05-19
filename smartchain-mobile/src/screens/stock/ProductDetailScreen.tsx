@@ -1,4 +1,4 @@
-import React, {useCallback, useState} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {ScrollView, StyleSheet, Text, View} from 'react-native';
 import {Button, Card, Chip, Menu, Switch, TextInput} from 'react-native-paper';
 import {useFocusEffect, useRoute} from '@react-navigation/native';
@@ -19,6 +19,7 @@ import type {ProductVariant} from '../../db/models/ProductVariant';
 import type {Supplier} from '../../db/models/Supplier';
 import type {Uom} from '../../db/models/Uom';
 import {addToCart} from '../../store/slices/posSlice';
+import {LabelPrintDialog} from '../../components/LabelPrintDialog';
 
 type Route = RouteProp<StockStackParamList, 'ProductDetail'>;
 
@@ -41,6 +42,28 @@ export default function ProductDetailScreen() {
   const [supplierMenuOpen, setSupplierMenuOpen] = useState(false);
   const [purchaseUomMenuOpen, setPurchaseUomMenuOpen] = useState(false);
   const [saleUomMenuOpen, setSaleUomMenuOpen] = useState(false);
+  const [labelDialogOpen, setLabelDialogOpen] = useState(false);
+
+  const selectedVariant = useMemo(
+    () => variants.find(v => v.id === selectedId),
+    [variants, selectedId],
+  );
+
+  const labelData = useMemo(() => {
+    if (!product || !selectedVariant) {
+      return null;
+    }
+    const unitPrice = selectedVariant.priceOverride ?? product.baseUnitPrice;
+    const saleUom = uoms.find(u => u.id === saleUomId);
+    return {
+      name: product.name,
+      price: unitPrice,
+      currency: product.currencyCode === 'USD' ? 'USD' : 'FRW',
+      barcode: selectedVariant.barcode,
+      sku: selectedVariant.sku,
+      uom: saleUom?.name,
+    };
+  }, [product, selectedVariant, uoms, saleUomId]);
 
   const load = useCallback(async () => {
     const [{product: p, variants: vs}, sups, uomList] = await Promise.all([
@@ -163,6 +186,18 @@ export default function ProductDetailScreen() {
       <Button mode="contained" onPress={addSelectedToCart}>
         {t('inventory.addToCart')}
       </Button>
+      {labelData ? (
+        <Button mode="outlined" onPress={() => setLabelDialogOpen(true)}>
+          {t('hardware.printLabel')}
+        </Button>
+      ) : null}
+      {labelData ? (
+        <LabelPrintDialog
+          visible={labelDialogOpen}
+          onDismiss={() => setLabelDialogOpen(false)}
+          data={labelData}
+        />
+      ) : null}
       {variants.length < 3 ? (
         <Button mode="outlined" onPress={() => void seedSmL()}>
           {t('inventory.seedVariants')}

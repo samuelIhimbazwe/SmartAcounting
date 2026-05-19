@@ -8,7 +8,7 @@ Use this list before staging/production cutover.
 ./gradlew test                    # unit tests
 ./gradlew integrationTest         # needs Docker for Kafka IT; Postgres via embedded or CI service
 cd frontend && npm run build
-cd smartchain-mobile && npm install --legacy-peer-deps
+cd smartchain-mobile && npm install --legacy-peer-deps   # see docs/mobile-npm-install.md
 ```
 
 ## 2. Production secrets

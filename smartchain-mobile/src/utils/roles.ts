@@ -88,6 +88,10 @@ export function canManageProcurement(roles: AppRole[]): boolean {
   return hasAnyRole(roles, 'CEO', 'CFO', 'OPS_MANAGER');
 }
 
+export function canOpenCashDrawer(roles: AppRole[]): boolean {
+  return canManageTillSession(roles);
+}
+
 export function canPrintXReport(roles: AppRole[]): boolean {
   return hasAnyRole(
     roles,

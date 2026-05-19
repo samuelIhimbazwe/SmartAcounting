@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useMemo} from 'react';
 import {Platform, ScrollView, Share, StyleSheet, Text, View} from 'react-native';
 import {Button} from 'react-native-paper';
 import QRCode from 'react-native-qrcode-svg';
@@ -8,6 +8,7 @@ import type {RootState} from '../../store';
 import {printReceiptWithAlert} from '../../services/printing';
 import {testIds} from '../../e2e/testIds';
 import {formatMoney} from '../../utils/currency';
+import {loadHardwareConfig} from '../../hardware/printerConfig';
 
 export default function ReceiptScreen() {
   const {t} = useTranslation();
@@ -19,12 +20,25 @@ export default function ReceiptScreen() {
   const vatAmount = useSelector((s: RootState) => s.pos.lastVatAmount);
   const taxExempt = useSelector((s: RootState) => s.pos.lastTaxExempt);
   const sessionCurrency = useSelector((s: RootState) => s.pos.sessionCurrency);
+  const locationId = useSelector((s: RootState) => s.location.selectedLocationId);
+
+  const htmlExtras = useMemo(
+    () => ({
+      netAmount,
+      vatAmount,
+      taxExempt,
+      currency: sessionCurrency,
+      fiscalSignature,
+      storeName: loadHardwareConfig().storeDisplayName,
+    }),
+    [netAmount, vatAmount, taxExempt, sessionCurrency, fiscalSignature],
+  );
 
   const onPrint = async () => {
     if (!txId) {
       return;
     }
-    await printReceiptWithAlert(txId, receiptLines);
+    await printReceiptWithAlert(txId, receiptLines, htmlExtras, locationId);
   };
 
   const onShare = async () => {
@@ -73,8 +87,10 @@ export default function ReceiptScreen() {
         disabled={!txId}
         onPress={() => void onPrint()}
         contentStyle={styles.btnInner}
-        accessibilityLabel={t('receipt.print')}>
-        {t('receipt.print')}
+        accessibilityLabel={
+          Platform.OS === 'ios' ? t('receipt.airPrint') : t('receipt.print')
+        }>
+        {Platform.OS === 'ios' ? t('receipt.airPrint') : t('receipt.print')}
       </Button>
       {Platform.OS === 'ios' ? (
         <Button

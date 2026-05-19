@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useState} from 'react';
-import {ScrollView, StyleSheet, Text, View} from 'react-native';
+import {Alert, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {Button, Card, Menu, TextInput} from 'react-native-paper';
 import {useRoute} from '@react-navigation/native';
 import type {RouteProp} from '@react-navigation/native';
@@ -22,6 +22,11 @@ import {receiveStock} from '../../api/inventory';
 import {queueOfflineGrnPost} from '../../services/offlineQueue';
 import type {Supplier} from '../../db/models/Supplier';
 import type {Product} from '../../db/models/Product';
+import {
+  labelPrinterService,
+  type LabelFormat,
+  type LabelType,
+} from '../../services/printer/LabelPrinterService';
 
 type Route = RouteProp<StockStackParamList, 'ReceiveGrn'>;
 
@@ -144,6 +149,53 @@ export default function ReceiveGrnScreen() {
     setBarcodeInput('');
   };
 
+  const promptPrintLabels = (
+    grnLines: Array<{
+      productName: string;
+      sku: string;
+      qtyReceived: number;
+      unitCost: number;
+      productId: string;
+      expiryDate?: string;
+      batchNumber?: string;
+    }>,
+  ) => {
+    Alert.alert(t('hardware.printLabelsPrompt'), undefined, [
+      {text: t('hardware.printLabelsNo'), style: 'cancel'},
+      {
+        text: t('hardware.printLabelsYes'),
+        onPress: () => {
+          void (async () => {
+            const bulk = grnLines.map(line => {
+              const product = products.find(p => p.id === line.productId);
+              const currency =
+                product?.currencyCode === 'USD' ? 'USD' : 'FRW';
+              return {
+                type: 'price' as LabelType,
+                format: 'zpl' as LabelFormat,
+                data: {
+                  name: line.productName,
+                  price: line.unitCost,
+                  currency,
+                  barcode: line.sku,
+                  sku: line.sku,
+                  batch: line.batchNumber,
+                  expiryDate: line.expiryDate,
+                },
+                copies: Math.max(1, Math.round(line.qtyReceived)),
+              };
+            });
+            try {
+              await labelPrinterService.printBulk(bulk);
+            } catch {
+              /* optional hardware */
+            }
+          })();
+        },
+      },
+    ]);
+  };
+
   const post = async () => {
     if (!supplierId) {
       return;
@@ -244,6 +296,7 @@ export default function ReceiveGrnScreen() {
           : undefined,
       });
     }
+    promptPrintLabels(grnLines);
   };
 
   const selectedSupplier = suppliers.find(s => s.id === supplierId);

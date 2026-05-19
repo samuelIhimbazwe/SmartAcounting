@@ -13,6 +13,7 @@ type SettingsStackParamList = {
   SettingsHome: undefined;
   LanguageSettings: undefined;
   PrinterSettings: undefined;
+  PosHardware: undefined;
   LocationSettings: undefined;
   AuditLog: undefined;
 };
@@ -37,6 +38,11 @@ export function SettingsHomeScreen() {
           title={t('settings.printer')}
           left={props => <List.Icon {...props} icon="printer" />}
           onPress={() => navigation.navigate('PrinterSettings')}
+        />
+        <List.Item
+          title={t('hardware.posTitle')}
+          left={props => <List.Icon {...props} icon="barcode-scan" />}
+          onPress={() => navigation.navigate('PosHardware')}
         />
         <List.Item
           title={t('locations.switchLocation')}

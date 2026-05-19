@@ -305,13 +305,15 @@
     "alerts": "{{count}} alert(s)"
   },
   "receipt": {
-    "title": "Last transaction",
-    "print": "Print receipt",
-    "shareIos": "Share / AirPrint",
-    "iosPrintTitle": "Printing",
-    "iosPrintAlert": "Bluetooth printing is Android-only. Use AirPrint from the receipt screen.",
-    "printFailed": "Print failed",
-    "printFailedBody": "{{message}}\n\nThe sale was recorded successfully."
+    "title": "Dernière transaction",
+    "print": "Imprimer le reçu",
+    "airPrint": "Imprimer via AirPrint",
+    "shareIos": "Partager le reçu",
+    "iosPrintTitle": "Impression",
+    "iosPrintAlert": "ESC/POS Bluetooth et réseau : Android uniquement. Utilisez AirPrint sur iOS.",
+    "iosPrintNeedsData": "Données de reçu indisponibles.",
+    "printFailed": "Échec impression",
+    "printFailedBody": "{{message}}\n\nLa vente a bien été enregistrée."
   },
   "printing": {
     "failed": "Échec impression"
@@ -328,6 +330,68 @@
     "xReportTitle": "Rapport X (mi-journée)",
     "zReportTitle": "Rapport Z (fin de journée)",
     "xReportHint": "La session reste ouverte — les totaux ne sont pas réinitialisés."
+  },
+  "hardware": {
+    "posTitle": "Matériel PDV",
+    "cashDrawer": "Tiroir-caisse",
+    "cashDrawerEnabled": "Ouvrir après vente ESPÈCES",
+    "openDrawer": "Ouvrir le tiroir",
+    "drawerOpened": "Commande tiroir envoyée",
+    "plu": "Codes-barres PLU",
+    "pluPrefix": "Chiffre préfixe PLU",
+    "pluWeightMode": "Valeur = poids (kg)",
+    "pluWeightHint": "Champ 5 chiffres = poids en kg (÷1000).",
+    "pluPriceHint": "Champ 5 chiffres = prix (÷100).",
+    "scanner": "Scanner USB / HID",
+    "scannerMode": "Mode scanner (focus + 50 ms)",
+    "scannerModeHint": "Garde le champ code-barres actif pour les scanners en coin.",
+    "poleDisplay": "Afficheur client",
+    "poleEnabled": "Afficheur activé",
+    "poleHost": "IP afficheur",
+    "polePort": "Port afficheur",
+    "storeName": "Nom du magasin",
+    "preferredRoute": "Imprimante préférée (ce site)",
+    "route": {
+      "bluetooth": "Bluetooth",
+      "network": "Réseau (TCP)",
+      "system": "Impression système"
+    },
+    "networkPrinters": "Imprimantes réseau",
+    "discoverNetwork": "Découvrir (mDNS)",
+    "addNetworkPrinter": "Ajouter imprimante réseau",
+    "printerName": "Nom",
+    "printerHost": "Adresse IP",
+    "printerPort": "Port (9100)",
+    "scanBt": "Scanner Bluetooth appairés",
+    "btHint": "Appairez l'imprimante dans les paramètres Bluetooth Android.",
+    "iosPrinterHint": "Sur iOS, utilisez AirPrint depuis l'écran reçu.",
+    "connected": "Connecté",
+    "notConnected": "Non connecté",
+    "connect": "Connecter",
+    "connectFailed": "Échec connexion",
+    "testPrint": "Test",
+    "testPrintOk": "Page test envoyée",
+    "printFailed": "Échec impression",
+    "noBtPrintersTitle": "Aucune imprimante",
+    "noBtPrintersBody": "Appairez une imprimante thermique puis rescannez.",
+    "noNetworkPrintersTitle": "Aucune imprimante réseau",
+    "noNetworkPrintersBody": "Ajoutez une IP manuellement ou vérifiez le LAN.",
+    "printLabel": "Imprimer étiquette",
+    "labelPrinted": "Étiquette envoyée",
+    "labelPrintFailed": "Échec étiquette",
+    "labelCopies": "Exemplaires",
+    "labelType": {
+      "price": "Étiquette prix",
+      "shelf": "Étiquette rayon",
+      "expiry": "Étiquette péremption"
+    },
+    "labelFormat": {
+      "zpl": "Zebra ZPL",
+      "escpos": "Étiquette ESC/POS"
+    },
+    "printLabelsPrompt": "Imprimer les étiquettes pour le stock reçu ?",
+    "printLabelsYes": "Imprimer",
+    "printLabelsNo": "Plus tard"
   },
   "audit": {
     "title": "Journal d'audit fiscal",

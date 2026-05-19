@@ -306,13 +306,15 @@
     "alerts": "{{count}} alert(s)"
   },
   "receipt": {
-    "title": "Last transaction",
-    "print": "Print receipt",
-    "shareIos": "Share / AirPrint",
-    "iosPrintTitle": "Printing",
-    "iosPrintAlert": "Bluetooth printing is Android-only. Use AirPrint from the receipt screen.",
-    "printFailed": "Print failed",
-    "printFailedBody": "{{message}}\n\nThe sale was recorded successfully."
+    "title": "Ubucuruzi buheruka",
+    "print": "Capira inyemezabwishyu",
+    "airPrint": "Capira ukoresheje AirPrint",
+    "shareIos": "Sangiza inyemezabwishyu",
+    "iosPrintTitle": "Gucapa",
+    "iosPrintAlert": "Bluetooth na reseau: Android gusa. Koresha AirPrint kuri iOS.",
+    "iosPrintNeedsData": "Amakuru y'inyemezabwishyu ntabwo ahari.",
+    "printFailed": "Gucapira byanze",
+    "printFailedBody": "{{message}}\n\nIgurishwa cyanditswe neza."
   },
   "printing": {
     "failed": "Gucapira byanze"
@@ -329,6 +331,68 @@
     "xReportTitle": "Raporo X (hagati y'umunsi)",
     "zReportTitle": "Raporo Z (impera y'umunsi)",
     "xReportHint": "Isomo rirakomeza — ibarura ntiryasubizwa."
+  },
+  "hardware": {
+    "posTitle": "Ibikoresho bya POS",
+    "cashDrawer": "Udukarita tw'amafaranga",
+    "cashDrawerEnabled": "Fungura nyuma y'igurishwa rya CASH",
+    "openDrawer": "Fungura udukarita",
+    "drawerOpened": "Komande yoherejwe",
+    "plu": "PLU barcode",
+    "pluPrefix": "Imibare y'intango ya PLU",
+    "pluWeightMode": "Agaciro = uburemere (kg)",
+    "pluWeightHint": "Imibare 5 = uburemere mu kg (÷1000).",
+    "pluPriceHint": "Imibare 5 = igiciro (÷100).",
+    "scanner": "Scanner USB / HID",
+    "scannerMode": "Uburyo bwa scanner (50ms)",
+    "scannerModeHint": "Gumana umwanya wa barcode witeguye scanner.",
+    "poleDisplay": "Ecran y'abakiriya",
+    "poleEnabled": "Ecran irakora",
+    "poleHost": "IP ya ecran",
+    "polePort": "Port ya ecran",
+    "storeName": "Izina ry'iduka",
+    "preferredRoute": "Printer ikoreshwa (aha)",
+    "route": {
+      "bluetooth": "Bluetooth",
+      "network": "Reseau (TCP)",
+      "system": "Gucapira bisistem"
+    },
+    "networkPrinters": "Printer za reseau",
+    "discoverNetwork": "Shakisha kuri reseau (mDNS)",
+    "addNetworkPrinter": "Ongeraho printer",
+    "printerName": "Izina",
+    "printerHost": "Aderesi IP",
+    "printerPort": "Port (9100)",
+    "scanBt": "Shakisha Bluetooth",
+    "btHint": "Huza printer muri Android Bluetooth mbere.",
+    "iosPrinterHint": "Kuri iOS, koresha AirPrint kuri ecran y'inyemezabwishyu.",
+    "connected": "Yahujwe",
+    "notConnected": "Ntiyahujwe",
+    "connect": "Huza",
+    "connectFailed": "Guhuza byanze",
+    "testPrint": "Igerageza",
+    "testPrintOk": "Paje y'igerageza yoherejwe",
+    "printFailed": "Gucapira byanze",
+    "noBtPrintersTitle": "Nta printer",
+    "noBtPrintersBody": "Huza printer ya thermal hanyuma ongera ushakishe.",
+    "noNetworkPrintersTitle": "Nta printer ya reseau",
+    "noNetworkPrintersBody": "Ongeraho IP cyangwa reba LAN.",
+    "printLabel": "Capira etiketi",
+    "labelPrinted": "Etiketi yoherejwe",
+    "labelPrintFailed": "Etiketi yanze",
+    "labelCopies": "Umubare",
+    "labelType": {
+      "price": "Etiketi y'igiciro",
+      "shelf": "Etiketi ya shelf",
+      "expiry": "Etiketi y'itariki"
+    },
+    "labelFormat": {
+      "zpl": "Zebra ZPL",
+      "escpos": "ESC/POS etiketi"
+    },
+    "printLabelsPrompt": "Capira etiketi z'ibicuruzwa byakiriwe?",
+    "printLabelsYes": "Capira",
+    "printLabelsNo": "Nyuma"
   },
   "audit": {
     "title": "Inyandiko y'igenzura ya fiskale",

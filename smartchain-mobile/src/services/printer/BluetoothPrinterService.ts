@@ -7,8 +7,9 @@ import {getItem, setItem} from '../../utils/storage';
 import {printReceiptEscPos} from '../../api/pos';
 import {appendReceiptLineExtras} from '../../utils/receiptExtras';
 import type {CartItem} from '../../store/slices/posSlice';
+import {CASH_DRAWER_KICK, escPosInit} from '../../hardware/escpos';
 
-const PREFERRED_PRINTER_KEY = 'preferred_printer';
+export const PREFERRED_PRINTER_KEY = 'preferred_printer';
 
 class BluetoothPrinterService {
   private connectedDevice: BluetoothDevice | null = null;
@@ -124,6 +125,10 @@ class BluetoothPrinterService {
     const data = await printReceiptEscPos(transactionId);
     const escpos = appendReceiptLineExtras(data.escPos ?? '', cartLines);
     await this.printEscPos(escpos);
+  }
+
+  async openCashDrawer(): Promise<void> {
+    await this.printEscPos(escPosInit() + CASH_DRAWER_KICK);
   }
 
   async printTestPage(): Promise<void> {

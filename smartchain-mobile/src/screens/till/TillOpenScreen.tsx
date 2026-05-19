@@ -21,7 +21,13 @@ import {
   suspendTillSession,
 } from '../../api/tillSessions';
 import {fetchRegisters, type RegisterDto} from '../../api/locations';
-import {canManageTillSession, canPrintXReport} from '../../utils/roles';
+import {
+  canManageTillSession,
+  canOpenCashDrawer,
+  canPrintXReport,
+} from '../../utils/roles';
+import {openCashDrawer} from '../../services/printing';
+import {recordFiscalAudit} from '../../fiscal/auditLogRepository';
 import type {AppRole} from '../../utils/roles';
 import {clearTillSession} from '../../store/slices/tillSlice';
 import {useTranslation} from 'react-i18next';
@@ -63,6 +69,27 @@ export default function TillOpenScreen() {
   const appRoles = roles as AppRole[];
   const canSuspend = canManageTillSession(appRoles);
   const showXReport = canPrintXReport(appRoles);
+  const showOpenDrawer = canOpenCashDrawer(appRoles);
+
+  const openDrawerManual = async () => {
+    try {
+      await openCashDrawer(locationId);
+      if (activeSessionId) {
+        await recordFiscalAudit({
+          entityType: 'TILL',
+          entityId: activeSessionId,
+          action: 'CASH_DRAWER_OPEN',
+          actorId: userId ?? 'unknown',
+        });
+      }
+      Alert.alert(t('hardware.openDrawer'), t('hardware.drawerOpened'));
+    } catch (e: unknown) {
+      Alert.alert(
+        t('common.error'),
+        e instanceof Error ? e.message : t('hardware.printFailed'),
+      );
+    }
+  };
 
   useEffect(() => {
     void (async () => {
@@ -237,6 +264,13 @@ export default function TillOpenScreen() {
               })
             }>
             <Text style={styles.linkButtonText}>{t('fiscal.printXReport')}</Text>
+          </TouchableOpacity>
+        ) : null}
+        {showOpenDrawer ? (
+          <TouchableOpacity
+            style={styles.linkButton}
+            onPress={() => void openDrawerManual()}>
+            <Text style={styles.linkButtonText}>{t('hardware.openDrawer')}</Text>
           </TouchableOpacity>
         ) : null}
         {canSuspend ? (

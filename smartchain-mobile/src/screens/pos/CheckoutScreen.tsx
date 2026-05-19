@@ -1,7 +1,7 @@
-import React, {useEffect, useMemo} from 'react';
+import React, {useCallback, useEffect, useMemo} from 'react';
 import {ScrollView, StyleSheet, Text, View} from 'react-native';
 import {Button, Card, TextInput} from 'react-native-paper';
-import {useNavigation} from '@react-navigation/native';
+import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import Toast from 'react-native-toast-message';
 import {useTranslation} from 'react-i18next';
@@ -38,6 +38,13 @@ import {
 } from '../../inventory/inventoryRepository';
 import type {PosStackParamList} from '../../navigation/PosNavigator';
 import {useBarcode} from '../../hooks/useBarcode';
+import {useScannerBarcode} from '../../hooks/useScannerBarcode';
+import {loadHardwareConfig} from '../../hardware/printerConfig';
+import {
+  openCashDrawer,
+  shouldKickCashDrawer,
+} from '../../services/printing';
+import {poleDisplayService} from '../../services/printer/PoleDisplayService';
 import {useWakeLock} from '../../hooks/useWakeLock';
 import {postCheckout} from '../../api/pos';
 import {queueOfflineCheckout} from '../../services/offlineQueue';
@@ -88,6 +95,28 @@ export default function CheckoutScreen() {
   const online = useSelector((s: RootState) => s.network.online);
   const roles = useSelector((s: RootState) => s.auth.roles) as AppRole[];
   const userId = useSelector((s: RootState) => s.auth.userId);
+  const locationId = useSelector((s: RootState) => s.location.selectedLocationId);
+  const scannerMode = loadHardwareConfig().scannerModeEnabled;
+
+  const onScan = useCallback(
+    (code: string) => {
+      void lookupAndAddProduct(code);
+      dispatch(setBarcodeInput(''));
+    },
+    [dispatch, lookupAndAddProduct],
+  );
+
+  const {
+    inputRef: scannerInputRef,
+    onChangeText: scannerOnChange,
+    onSubmitEditing: scannerOnSubmit,
+  } = useScannerBarcode(scannerMode, onScan);
+
+  useFocusEffect(
+    useCallback(() => {
+      void poleDisplayService.welcome(loadHardwareConfig().storeDisplayName);
+    }, []),
+  );
 
   const showOnAccount =
     canUseOnAccountTender(roles) && (selectedCustomer?.creditLimit ?? 0) > 0;
@@ -291,6 +320,14 @@ export default function CheckoutScreen() {
             await markSerialSold(item.serialNumber, String(sid ?? Date.now()));
           }
         }
+        if (shouldKickCashDrawer(tenderLines)) {
+          void openCashDrawer(locationId).catch(() => undefined);
+        }
+        void poleDisplayService.total(formatMoney(total, sessionCurrency));
+        const change = Math.max(0, tenderSum - total);
+        void poleDisplayService.thankYou(
+          formatMoney(change, sessionCurrency),
+        );
         Toast.show({type: 'success', text1: t('pos.saleCompleted')});
         dispatch(setLastReceiptLines([...cart]));
         dispatch(clearCart());
@@ -457,11 +494,23 @@ export default function CheckoutScreen() {
       <View style={styles.row}>
         <TextInput
           testID={testIds.checkoutBarcode}
+          ref={scannerMode ? scannerInputRef : undefined}
           label={t('pos.barcode')}
           value={barcodeInput}
-          onChangeText={v => dispatch(setBarcodeInput(v))}
+          onChangeText={v => {
+            dispatch(setBarcodeInput(v));
+            if (scannerMode) {
+              scannerOnChange(v);
+            }
+          }}
           style={[styles.field, {flex: 1}]}
+          showSoftInputOnFocus={!scannerMode}
+          autoFocus={scannerMode}
           onSubmitEditing={() => {
+            if (scannerMode) {
+              scannerOnSubmit();
+              return;
+            }
             if (barcodeInput.trim()) {
               void lookupAndAddProduct(barcodeInput.trim());
               dispatch(setBarcodeInput(''));

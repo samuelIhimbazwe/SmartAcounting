@@ -28,6 +28,10 @@ Enterprise multi-tenant ERP backend implementation aligned to the SmartAccountin
 - Async forecast jobs (`POST /api/v1/ai/forecast/jobs/{metric}` + status polling)
 - Tenant admin and new domain APIs for HR, assets, documents, and tenant data sharing
 
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md). For **smartchain-mobile**, `npm install` needs `--legacy-peer-deps` until React Native is upgraded ([why](docs/mobile-npm-install.md)).
+
 ## Run
 
 ```bash

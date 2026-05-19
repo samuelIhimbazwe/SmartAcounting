@@ -14,6 +14,9 @@ import {
 } from '../inventory/variantCart';
 import {addToCart} from '../store/slices/posSlice';
 import {loadPriceListContext} from '../pricing/priceListContext';
+import {loadHardwareConfig} from '../hardware/printerConfig';
+import {parsePluBarcode} from '../hardware/pluParser';
+import {poleDisplayService} from '../services/printer/PoleDisplayService';
 
 function mapCurrency(code: string): 'FRW' | 'USD' {
   const u = code?.toUpperCase() ?? 'FRW';
@@ -44,14 +47,30 @@ export function useBarcode() {
         return;
       }
 
-      const local = await findVariantByBarcode(trimmed);
+      const hw = loadHardwareConfig();
+      const plu = parsePluBarcode(trimmed, {
+        prefixDigit: hw.pluPrefixDigit,
+        valueMode: hw.pluValueMode,
+      });
+      const lookupCode = plu?.productLookupCode ?? trimmed;
+      const scanQty = plu?.quantity;
+
+      const local = await findVariantByBarcode(lookupCode);
       if (local) {
-        await dispatchVariantToCart(dispatch, local.product, local.variant, cartOpts);
+        await dispatchVariantToCart(dispatch, local.product, local.variant, {
+          ...cartOpts,
+          quantity: scanQty,
+        });
+        const price = local.variant.priceOverride ?? local.product.baseUnitPrice;
+        void poleDisplayService.lineItem(
+          local.product.name,
+          String(price),
+        );
         return;
       }
 
       try {
-        const scanned = await scanCatalog(trimmed);
+        const scanned = await scanCatalog(lookupCode);
         const product = await upsertProductFromBalance({
           productId: scanned.productId,
           sku: scanned.sku,
@@ -71,23 +90,27 @@ export function useBarcode() {
         }
 
         if (variants.length === 1) {
-          await dispatchVariantToCart(dispatch, product, variants[0], cartOpts);
+          await dispatchVariantToCart(dispatch, product, variants[0], {
+            ...cartOpts,
+            quantity: scanQty,
+          });
           return;
         }
 
         const currency = mapCurrency(scanned.currencyCode || 'FRW');
         const unitPrice = Number(scanned.unitPrice);
+        const qty = scanQty ?? 1;
         dispatch(
           addToCart({
             catalogItemId: String(scanned.catalogItemId),
             barcode: scanned.barcode,
             sku: scanned.sku ?? '',
             name: scanned.displayName,
-            quantity: 1,
+            quantity: qty,
             unitPrice,
             costPrice: 0,
             currency,
-            lineTotal: unitPrice,
+            lineTotal: unitPrice * qty,
             margin: 0,
             serialNumber: opts?.serialNumber,
           }),

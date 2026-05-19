@@ -67,3 +67,34 @@ jest.mock('react-native-qrcode-svg', () => {
   const {View} = require('react-native');
   return () => React.createElement(View, {testID: 'mock-qrcode'});
 });
+
+jest.mock('react-native-tcp-socket', () => ({
+  __esModule: true,
+  default: {
+    createConnection: jest.fn((_opts, cb) => {
+      const client = {
+        write: jest.fn((_d, _enc, done) => done?.(null)),
+        destroy: jest.fn(),
+        on: jest.fn(),
+      };
+      if (typeof cb === 'function') {
+        cb();
+      }
+      return client;
+    }),
+  },
+}));
+
+jest.mock('react-native-zeroconf', () => {
+  return jest.fn().mockImplementation(() => ({
+    scan: jest.fn(),
+    stop: jest.fn(),
+    on: jest.fn(),
+    removeDeviceListeners: jest.fn(),
+  }));
+});
+
+jest.mock('react-native-print', () => ({
+  __esModule: true,
+  default: {print: jest.fn().mockResolvedValue(undefined)},
+}));
