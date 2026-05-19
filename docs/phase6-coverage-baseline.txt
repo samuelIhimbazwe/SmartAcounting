@@ -1,47 +1,45 @@
-﻿# Phase 6 hardened Jest coverage baseline (scoped collectCoverageFrom)
-# Command: cd smartchain-mobile && npm run test:coverage
-# Tag: phase6-hardened (pending)
-# Thresholds: jest.config.js global 84% lines/statements, 74% branches, 78% functions
+﻿# Phase 6 final Jest coverage baseline (2026-05-19)
+# Command: cd smartchain-mobile && npx jest --coverage
+# Summary: Statements 84.94% | Branches 74.48% | Functions 78.43% | Lines 84.65%
+# Scoped files: jest.config.js collectCoverageFrom (not full app — see mobile-phase-gates.md)
+# Tag: phase6-complete @ HEAD
 
-> smartchain-mobile@1.0.0 test:coverage
-> jest --coverage
-
-node.exe : PASS __tests__/receiptDeliveryConfig.test.ts
+node.exe : PASS __tests__/auditChain.test.ts
 At line:1 char:1
 + & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
 + ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : NotSpecified: (PASS __tests__/...yConfig.test.ts:String) [], RemoteException
+    + CategoryInfo          : NotSpecified: (PASS __tests__/auditChain.test.ts:String) [], RemoteException
     + FullyQualifiedErrorId : NativeCommandError
  
-PASS __tests__/pluParser.test.ts
 PASS __tests__/App.test.tsx
-PASS __tests__/auditChain.test.ts
-PASS __tests__/tillSlice.test.ts
-PASS __tests__/inventorySync.test.ts
-PASS __tests__/locationSlice.test.ts
-PASS __tests__/efdIdempotency.test.ts
-PASS __tests__/tenderValidation.test.ts
-PASS __tests__/syncLocation.test.ts
-PASS __tests__/productSearchIndex.test.ts
-PASS __tests__/escposCashDrawer.test.ts
-PASS __tests__/resolveCheckoutPrice.test.ts
-PASS __tests__/secureFetch.present.test.ts
-PASS __tests__/receiptExtras.test.ts
-PASS __tests__/inventoryMath.test.ts
-PASS __tests__/modelHelpers.test.ts
-PASS __tests__/secureFetch.test.ts
-PASS __tests__/loyalty.test.ts
-PASS __tests__/vatEngine.test.ts
 PASS src/api/__contracts__/procurement.test.ts
-PASS __tests__/stockTransferFsm.test.ts
-PASS __tests__/locationScoping.test.ts
-PASS __tests__/secureFetch.patch.test.ts
-PASS __tests__/variantCart.test.ts
-PASS __tests__/aiAnalyticsApi.test.ts
-PASS __tests__/pricingEngine.test.ts
+PASS __tests__/locationSlice.test.ts
 PASS __tests__/posSlice.test.ts
+PASS __tests__/variantCart.test.ts
+PASS __tests__/receiptDeliveryConfig.test.ts
+PASS __tests__/productSearchIndex.test.ts
+PASS __tests__/efdIdempotency.test.ts
+PASS __tests__/secureFetch.test.ts
+PASS __tests__/escposCashDrawer.test.ts
+PASS __tests__/loyalty.test.ts
 PASS __tests__/syncProgress.test.ts
+PASS __tests__/tillSlice.test.ts
+PASS __tests__/resolveCheckoutPrice.test.ts
+PASS __tests__/locationScoping.test.ts
+PASS __tests__/secureFetch.present.test.ts
+PASS __tests__/inventoryMath.test.ts
+PASS __tests__/receiptExtras.test.ts
+PASS __tests__/pricingEngine.test.ts
+PASS __tests__/stockTransferFsm.test.ts
+PASS __tests__/secureFetch.patch.test.ts
+PASS __tests__/modelHelpers.test.ts
+PASS __tests__/aiAnalyticsApi.test.ts
+PASS __tests__/vatEngine.test.ts
+PASS __tests__/inventorySync.test.ts
+PASS __tests__/tenderValidation.test.ts
 PASS __tests__/promotionEngine.test.ts
+PASS __tests__/pluParser.test.ts
+PASS __tests__/syncLocation.test.ts
 ---------------------------|---------|----------|---------|---------|---------------------
 File                       | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s   
 ---------------------------|---------|----------|---------|---------|---------------------
@@ -71,5 +69,5 @@ All files                  |   84.94 |    74.48 |   78.43 |   84.65 |
 Test Suites: 1 skipped, 30 passed, 30 of 31 total
 Tests:       4 skipped, 65 passed, 69 total
 Snapshots:   0 total
-Time:        9.135 s, estimated 13 s
+Time:        7.989 s
 Ran all test suites.
