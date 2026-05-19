@@ -10,8 +10,16 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from 'react-native';
-import {useSelector} from 'react-redux';
-import type {RootState} from '../../store';
+import {useDispatch, useSelector} from 'react-redux';
+import type {AppDispatch, RootState} from '../../store';
+import {ApprovalCard} from '../../components/copilot/ApprovalCard';
+import {fetchPendingApprovals} from '../../api/copilot';
+import {
+  addPendingApproval,
+  removePendingApproval,
+  setPendingApprovals,
+} from '../../store/slices/copilotSlice';
+import {useFocusEffect} from '@react-navigation/native';
 import {
   copilotService,
   CopilotMessage,
@@ -33,9 +41,9 @@ import {refreshReorderAlerts} from '../../inventory/reorderCheck';
 const SUGGESTIONS: Record<string, string[]> = {
   CEO: [
     'What is our revenue today?',
-    'How is cash runway looking?',
+    'Forecast demand for next week',
+    'Show cash flow forecast',
     'Any critical alerts I should know about?',
-    'What are our top selling products this week?',
   ],
   CFO: [
     'What invoices are overdue?',
@@ -72,10 +80,12 @@ const SUGGESTIONS: Record<string, string[]> = {
 type PendingApproval = {
   approvalId: string;
   description: string;
+  impactSummary?: string;
 };
 
 export default function CopilotScreen() {
   const {t} = useTranslation();
+  const dispatch = useDispatch<AppDispatch>();
   const navigation = useNavigation<NavigationProp<CopilotTabParamList>>();
   const [messages, setMessages] = useState<CopilotMessage[]>([]);
   const [input, setInput] = useState('');
@@ -96,6 +106,22 @@ export default function CopilotScreen() {
   );
 
   const suggestions = SUGGESTIONS[role || 'CEO'] ?? SUGGESTIONS.CEO;
+
+  useFocusEffect(
+    useCallback(() => {
+      void fetchPendingApprovals().then(rows => {
+        dispatch(
+          setPendingApprovals(
+            rows.map(r => ({
+              approvalId: String(r.id),
+              description: String(r.actionDescription ?? 'Pending approval'),
+              impactSummary: r.impactSummary,
+            })),
+          ),
+        );
+      });
+    }, [dispatch]),
+  );
 
   const handleInventoryShortcut = useCallback(
     async (text: string): Promise<boolean> => {
@@ -120,6 +146,19 @@ export default function CopilotScreen() {
           },
         ]);
         navigation.navigate('Stock', {screen: 'Expiring'});
+        return true;
+      }
+      if (q.toLowerCase().includes('forecast demand')) {
+        navigation.getParent()?.navigate('Dashboard' as never, {
+          screen: 'DemandForecast',
+          params: {horizonDays: 7},
+        } as never);
+        return true;
+      }
+      if (q.toLowerCase().includes('cash flow')) {
+        navigation.getParent()?.navigate('Dashboard' as never, {
+          screen: 'CashFlowForecast',
+        } as never);
         return true;
       }
       if (q.includes('reorder')) {
@@ -186,11 +225,15 @@ export default function CopilotScreen() {
             tenantId,
             userId,
             evt => {
-              if (evt.event === 'step') {
+              if (evt.event === 'approval_required' || evt.event === 'step') {
                 const payload = evt.data;
                 const status = String(payload.status ?? '');
-                if (status === 'PENDING_APPROVAL' || payload.approvalRequired) {
-                  setPendingApproval({
+                if (
+                  evt.event === 'approval_required' ||
+                  status === 'PENDING_APPROVAL' ||
+                  payload.approvalRequired
+                ) {
+                  const approval = {
                     approvalId: String(
                       payload.approvalId ?? payload.approval_id ?? '',
                     ),
@@ -199,7 +242,10 @@ export default function CopilotScreen() {
                         payload.description ??
                         'Action requires approval',
                     ),
-                  });
+                    impactSummary: String(payload.impactSummary ?? ''),
+                  };
+                  setPendingApproval(approval);
+                  dispatch(addPendingApproval(approval));
                 }
                 const stepText = String(payload.message ?? payload.summary ?? '');
                 if (stepText) {
@@ -281,7 +327,7 @@ export default function CopilotScreen() {
     [loading, role, agentMode, accessToken, tenantId, userId, t, handleInventoryShortcut],
   );
 
-  const resolveApproval = async (approved: boolean) => {
+  const resolveApproval = async (approved: boolean, reason?: string) => {
     if (!pendingApproval?.approvalId) {
       return;
     }
@@ -290,8 +336,9 @@ export default function CopilotScreen() {
       if (approved) {
         await approveCopilotAction(pendingApproval.approvalId);
       } else {
-        await rejectCopilotAction(pendingApproval.approvalId);
+        await rejectCopilotAction(pendingApproval.approvalId, reason);
       }
+      dispatch(removePendingApproval(pendingApproval.approvalId));
       setPendingApproval(null);
     } finally {
       setApprovalBusy(false);
@@ -375,24 +422,14 @@ export default function CopilotScreen() {
       />
 
       {pendingApproval ? (
-        <View style={styles.approvalCard}>
-          <Text style={styles.approvalTitle}>{t('copilot.approvalWaiting')}</Text>
-          <Text style={styles.approvalBody}>{pendingApproval.description}</Text>
-          <View style={styles.approvalActions}>
-            <TouchableOpacity
-              style={[styles.approvalBtn, styles.approveBtn]}
-              disabled={approvalBusy}
-              onPress={() => void resolveApproval(true)}>
-              <Text style={styles.approvalBtnText}>{t('copilot.approve')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.approvalBtn, styles.rejectBtn]}
-              disabled={approvalBusy}
-              onPress={() => void resolveApproval(false)}>
-              <Text style={styles.approvalBtnText}>{t('copilot.reject')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <ApprovalCard
+          description={pendingApproval.description}
+          impactSummary={pendingApproval.impactSummary}
+          busy={approvalBusy}
+          onApprove={() => void resolveApproval(true)}
+          onReject={reason => void resolveApproval(false, reason)}
+          onAskMore={() => void sendMessage(t('copilot.askMorePrompt'))}
+        />
       ) : null}
 
       <View style={styles.modeRow}>
@@ -537,19 +574,4 @@ const styles = StyleSheet.create({
   },
   modeChipActive: {backgroundColor: '#DBEAFE', borderColor: '#1B6FDB'},
   modeChipText: {fontSize: 13, fontWeight: '600', color: '#1E40AF'},
-  approvalCard: {
-    margin: 12,
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: '#FEF3C7',
-    borderWidth: 1,
-    borderColor: '#F59E0B',
-  },
-  approvalTitle: {fontWeight: '700', marginBottom: 6, color: '#92400E'},
-  approvalBody: {color: '#78350F', marginBottom: 10},
-  approvalActions: {flexDirection: 'row', gap: 8},
-  approvalBtn: {flex: 1, padding: 10, borderRadius: 8, alignItems: 'center'},
-  approveBtn: {backgroundColor: '#16A34A'},
-  rejectBtn: {backgroundColor: '#DC2626'},
-  approvalBtnText: {color: '#FFFFFF', fontWeight: '600'},
 });

@@ -85,6 +85,7 @@ export function streamCopilotAgent(
   [
     'run_started',
     'step',
+    'approval_required',
     'completed',
     'failed',
     'timed_out',

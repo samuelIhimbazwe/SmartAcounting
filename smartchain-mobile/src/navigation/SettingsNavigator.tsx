@@ -7,12 +7,14 @@ import {PrinterSettingsScreen} from '../screens/settings/PrinterSettingsScreen';
 import {LocationSettingsScreen} from '../screens/settings/LocationSettingsScreen';
 import AuditLogScreen from '../screens/audit/AuditLogScreen';
 import {PosHardwareSettingsScreen} from '../screens/settings/PosHardwareSettingsScreen';
+import {ReceiptDeliverySettingsScreen} from '../screens/settings/ReceiptDeliverySettingsScreen';
 
 export type SettingsStackParamList = {
   SettingsHome: undefined;
   LanguageSettings: undefined;
   PrinterSettings: undefined;
   PosHardware: undefined;
+  ReceiptDelivery: undefined;
   LocationSettings: undefined;
   AuditLog: undefined;
 };
@@ -42,6 +44,11 @@ export default function SettingsNavigator() {
         name="PosHardware"
         component={PosHardwareSettingsScreen}
         options={{title: t('hardware.posTitle')}}
+      />
+      <Stack.Screen
+        name="ReceiptDelivery"
+        component={ReceiptDeliverySettingsScreen}
+        options={{title: t('receiptDelivery.settingsTitle')}}
       />
       <Stack.Screen
         name="LocationSettings"

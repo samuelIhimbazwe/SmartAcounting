@@ -1,5 +1,6 @@
 import {store} from '../store';
 import {addAlert, type AlertItem} from '../store/slices/alertSlice';
+import {addPendingApproval} from '../store/slices/copilotSlice';
 import {BASE_URL} from '../api/client';
 
 /**
@@ -21,20 +22,37 @@ interface ActiveStream {
 
 let active: ActiveStream | null = null;
 
+const ANOMALY_TYPES = new Set([
+  'void_spike',
+  'discount_abuse',
+  'unusual_return',
+  'stock_discrepancy',
+  'cashier_performance',
+  'revenue_drop',
+]);
+
 const TYPES_OF_INTEREST = new Set([
   'ANOMALY_DETECTED',
   'LOW_STOCK',
   'CREDIT_LIMIT_EXCEEDED',
+  'approval_required',
+  ...ANOMALY_TYPES,
 ]);
 
 function dispatchAlert(event: AlertItem): void {
   if (!event || typeof event !== 'object' || typeof event.type !== 'string') {
     return;
   }
-  if (!TYPES_OF_INTEREST.has(event.type)) {
-    // Still record everything else as a generic alert so the UI can react.
-    store.dispatch(addAlert(event));
-    return;
+  if (event.type === 'approval_required') {
+    store.dispatch(
+      addPendingApproval({
+        approvalId: String(event.approvalId ?? event.id ?? ''),
+        description: String(
+          event.actionDescription ?? event.description ?? 'Approval required',
+        ),
+        impactSummary: String(event.impactSummary ?? ''),
+      }),
+    );
   }
   store.dispatch(addAlert(event));
 }

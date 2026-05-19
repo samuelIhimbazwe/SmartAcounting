@@ -51,6 +51,7 @@ export default function CustomerLookupScreen() {
       customerId: c.id,
       serverId: c.serverId,
       customerName: c.name,
+      phone: c.phone,
       priceListId: c.priceListId,
       creditLimit: c.creditLimit,
       creditBalance: c.creditBalance,

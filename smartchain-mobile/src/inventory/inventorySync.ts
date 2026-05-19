@@ -5,15 +5,35 @@ import {database} from '../db';
 import {VariantBatch} from '../db/models/VariantBatch';
 import {ProductVariant} from '../db/models/ProductVariant';
 import {Q} from '@nozbe/watermelondb';
+import {setSyncProgress} from '../services/syncProgress';
+import {rebuildProductSearchIndex} from '../services/productSearchIndex';
+
+export const SYNC_BATCH_SIZE = 500;
 
 export async function syncCatalogFromBalances(
   locationCode?: string,
 ): Promise<void> {
   const loc = locationCode ?? getSyncLocationCode();
   const rows = await fetchBalances(loc);
-  for (const row of rows) {
-    await upsertProductFromBalance(row);
+  const total = rows.length;
+  if (total === 0) {
+    setSyncProgress(null);
+    return;
   }
+  setSyncProgress({active: true, processed: 0, total});
+  for (let i = 0; i < rows.length; i += SYNC_BATCH_SIZE) {
+    const batch = rows.slice(i, i + SYNC_BATCH_SIZE);
+    for (const row of batch) {
+      await upsertProductFromBalance(row);
+    }
+    setSyncProgress({
+      active: true,
+      processed: Math.min(i + batch.length, total),
+      total,
+    });
+  }
+  setSyncProgress(null);
+  await rebuildProductSearchIndex();
 }
 
 export async function syncBatchesFromApi(locationCode?: string): Promise<void> {

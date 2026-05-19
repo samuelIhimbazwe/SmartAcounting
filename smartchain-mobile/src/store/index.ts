@@ -23,6 +23,8 @@ import tillReducer from './slices/tillSlice';
 import inventoryReducer from './slices/inventorySlice';
 import dashboardReducer from './slices/dashboardSlice';
 import locationReducer from './slices/locationSlice';
+import copilotReducer from './slices/copilotSlice';
+import intelligenceReducer from './slices/intelligenceSlice';
 
 /** Never persist passwords, OTP drafts, or MFA workflow fields to disk. */
 const authPersistTransform = createTransform(
@@ -78,6 +80,8 @@ const rootReducer = combineReducers({
   till: tillReducer,
   inventory: inventoryReducer,
   dashboard: dashboardReducer,
+  copilot: copilotReducer,
+  intelligence: intelligenceReducer,
 });
 
 export const store = configureStore({

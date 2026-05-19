@@ -14,6 +14,7 @@ import {
   retryPendingEfdSubmissions,
 } from '../services/efd';
 import {useSyncStatus} from '../hooks/useSyncStatus';
+import {getSyncProgress} from '../services/syncProgress';
 
 export function SyncStatusBar() {
   const {t} = useTranslation();
@@ -22,6 +23,7 @@ export function SyncStatusBar() {
   const [syncing, setSyncing] = useState(false);
   const [lastItemError, setLastItemError] = useState<string | null>(null);
   const [efdPending, setEfdPending] = useState(0);
+  const [catalogSync, setCatalogSync] = useState<ReturnType<typeof getSyncProgress>>(null);
 
   const accessToken = useSelector((s: RootState) => s.auth.accessToken);
   const roles = useSelector((s: RootState) => s.auth.roles) as AppRole[];
@@ -43,6 +45,8 @@ export function SyncStatusBar() {
 
   useEffect(() => {
     void refreshPending();
+    const id = setInterval(() => setCatalogSync(getSyncProgress()), 500);
+    return () => clearInterval(id);
   }, [refreshPending]);
 
   useEffect(() => {
@@ -81,8 +85,9 @@ export function SyncStatusBar() {
     isOnline && (serverPending > 0 || serverAlerts > 0);
   const showOfflineBar =
     !isOnline || pendingCount > 0 || efdPending > 0 || syncing;
+  const showCatalogSync = catalogSync?.active && (catalogSync.total ?? 0) > 0;
 
-  if (!showOfflineBar && !showServerBadges) {
+  if (!showOfflineBar && !showServerBadges && !showCatalogSync) {
     return null;
   }
 
@@ -112,6 +117,17 @@ export function SyncStatusBar() {
               {t('sync.alerts', {count: serverAlerts})}
             </Text>
           ) : null}
+        </View>
+      ) : null}
+      {showCatalogSync ? (
+        <View style={[styles.bar, styles.syncing]}>
+          <Text style={styles.text}>
+            {t('sync.catalogProgress', {
+              processed: catalogSync?.processed ?? 0,
+              total: catalogSync?.total ?? 0,
+              defaultValue: 'Syncing catalog {{processed}}/{{total}}',
+            })}
+          </Text>
         </View>
       ) : null}
       {showOfflineBar ? (

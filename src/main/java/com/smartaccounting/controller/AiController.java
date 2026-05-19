@@ -9,6 +9,7 @@ import com.smartaccounting.dto.CopilotQueryRequest;
 import com.smartaccounting.dto.CopilotWhatIfRequest;
 import com.smartaccounting.forecast.ForecastService;
 import com.smartaccounting.service.ActionQueueService;
+import com.smartaccounting.service.AiAnalyticsService;
 import com.smartaccounting.service.ForecastJobService;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
@@ -37,19 +38,22 @@ public class AiController {
     private final ForecastJobService forecastJobService;
     private final ActionQueueService actionQueueService;
     private final AnomalyService anomalyService;
+    private final AiAnalyticsService aiAnalyticsService;
 
     public AiController(CopilotService copilotService,
                         CopilotAgentService copilotAgentService,
                         ForecastService forecastService,
                         ForecastJobService forecastJobService,
                         ActionQueueService actionQueueService,
-                        AnomalyService anomalyService) {
+                        AnomalyService anomalyService,
+                        AiAnalyticsService aiAnalyticsService) {
         this.copilotService = copilotService;
         this.copilotAgentService = copilotAgentService;
         this.forecastService = forecastService;
         this.forecastJobService = forecastJobService;
         this.actionQueueService = actionQueueService;
         this.anomalyService = anomalyService;
+        this.aiAnalyticsService = aiAnalyticsService;
     }
 
     @GetMapping("/copilot/provider-status")
@@ -202,5 +206,28 @@ public class AiController {
     @PreAuthorize("@roleScopeGuard.canAccessRole(authentication, #role)")
     public Map<String, Object> briefing(@PathVariable String role) {
         return copilotService.briefing(role);
+    }
+
+    @PostMapping("/analytics/demand-forecast")
+    public Map<String, Object> demandForecast(@RequestBody(required = false) Map<String, Object> body) {
+        int days = 7;
+        if (body != null && body.get("horizonDays") instanceof Number n) {
+            days = n.intValue();
+        }
+        return aiAnalyticsService.demandForecast(days);
+    }
+
+    @GetMapping("/reorder-suggestions")
+    public Map<String, Object> reorderSuggestions() {
+        return aiAnalyticsService.reorderSuggestions();
+    }
+
+    @PostMapping("/analytics/cash-flow-forecast")
+    public Map<String, Object> cashFlowForecast(@RequestBody(required = false) Map<String, Object> body) {
+        int days = 30;
+        if (body != null && body.get("days") instanceof Number n) {
+            days = n.intValue();
+        }
+        return aiAnalyticsService.cashFlowForecast(days);
     }
 }

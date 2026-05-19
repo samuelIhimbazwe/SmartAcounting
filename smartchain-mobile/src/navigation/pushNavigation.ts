@@ -10,6 +10,8 @@ const PUSH_ROUTE_MAP: Record<string, {tab: string; screen?: string}> = {
   '/pos': {tab: 'POS', screen: 'Checkout'},
   '/anomaly/cases': {tab: 'Dashboard'},
   '/credit-ledger': {tab: 'Dashboard'},
+  '/copilot': {tab: 'Copilot'},
+  '/copilot/approvals': {tab: 'Copilot'},
 };
 
 const CASHIER_ALLOWED_TABS = new Set(['Till', 'POS', 'Settings']);

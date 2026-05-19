@@ -1,14 +1,20 @@
-import React, {useMemo} from 'react';
+import React, {useEffect, useMemo} from 'react';
 import {Platform, ScrollView, Share, StyleSheet, Text, View} from 'react-native';
 import {Button} from 'react-native-paper';
 import QRCode from 'react-native-qrcode-svg';
 import {useTranslation} from 'react-i18next';
 import {useSelector} from 'react-redux';
+import Toast from 'react-native-toast-message';
 import type {RootState} from '../../store';
 import {printReceiptWithAlert} from '../../services/printing';
 import {testIds} from '../../e2e/testIds';
 import {formatMoney} from '../../utils/currency';
 import {loadHardwareConfig} from '../../hardware/printerConfig';
+import {
+  buildReceiptMessage,
+  deliverReceipt,
+} from '../../api/receiptDelivery';
+import {loadReceiptDeliveryConfig} from '../../services/receiptDeliveryConfig';
 
 export default function ReceiptScreen() {
   const {t} = useTranslation();
@@ -21,6 +27,12 @@ export default function ReceiptScreen() {
   const taxExempt = useSelector((s: RootState) => s.pos.lastTaxExempt);
   const sessionCurrency = useSelector((s: RootState) => s.pos.sessionCurrency);
   const locationId = useSelector((s: RootState) => s.location.selectedLocationId);
+  const customerPhone = useSelector((s: RootState) => s.pos.lastCustomerPhone);
+
+  const total = useMemo(
+    () => receiptLines.reduce((a, l) => a + l.lineTotal, 0),
+    [receiptLines],
+  );
 
   const htmlExtras = useMemo(
     () => ({
@@ -33,6 +45,51 @@ export default function ReceiptScreen() {
     }),
     [netAmount, vatAmount, taxExempt, sessionCurrency, fiscalSignature],
   );
+
+  const sendWhatsApp = async (channel: 'WHATSAPP' | 'SMS' = 'WHATSAPP') => {
+    if (!txId || !customerPhone?.trim()) {
+      return;
+    }
+    const cfg = loadReceiptDeliveryConfig();
+    if (!cfg.whatsappEnabled && channel === 'WHATSAPP') {
+      return;
+    }
+    try {
+      const message = buildReceiptMessage(
+        txId,
+        receiptLines,
+        total,
+        sessionCurrency,
+      );
+      const res = await deliverReceipt({
+        salesOrderId: txId,
+        phone: customerPhone.trim(),
+        channel,
+        message,
+      });
+      if (res.ok) {
+        Toast.show({type: 'success', text1: t('receiptDelivery.whatsappSent')});
+      } else {
+        if (channel === 'WHATSAPP') {
+          await sendWhatsApp('SMS');
+          return;
+        }
+        Toast.show({type: 'error', text1: t('receiptDelivery.whatsappFailed')});
+      }
+    } catch {
+      Toast.show({type: 'error', text1: t('receiptDelivery.whatsappFailed')});
+    }
+  };
+
+  useEffect(() => {
+    if (!txId || !customerPhone?.trim()) {
+      return;
+    }
+    const cfg = loadReceiptDeliveryConfig();
+    if (cfg.mode === 'always' && cfg.whatsappEnabled) {
+      void sendWhatsApp();
+    }
+  }, [txId, customerPhone]);
 
   const onPrint = async () => {
     if (!txId) {
@@ -50,6 +107,9 @@ export default function ReceiptScreen() {
       message: `${t('receipt.title')}: ${txId}`,
     });
   };
+
+  const showWhatsApp =
+    !!customerPhone?.trim() && loadReceiptDeliveryConfig().whatsappEnabled;
 
   return (
     <ScrollView contentContainerStyle={styles.wrap}>
@@ -92,6 +152,16 @@ export default function ReceiptScreen() {
         }>
         {Platform.OS === 'ios' ? t('receipt.airPrint') : t('receipt.print')}
       </Button>
+      {showWhatsApp ? (
+        <Button
+          mode="outlined"
+          icon="whatsapp"
+          disabled={!txId}
+          onPress={() => void sendWhatsApp()}
+          contentStyle={styles.btnInner}>
+          {t('receiptDelivery.whatsapp')}
+        </Button>
+      ) : null}
       {Platform.OS === 'ios' ? (
         <Button
           mode="outlined"

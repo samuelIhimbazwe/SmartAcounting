@@ -21,6 +21,9 @@ import {
 } from '../services/biometricUnlock';
 import {runInventorySync} from '../inventory/inventorySync';
 import {refreshReorderAlerts} from '../inventory/reorderCheck';
+import {startReorderSuggestionsWatcher} from '../services/reorderSuggestionsSync';
+import {rebuildProductSearchIndex} from '../services/productSearchIndex';
+import {downloadProductModelIfNeeded} from '../services/productRecognition';
 
 const Stack = createNativeStackNavigator();
 
@@ -101,17 +104,26 @@ export default function RootNavigator() {
     if (!token || !selectedLocationCode) {
       return undefined;
     }
-    void runInventorySync().then(() => refreshReorderAlerts());
+    const stopReorder = startReorderSuggestionsWatcher();
+    void runInventorySync()
+      .then(() => rebuildProductSearchIndex())
+      .then(() => refreshReorderAlerts());
+    void downloadProductModelIfNeeded();
     const sub = AppState.addEventListener('change', next => {
       if (
         appState.current.match(/inactive|background/) &&
         next === 'active'
       ) {
-        void runInventorySync().then(() => refreshReorderAlerts());
+        void runInventorySync()
+          .then(() => rebuildProductSearchIndex())
+          .then(() => refreshReorderAlerts());
       }
       appState.current = next;
     });
-    return () => sub.remove();
+    return () => {
+      stopReorder();
+      sub.remove();
+    };
   }, [token, selectedLocationCode]);
 
   return (

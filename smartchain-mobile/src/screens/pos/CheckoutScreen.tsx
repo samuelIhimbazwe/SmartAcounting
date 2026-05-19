@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {ScrollView, StyleSheet, Text, View} from 'react-native';
 import {Button, Card, TextInput} from 'react-native-paper';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
@@ -17,7 +17,9 @@ import {
   setDiscount,
   setLastTransaction,
   setLastReceiptLines,
+  setLastCustomerPhone,
   setLastFiscal,
+  setTenderLineReference,
   setPosRegisterCode,
   setProcessing,
   setSessionCurrency,
@@ -68,6 +70,7 @@ import {
 } from '../../fiscal/vatEngine';
 import {submitSaleToEfd} from '../../services/efd';
 import {recordFiscalAudit} from '../../fiscal/auditLogRepository';
+import {verifyMomoTransaction} from '../../api/payments';
 
 type Nav = NativeStackNavigationProp<PosStackParamList, 'Checkout'>;
 
@@ -97,6 +100,60 @@ export default function CheckoutScreen() {
   const userId = useSelector((s: RootState) => s.auth.userId);
   const locationId = useSelector((s: RootState) => s.location.selectedLocationId);
   const scannerMode = loadHardwareConfig().scannerModeEnabled;
+
+  type MomoVerifyState = {
+    status: 'idle' | 'pending' | 'ok' | 'fail';
+    message?: string;
+  };
+  const [momoVerify, setMomoVerify] = useState<Record<number, MomoVerifyState>>(
+    {},
+  );
+
+  const isMomoTender = (tt: TenderType) =>
+    tt === 'MOMO' || tt === 'AIRTEL_MONEY';
+
+  const verifyMomoLine = async (index: number) => {
+    const line = tenderLines[index];
+    if (!line || !isMomoTender(line.tenderType)) {
+      return;
+    }
+    const code = line.reference?.trim();
+    if (!code) {
+      Toast.show({type: 'error', text1: t('payments.ussdCode')});
+      return;
+    }
+    setMomoVerify(v => ({...v, [index]: {status: 'pending'}}));
+    const provider = line.tenderType === 'AIRTEL_MONEY' ? 'AIRTEL_MONEY' : 'MTN';
+    try {
+      const res = await Promise.race([
+        verifyMomoTransaction({
+          transactionCode: code,
+          provider,
+          amount: line.amount || total,
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 30_000),
+        ),
+      ]);
+      if (res.status === 'CONFIRMED') {
+        setMomoVerify(v => ({
+          ...v,
+          [index]: {status: 'ok', message: t('payments.verified')},
+        }));
+      } else {
+        setMomoVerify(v => ({
+          ...v,
+          [index]: {status: 'fail', message: res.message ?? t('payments.verifyFailed')},
+        }));
+      }
+    } catch (e: unknown) {
+      const msg =
+        e instanceof Error && e.message === 'timeout'
+          ? t('payments.verifyTimeout')
+          : t('payments.verifyFailed');
+      setMomoVerify(v => ({...v, [index]: {status: 'fail', message: msg}}));
+    }
+  };
 
   const onScan = useCallback(
     (code: string) => {
@@ -210,6 +267,20 @@ export default function CheckoutScreen() {
     if (cart.length === 0) {
       Toast.show({type: 'error', text1: t('pos.cartEmpty')});
       return;
+    }
+
+    for (let i = 0; i < tenderLines.length; i++) {
+      const line = tenderLines[i];
+      if (line.amount > 0 && isMomoTender(line.tenderType)) {
+        if (momoVerify[i]?.status !== 'ok') {
+          Toast.show({
+            type: 'error',
+            text1: t('payments.verifyMomo'),
+            text2: t('payments.ussdCode'),
+          });
+          return;
+        }
+      }
     }
 
     const validation = validateTendersForTotal(tenderLines, total);
@@ -330,6 +401,7 @@ export default function CheckoutScreen() {
         );
         Toast.show({type: 'success', text1: t('pos.saleCompleted')});
         dispatch(setLastReceiptLines([...cart]));
+        dispatch(setLastCustomerPhone(selectedCustomer?.phone ?? null));
         dispatch(clearCart());
         navigation.navigate('Receipt');
       } else {
@@ -420,6 +492,37 @@ export default function CheckoutScreen() {
             }
             style={styles.field}
           />
+          {isMomoTender(line.tenderType) && line.amount > 0 ? (
+            <>
+              <TextInput
+                label={t('payments.ussdCode')}
+                value={line.reference ?? ''}
+                onChangeText={v => {
+                  dispatch(setTenderLineReference({index, reference: v}));
+                  setMomoVerify(m => ({...m, [index]: {status: 'idle'}}));
+                }}
+                style={styles.field}
+              />
+              <Button
+                mode="contained-tonal"
+                loading={momoVerify[index]?.status === 'pending'}
+                onPress={() => void verifyMomoLine(index)}>
+                {momoVerify[index]?.status === 'pending'
+                  ? t('payments.verifying')
+                  : t('payments.verifyMomo')}
+              </Button>
+              {momoVerify[index]?.message ? (
+                <Text
+                  style={
+                    momoVerify[index]?.status === 'ok'
+                      ? styles.momoOk
+                      : styles.momoFail
+                  }>
+                  {momoVerify[index]?.message}
+                </Text>
+              ) : null}
+            </>
+          ) : null}
           {tenderLines.length > 1 ? (
             <Button onPress={() => dispatch(removeTenderLine(index))}>
               {t('pos.removeTenderLine')}
@@ -531,12 +634,27 @@ export default function CheckoutScreen() {
           {t('common.add')}
         </Button>
       </View>
+      <View style={styles.row}>
+        <Button
+          mode="outlined"
+          onPress={() => navigation.navigate('Barcode')}
+          style={[styles.field, {flex: 1}]}
+          contentStyle={styles.btnInner}>
+          {t('pos.openScanner')}
+        </Button>
+        <Button
+          mode="outlined"
+          onPress={() => navigation.navigate('CatalogSearch')}
+          style={[styles.field, {flex: 1}]}
+          contentStyle={styles.btnInner}>
+          {t('pos.searchCatalog', 'Search')}
+        </Button>
+      </View>
       <Button
-        mode="outlined"
-        onPress={() => navigation.navigate('Barcode')}
-        style={styles.field}
-        contentStyle={styles.btnInner}>
-        {t('pos.openScanner')}
+        mode="text"
+        onPress={() => navigation.navigate('SaleHistory')}
+        style={styles.field}>
+        {t('pos.saleHistory', 'Sale history')}
       </Button>
 
       <Text style={[styles.section, styles.sectionTitle]}>{t('pos.cart')}</Text>
@@ -701,4 +819,6 @@ const styles = StyleSheet.create({
   promo: {fontSize: 13, color: '#059669'},
   bodyMedium: {fontSize: 15},
   total: {fontSize: 22, fontWeight: '700'},
+  momoOk: {color: '#16A34A', marginBottom: 8},
+  momoFail: {color: '#DC2626', marginBottom: 8},
 });

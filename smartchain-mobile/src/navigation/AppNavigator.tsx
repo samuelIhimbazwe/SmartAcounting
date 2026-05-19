@@ -11,7 +11,7 @@ import {SyncStatusBar} from '../components/SyncStatusBar';
 import PosNavigator from './PosNavigator';
 import StockNavigator from './StockNavigator';
 import TillNavigator from './TillNavigator';
-import OwnerDashboardScreen from '../screens/dashboard/OwnerDashboardScreen';
+import DashboardNavigator from './DashboardNavigator';
 import SettingsNavigator from './SettingsNavigator';
 import CopilotScreen from '../screens/copilot/CopilotScreen';
 import CustomerNavigator from './CustomerNavigator';
@@ -83,6 +83,7 @@ export default function AppNavigator() {
   const showDashboard =
     !cashierShell && hasAnyRole(roles, 'CEO', 'CFO');
   const showCopilot = !cashierShell;
+  const copilotBadge = useSelector((s: RootState) => s.copilot.badgeCount);
   const showCustomers =
     !cashierShell &&
     hasAnyRole(roles, 'CEO', 'SALES_MANAGER', 'OPS_MANAGER', 'ACCOUNTING_CONTROLLER');
@@ -144,7 +145,7 @@ export default function AppNavigator() {
           {showDashboard ? (
             <Tab.Screen
               name="Dashboard"
-              component={OwnerDashboardScreen}
+              component={DashboardNavigator}
               options={{
                 tabBarIcon: p =>
                   tabIcon('view-dashboard-outline', p.color, p.size),
@@ -160,6 +161,7 @@ export default function AppNavigator() {
                   <Text style={{fontSize: 20, color: p.color}}>✨</Text>
                 ),
                 tabBarLabel: 'Copilot',
+                tabBarBadge: copilotBadge > 0 ? copilotBadge : undefined,
               }}
             />
           ) : null}

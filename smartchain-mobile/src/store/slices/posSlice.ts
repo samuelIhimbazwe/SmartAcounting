@@ -26,6 +26,7 @@ export type SelectedCustomer = {
   customerId: string;
   serverId?: string;
   customerName: string;
+  phone?: string;
   priceListId?: string;
   creditLimit: number;
   creditBalance: number;
@@ -59,6 +60,7 @@ interface PosState {
   lastNetAmount: number;
   lastVatAmount: number;
   lastTaxExempt: boolean;
+  lastCustomerPhone: string | null;
   barcodeInput: string;
   openingFloat: number | null;
   shiftStartTime: string | null;
@@ -85,6 +87,7 @@ const initialState: PosState = {
   lastNetAmount: 0,
   lastVatAmount: 0,
   lastTaxExempt: false,
+  lastCustomerPhone: null,
   barcodeInput: '',
   openingFloat: null,
   shiftStartTime: null,
@@ -200,6 +203,9 @@ const posSlice = createSlice({
     setLastReceiptLines: (state, action: PayloadAction<CartItem[]>) => {
       state.lastReceiptLines = action.payload;
     },
+    setLastCustomerPhone: (state, action: PayloadAction<string | null>) => {
+      state.lastCustomerPhone = action.payload;
+    },
     setLastFiscal: (
       state,
       action: PayloadAction<{
@@ -288,6 +294,16 @@ const posSlice = createSlice({
       const line = state.tenderLines[action.payload.index];
       if (line) {
         line.tenderType = action.payload.tenderType;
+        line.reference = null;
+      }
+    },
+    setTenderLineReference: (
+      state,
+      action: PayloadAction<{index: number; reference: string}>,
+    ) => {
+      const line = state.tenderLines[action.payload.index];
+      if (line) {
+        line.reference = action.payload.reference;
       }
     },
     setShiftContext: (
@@ -322,6 +338,7 @@ export const {
   setProcessing,
   setLastTransaction,
   setLastReceiptLines,
+  setLastCustomerPhone,
   setLastFiscal,
   loadCartFromQuote,
   clearCart,
@@ -332,5 +349,6 @@ export const {
   updateTenderLine,
   removeTenderLine,
   setTenderLineType,
+  setTenderLineReference,
 } = posSlice.actions;
 export default posSlice.reducer;

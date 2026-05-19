@@ -14,6 +14,7 @@ type SettingsStackParamList = {
   LanguageSettings: undefined;
   PrinterSettings: undefined;
   PosHardware: undefined;
+  ReceiptDelivery: undefined;
   LocationSettings: undefined;
   AuditLog: undefined;
 };
@@ -43,6 +44,11 @@ export function SettingsHomeScreen() {
           title={t('hardware.posTitle')}
           left={props => <List.Icon {...props} icon="barcode-scan" />}
           onPress={() => navigation.navigate('PosHardware')}
+        />
+        <List.Item
+          title={t('receiptDelivery.settingsTitle')}
+          left={props => <List.Icon {...props} icon="whatsapp" />}
+          onPress={() => navigation.navigate('ReceiptDelivery')}
         />
         <List.Item
           title={t('locations.switchLocation')}

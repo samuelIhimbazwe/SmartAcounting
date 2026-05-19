@@ -77,6 +77,7 @@ public class PosReceiptService {
         out.put("transactionId", order.getId());
         out.put("printerType", normalizePrinterType(receiptProperties.getPrinterType()));
         out.put("escPos", escpos);
+        out.put("receiptText", receiptText);
         out.put("reprint", reprint);
         out.put("smsReceiptsSent", smsSent);
         return out;
