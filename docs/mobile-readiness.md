@@ -2,6 +2,8 @@
 
 Definition of done for merging mobile hardening work.
 
+**Phase gate rule:** do not advance until all four gates pass — see [mobile-phase-gates.md](./mobile-phase-gates.md) (Jest coverage, Maestro on device, staging API contract, manual checklist ticked).
+
 ## Checklist
 
 - [ ] EAS preview APK installs and logs in against staging API
@@ -14,8 +16,9 @@ Definition of done for merging mobile hardening work.
 - [ ] Returns and stock count queue offline, sync on reconnect
 - [ ] i18n: switching to FR in Settings changes all POS/till strings
 - [ ] Biometric unlock offered after first login
-- [ ] All Jest smoke tests pass (`cd smartchain-mobile && npm test`)
-- [ ] Maestro smoke flow completes without manual steps (`maestro test e2e/smoke.yaml`)
+- [ ] Gate 1: `cd smartchain-mobile && npm run test:coverage` (pass + threshold)
+- [ ] Gate 2: Maestro smoke on physical device (`maestro test e2e/smoke.yaml`)
+- [ ] Gate 3: `npm run test:contract` against staging (see mobile-phase-gates.md)
 - [ ] Play internal track has at least one signed AAB
 
 ## Manual secrets / files (never commit real values)

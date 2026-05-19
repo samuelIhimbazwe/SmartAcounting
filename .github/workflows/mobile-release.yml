@@ -38,7 +38,7 @@ jobs:
           cache-dependency-path: smartchain-mobile/package-lock.json
       - run: npm ci --legacy-peer-deps
       - run: npx tsc --noEmit
-      - run: npm test -- --passWithNoTests
+      - run: npm run test:coverage
       - name: Maestro smoke (optional)
         continue-on-error: true
         run: |

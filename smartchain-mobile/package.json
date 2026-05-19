@@ -8,6 +8,8 @@
     "start": "react-native start",
     "lint": "eslint .",
     "test": "jest",
+    "test:coverage": "jest --coverage",
+    "test:contract": "jest --testPathPattern=staging.apiContract --passWithNoTests",
     "build:android:debug": "react-native run-android",
     "build:android:release": "cd android && gradlew.bat assembleRelease",
     "build:android:bundle": "cd android && gradlew.bat bundleRelease",

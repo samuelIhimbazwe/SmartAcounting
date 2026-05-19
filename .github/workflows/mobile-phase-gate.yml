@@ -1,0 +1,50 @@
+name: Mobile Phase Gate
+
+on:
+  pull_request:
+    paths:
+      - 'smartchain-mobile/**'
+      - 'e2e/**'
+      - '.github/workflows/mobile-phase-gate.yml'
+  workflow_dispatch:
+
+jobs:
+  jest-coverage:
+    name: Gate 1 — Jest coverage
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: smartchain-mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: smartchain-mobile/package-lock.json
+      - run: npm ci --legacy-peer-deps
+      - run: npm run test:coverage
+
+  api-contract-staging:
+    name: Gate 3 — API contract (staging)
+    runs-on: ubuntu-latest
+    if: ${{ secrets.STAGING_API_URL != '' }}
+    defaults:
+      run:
+        working-directory: smartchain-mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: smartchain-mobile/package-lock.json
+      - run: npm ci --legacy-peer-deps
+      - name: Contract tests
+        env:
+          STAGING_API_URL: ${{ secrets.STAGING_API_URL }}
+          CONTRACT_USERNAME: ${{ secrets.CONTRACT_USERNAME }}
+          CONTRACT_PASSWORD: ${{ secrets.CONTRACT_PASSWORD }}
+          CONTRACT_TENANT_ID: ${{ secrets.CONTRACT_TENANT_ID }}
+          CONTRACT_USER_ID: ${{ secrets.CONTRACT_USER_ID }}
+        run: npm run test:contract
