@@ -495,7 +495,7 @@ public class ReceivablesPayablesService {
         if (normalizedName.isBlank()) {
             throw new IllegalArgumentException("customerName is required");
         }
-        return financeCustomerRepository.findFirstByTenantIdAndCustomerNameIgnoreCase(tenantId, normalizedName)
+        return financeCustomerRepository.findFirstByTenantIdAndCustomerNameIgnoreCaseAndDeletedAtIsNull(tenantId, normalizedName)
             .orElseGet(() -> {
                 FinanceCustomer c = new FinanceCustomer();
                 c.setId(UUID.randomUUID());

@@ -60,9 +60,10 @@ public class TillSessionService {
                     throw new BusinessException("Register already has an open session");
                 });
         } else {
-            tillSessionRepository.findByTenantIdAndPosRegisterCodeAndStatus(tenantId, reg, "OPEN")
+            final String registerCode = reg;
+            tillSessionRepository.findByTenantIdAndPosRegisterCodeAndStatus(tenantId, registerCode, "OPEN")
                 .ifPresent(s -> {
-                    throw new BusinessException("Till " + reg + " already has an open session");
+                    throw new BusinessException("Till " + registerCode + " already has an open session");
                 });
         }
         UUID tillId = tillIdForRegister(tenantId, reg);

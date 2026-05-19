@@ -37,6 +37,24 @@ With demo seed script quantities:
 
 If SHOP and BRANCH_B show the same counts, sync is still wrong — do not start Phase 4.
 
+## Automated checks (local, no staging URL)
+
+```bash
+# Service layer: listBalances scopes by ?location= code
+./gradlew.bat test --tests "com.smartaccounting.service.InventoryServiceLocationScopeTest"
+
+# Seed data: SHOP 120 vs BRANCH_B 40 for demo water (embedded Postgres)
+./gradlew.bat integrationTest --tests "com.smartaccounting.integration.Phase3LocationBalancesSeedIT"
+
+# Live DB (after seed-staging-two-locations.sql)
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/verify-phase3-location-sync.sql
+
+# Live API (Docker/staging backend running)
+./scripts/verify-phase3-location-sync.ps1
+```
+
+Full-stack API verification needs Postgres with **pgvector** (Flyway V13+) — start Docker Desktop, then `docker compose up -d` and `.\gradlew.bat bootRun`, apply seed, run the PowerShell script.
+
 ## Rollback tags
 
 | Tag | When to use |

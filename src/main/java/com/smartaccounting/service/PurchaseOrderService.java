@@ -174,6 +174,8 @@ public class PurchaseOrderService {
         WorkflowCreatePurchaseOrderRequest request = new WorkflowCreatePurchaseOrderRequest(
             supplier.getId(),
             supplier.getSupplierName(),
+            null,
+            null,
             LocalDate.now().plusDays(leadDays),
             "RWF",
             null,

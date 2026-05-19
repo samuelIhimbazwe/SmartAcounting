@@ -74,21 +74,23 @@ public class PriceListService {
         BigDecimal fallback
     ) {
         UUID tenant = requireTenant();
-        BigDecimal price = fallback;
+        BigDecimal resolved = fallback;
         if (locationId != null) {
-            price = priceListRepository
+            final BigDecimal beforeBranch = resolved;
+            resolved = priceListRepository
                 .findFirstByTenantIdAndLocationIdAndDeletedAtIsNull(tenant, locationId)
-                .map(list -> resolveUnitPrice(list.getId(), productId, variantId, price))
-                .orElse(price);
+                .map(list -> resolveUnitPrice(list.getId(), productId, variantId, beforeBranch))
+                .orElse(beforeBranch);
         }
         if (customerPriceListId != null) {
-            price = resolveUnitPrice(customerPriceListId, productId, variantId, price);
+            resolved = resolveUnitPrice(customerPriceListId, productId, variantId, resolved);
         }
-        price = priceListRepository
+        final BigDecimal beforeGlobal = resolved;
+        resolved = priceListRepository
             .findFirstByTenantIdAndLocationIdIsNullAndScopeAndDeletedAtIsNull(tenant, "GLOBAL")
-            .map(list -> resolveUnitPrice(list.getId(), productId, variantId, price))
-            .orElse(price);
-        return price;
+            .map(list -> resolveUnitPrice(list.getId(), productId, variantId, beforeGlobal))
+            .orElse(beforeGlobal);
+        return resolved;
     }
 
     public List<Map<String, Object>> listPriceLists() {

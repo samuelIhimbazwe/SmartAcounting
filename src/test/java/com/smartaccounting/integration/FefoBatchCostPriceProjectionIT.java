@@ -101,7 +101,8 @@ class FefoBatchCostPriceProjectionIT extends AbstractPostgresSpringBootIntegrati
             "Walk-in",
             "RWF",
             "REG-A",
-            List.of(new PosCheckoutLineRequest(product.getBarcode(), new BigDecimal("5"))),
+            List.of(new PosCheckoutLineRequest(
+                product.getBarcode(), new BigDecimal("5"), null, null, null, null)),
             List.of(new PosTenderRequest("CASH", new BigDecimal("500.00"), null)),
             null,
             false,

@@ -125,10 +125,6 @@ public class CustomerRetailService {
     public List<Map<String, Object>> creditStatement(UUID customerId) {
         requireCustomer(customerId);
         List<Map<String, Object>> out = new ArrayList<>();
-        BigDecimal running = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-        for (CustomerLoyaltyTransaction tx : List.of()) {
-            // placeholder — ON_ACCOUNT ledger via invoices in future
-        }
         FinanceCustomer c = requireCustomer(customerId);
         Map<String, Object> balance = new LinkedHashMap<>();
         balance.put("type", "BALANCE");
@@ -298,6 +294,10 @@ public class CustomerRetailService {
     }
 
     private UUID requireTenant() {
-        return UUID.fromString(TenantContext.getTenantId());
+        UUID tenantId = TenantContext.tenantId();
+        if (tenantId == null) {
+            throw new IllegalStateException("Tenant context is required");
+        }
+        return tenantId;
     }
 }
