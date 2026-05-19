@@ -20,6 +20,8 @@ const creds = {
 };
 const hasCreds = Object.values(creds).every(v => v.length > 0);
 
+// STAGING_ENV_REQUIRED: whole suite skipped when STAGING_API_URL is unset (local default).
+// Not hardware — run in CI or locally with staging URL + CONTRACT_* creds (see file header).
 const describeStaging = hasStaging ? describe : describe.skip;
 
 async function api(
@@ -51,6 +53,7 @@ describeStaging('staging API contract (mobile)', () => {
     expect([401, 403]).toContain(res.status);
   });
 
+  // STAGING_ENV_REQUIRED: needs CONTRACT_USERNAME, CONTRACT_PASSWORD, CONTRACT_TENANT_ID, CONTRACT_USER_ID
   (hasCreds ? it : it.skip)('login returns access and refresh tokens', async () => {
     const mfa = await api('/auth/mfa/challenge', {
       method: 'POST',
@@ -75,6 +78,7 @@ describeStaging('staging API contract (mobile)', () => {
     expect(typeof body.refreshToken).toBe('string');
   });
 
+  // STAGING_ENV_REQUIRED: same CONTRACT_* env vars as login case above
   (hasCreds ? it : it.skip)('authenticated till-sessions/current returns JSON object', async () => {
     const mfa = await api('/auth/mfa/challenge', {
       method: 'POST',

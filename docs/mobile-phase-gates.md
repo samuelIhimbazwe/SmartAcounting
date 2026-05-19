@@ -34,7 +34,10 @@ npm run test:coverage
 | 6 | 70 | 55 |
 
 Phase 4 targets a larger jump (VAT, hash chain, Z-report) where pure logic tests are dense.
-Baseline snapshot: [phase2-coverage-baseline.txt](./phase2-coverage-baseline.txt).
+
+Baseline snapshots: [phase2-coverage-baseline.txt](./phase2-coverage-baseline.txt), [phase4-coverage-baseline.txt](./phase4-coverage-baseline.txt), [phase5-coverage-baseline.txt](./phase5-coverage-baseline.txt).
+
+**Local “4 skipped”:** the staging API contract suite (`staging.apiContract.test.ts`) skips when `STAGING_API_URL` is not set — not hardware gaps. See comments in that file (`STAGING_ENV_REQUIRED`).
 
 ---
 

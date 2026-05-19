@@ -30,7 +30,7 @@ Enterprise multi-tenant ERP backend implementation aligned to the SmartAccountin
 
 ## Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md). For **smartchain-mobile**, `npm install` needs `--legacy-peer-deps` until React Native is upgraded ([why](docs/mobile-npm-install.md)).
+See [CONTRIBUTING.md](./CONTRIBUTING.md). For **smartchain-mobile**, `npm install` needs `--legacy-peer-deps` until React Native is upgraded ([why](docs/mobile-npm-install.md)). After pulling Phase 5+, run `npm install --legacy-peer-deps` in `smartchain-mobile` then `npx react-native run-android` to link new native modules (`react-native-tcp-socket`, `react-native-zeroconf`, `react-native-print`).
 
 ## Run
 

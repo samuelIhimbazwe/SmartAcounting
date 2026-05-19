@@ -10,6 +10,16 @@ npm install --legacy-peer-deps
 
 See [../docs/mobile-npm-install.md](../docs/mobile-npm-install.md) and [../CONTRIBUTING.md](../CONTRIBUTING.md).
 
+## Native rebuild (required after pulling Phase 5+)
+
+After `npm install`, rebuild the Android app so new native modules link (Phase 5 adds `react-native-tcp-socket`, `react-native-zeroconf`, `react-native-print`):
+
+```bash
+npx react-native run-android
+```
+
+A Metro-only reload is not enough when native dependencies change.
+
 # Getting Started
 
 >**Note**: Make sure you have completed the [React Native - Environment Setup](https://reactnative.dev/docs/environment-setup) instructions till "Creating a new application" step, before proceeding.

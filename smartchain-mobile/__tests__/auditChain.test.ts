@@ -47,4 +47,44 @@ describe('auditChain', () => {
     });
     expect(verifyAuditChain([e1, e2])).toBe(false);
   });
+
+  it('hash chain stays valid across mixed event types', () => {
+    const buildEntry = (
+      action: string,
+      entityId: string,
+      entityType: string,
+      previousHash: string,
+      timestamp: string,
+    ) =>
+      appendAuditEntry(previousHash, {
+        entityType,
+        entityId,
+        action,
+        actorId: 'manager-1',
+        timestamp,
+      });
+
+    const sale1 = buildEntry(
+      'POS_CHECKOUT',
+      'sale-1',
+      'SALE',
+      GENESIS_HASH,
+      '2026-05-19T10:00:00.000Z',
+    );
+    const drawer = buildEntry(
+      'CASH_DRAWER_OPEN',
+      'drawer-1',
+      'TILL',
+      sale1.hash,
+      '2026-05-19T10:05:00.000Z',
+    );
+    const sale2 = buildEntry(
+      'POS_CHECKOUT',
+      'sale-2',
+      'SALE',
+      drawer.hash,
+      '2026-05-19T10:10:00.000Z',
+    );
+    expect(verifyAuditChain([sale1, drawer, sale2])).toBe(true);
+  });
 });
