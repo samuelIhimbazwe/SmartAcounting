@@ -13,6 +13,7 @@ import {
   showVariantPickerAlert,
 } from '../inventory/variantCart';
 import {addToCart} from '../store/slices/posSlice';
+import {loadPriceListContext} from '../pricing/priceListContext';
 
 function mapCurrency(code: string): 'FRW' | 'USD' {
   const u = code?.toUpperCase() ?? 'FRW';
@@ -24,10 +25,20 @@ export function useBarcode() {
   const priceListId = useSelector(
     (s: RootState) => s.pos.selectedCustomer?.priceListId,
   );
+  const locationId = useSelector(
+    (s: RootState) => s.location.selectedLocationId,
+  );
 
   const lookupAndAddProduct = useCallback(
     async (barcode: string, opts?: {serialNumber?: string}) => {
-      const cartOpts = {...opts, priceListId};
+      const ctx = await loadPriceListContext(locationId);
+      const cartOpts = {
+        ...opts,
+        priceListId,
+        locationId,
+        branchPriceListId: ctx.branchPriceListId,
+        globalPriceListId: ctx.globalPriceListId,
+      };
       const trimmed = barcode.trim();
       if (!trimmed) {
         return;
@@ -86,7 +97,7 @@ export function useBarcode() {
         Alert.alert('Not found', `No product for barcode ${trimmed}`);
       }
     },
-    [dispatch, priceListId],
+    [dispatch, priceListId, locationId],
   );
 
   return {lookupAndAddProduct};

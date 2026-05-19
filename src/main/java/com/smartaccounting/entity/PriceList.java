@@ -21,6 +21,8 @@ public class PriceList {
     private Instant createdAt;
     private Instant updatedAt;
     private Instant deletedAt;
+    private UUID locationId;
+    private String scope;
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
@@ -42,4 +44,8 @@ public class PriceList {
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
     public Instant getDeletedAt() { return deletedAt; }
     public void setDeletedAt(Instant deletedAt) { this.deletedAt = deletedAt; }
+    public UUID getLocationId() { return locationId; }
+    public void setLocationId(UUID locationId) { this.locationId = locationId; }
+    public String getScope() { return scope; }
+    public void setScope(String scope) { this.scope = scope; }
 }

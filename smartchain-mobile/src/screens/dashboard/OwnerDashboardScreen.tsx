@@ -11,13 +11,17 @@ import {
 } from '../../store/slices/dashboardSlice';
 import {fetchDashboardKpis} from '../../api/dashboard';
 import type {AppRole} from '../../utils/roles';
-import {roleDashboardPath} from '../../utils/roles';
+import {hasAnyRole, roleDashboardPath} from '../../utils/roles';
+import {fetchAnalyticsDashboard, type HqDashboardDto} from '../../api/analytics';
 
 export default function OwnerDashboardScreen() {
   const dispatch = useDispatch<AppDispatch>();
   const kpis = useSelector((s: RootState) => s.dashboard.ownerKpis);
   const loading = useSelector((s: RootState) => s.dashboard.loading);
   const role = useSelector((s: RootState) => s.auth.role) as AppRole | null;
+  const roles = useSelector((s: RootState) => s.auth.roles) as AppRole[];
+  const [hq, setHq] = React.useState<HqDashboardDto | null>(null);
+  const showHq = hasAnyRole(roles, 'CEO', 'CFO');
 
   const reload = useCallback(() => {
     if (!role) {
@@ -33,11 +37,28 @@ export default function OwnerDashboardScreen() {
   useFocusEffect(
     useCallback(() => {
       reload();
-    }, [reload]),
+      if (showHq) {
+        void fetchAnalyticsDashboard('all').then(setHq).catch(() => setHq(null));
+      }
+    }, [reload, showHq]),
   );
 
   return (
     <View style={styles.wrap}>
+      {showHq && hq ? (
+        <Card style={styles.card}>
+          <Card.Title title="All branches" />
+          <Card.Content>
+            <Text>Sales today: {String(hq.totalSalesToday ?? 0)}</Text>
+            <Text>Open tills: {String(hq.openTills ?? 0)}</Text>
+            {(hq.locations ?? []).map(loc => (
+              <Text key={String(loc.locationId)}>
+                {loc.name}: {String(loc.salesToday ?? 0)}
+              </Text>
+            ))}
+          </Card.Content>
+        </Card>
+      ) : null}
       <Text style={styles.h}>Executive KPIs ({role ?? '—'})</Text>
       <Text style={styles.sub}>{loading ? 'Loading…' : ' '}</Text>
       <FlatList

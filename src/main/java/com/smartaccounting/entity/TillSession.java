@@ -14,6 +14,8 @@ public class TillSession {
     @Id private UUID id;
     private UUID tenantId;
     private UUID tillId;
+    private UUID locationId;
+    private UUID registerId;
     private String posRegisterCode;
     private UUID cashierId;
     private UUID shiftId;
@@ -32,6 +34,10 @@ public class TillSession {
     public void setTenantId(UUID tenantId) { this.tenantId = tenantId; }
     public UUID getTillId() { return tillId; }
     public void setTillId(UUID tillId) { this.tillId = tillId; }
+    public UUID getLocationId() { return locationId; }
+    public void setLocationId(UUID locationId) { this.locationId = locationId; }
+    public UUID getRegisterId() { return registerId; }
+    public void setRegisterId(UUID registerId) { this.registerId = registerId; }
     public String getPosRegisterCode() { return posRegisterCode; }
     public void setPosRegisterCode(String posRegisterCode) { this.posRegisterCode = posRegisterCode; }
     public UUID getCashierId() { return cashierId; }

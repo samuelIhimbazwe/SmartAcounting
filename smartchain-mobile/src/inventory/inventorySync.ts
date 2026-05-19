@@ -1,19 +1,24 @@
 import {fetchBalances, fetchBatches, fetchExpiryRisk} from '../api/inventory';
 import {upsertProductFromBalance} from './inventoryRepository';
+import {getSyncLocationCode} from './syncLocation';
 import {database} from '../db';
 import {VariantBatch} from '../db/models/VariantBatch';
 import {ProductVariant} from '../db/models/ProductVariant';
 import {Q} from '@nozbe/watermelondb';
 
-export async function syncCatalogFromBalances(): Promise<void> {
-  const rows = await fetchBalances();
+export async function syncCatalogFromBalances(
+  locationCode?: string,
+): Promise<void> {
+  const loc = locationCode ?? getSyncLocationCode();
+  const rows = await fetchBalances(loc);
   for (const row of rows) {
     await upsertProductFromBalance(row);
   }
 }
 
-export async function syncBatchesFromApi(): Promise<void> {
-  const rows = await fetchBatches();
+export async function syncBatchesFromApi(locationCode?: string): Promise<void> {
+  const loc = locationCode ?? getSyncLocationCode();
+  const rows = await fetchBatches(loc);
   const ops: Array<() => Promise<void>> = [];
 
   for (const row of rows) {
@@ -67,9 +72,10 @@ export async function syncBatchesFromApi(): Promise<void> {
   }
 }
 
-export async function fetchExpiringItems(daysAhead = 30) {
+export async function fetchExpiringItems(daysAhead = 30, locationCode?: string) {
+  const loc = locationCode ?? getSyncLocationCode();
   try {
-    return await fetchExpiryRisk(daysAhead);
+    return await fetchExpiryRisk(daysAhead, loc);
   } catch {
     const batches = await database.get<VariantBatch>('variant_batches').query().fetch();
     const now = Date.now();
@@ -91,14 +97,16 @@ export async function fetchExpiringItems(daysAhead = 30) {
   }
 }
 
-export async function runInventorySync(): Promise<void> {
+/** Sync local catalog from API for the active branch (`selectedLocationCode`). */
+export async function runInventorySync(locationCode?: string): Promise<void> {
+  const loc = locationCode ?? getSyncLocationCode();
   try {
-    await syncCatalogFromBalances();
+    await syncCatalogFromBalances(loc);
   } catch {
     /* offline */
   }
   try {
-    await syncBatchesFromApi();
+    await syncBatchesFromApi(loc);
   } catch {
     /* offline */
   }

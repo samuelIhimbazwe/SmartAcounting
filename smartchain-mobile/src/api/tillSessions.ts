@@ -3,6 +3,8 @@ import {apiCall} from './client';
 export type TillSessionDto = {
   id: string;
   tillId: string;
+  locationId?: string;
+  registerId?: string;
   posRegisterCode: string;
   cashierId: string;
   shiftId?: string;
@@ -19,10 +21,16 @@ export async function getCurrentTillSession(): Promise<TillSessionDto> {
   return apiCall<TillSessionDto>('/pos/till-sessions/current');
 }
 
+export async function fetchFloorSessions(): Promise<TillSessionDto[]> {
+  return apiCall<TillSessionDto[]>('/pos/till-sessions/floor');
+}
+
 export async function openTillSession(body: {
   posRegisterCode: string;
   openingFloat: number;
   shiftId?: string;
+  registerId?: string;
+  locationId?: string;
 }): Promise<TillSessionDto> {
   return apiCall<TillSessionDto>('/pos/till-sessions', {
     method: 'POST',

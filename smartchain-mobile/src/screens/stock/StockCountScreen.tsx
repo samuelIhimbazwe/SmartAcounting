@@ -13,6 +13,7 @@ import {apiClient, isApiError} from '../../api/client';
 import type {RootState} from '../../store';
 import {queueOfflineStockCount} from '../../services/offlineQueue';
 import {useTranslation} from 'react-i18next';
+import {getSyncLocationCode} from '../../inventory/syncLocation';
 
 interface CountItem {
   productId: string;
@@ -27,13 +28,16 @@ interface CountItem {
 export default function StockCountScreen() {
   const {t} = useTranslation();
   const online = useSelector((s: RootState) => s.network.online);
+  const locationCode = useSelector(
+    (s: RootState) => s.location.selectedLocationCode,
+  );
   const [items, setItems] = useState<CountItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [location] = useState('SHOP');
 
   const loadInventory = useCallback(async () => {
+    const location = getSyncLocationCode();
     setLoading(true);
     try {
       const {data} = await apiClient.get<
@@ -66,7 +70,7 @@ export default function StockCountScreen() {
     } finally {
       setLoading(false);
     }
-  }, [location, t]);
+  }, [locationCode, t]);
 
   useEffect(() => {
     void loadInventory();
@@ -110,6 +114,7 @@ export default function StockCountScreen() {
   );
 
   const doSubmit = async () => {
+    const location = getSyncLocationCode();
     setSubmitting(true);
     try {
       const adjustments = items.filter(

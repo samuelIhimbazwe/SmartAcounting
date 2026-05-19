@@ -22,6 +22,7 @@ import alertReducer from './slices/alertSlice';
 import tillReducer from './slices/tillSlice';
 import inventoryReducer from './slices/inventorySlice';
 import dashboardReducer from './slices/dashboardSlice';
+import locationReducer from './slices/locationSlice';
 
 /** Never persist passwords, OTP drafts, or MFA workflow fields to disk. */
 const authPersistTransform = createTransform(
@@ -40,6 +41,15 @@ const authPersistTransform = createTransform(
   }),
 );
 
+const locationPersistTransform = createTransform(
+  (inbound: {selectedLocationId?: string | null; selectedLocationName?: string | null; selectedLocationCode?: string | null}) => ({
+    selectedLocationId: inbound.selectedLocationId ?? null,
+    selectedLocationName: inbound.selectedLocationName ?? null,
+    selectedLocationCode: inbound.selectedLocationCode ?? null,
+  }),
+  outbound => outbound,
+);
+
 const authPersistConfig = {
   key: 'auth',
   storage: AsyncStorage,
@@ -48,8 +58,20 @@ const authPersistConfig = {
 
 const persistedAuthReducer = persistReducer(authPersistConfig, authReducer);
 
+const locationPersistConfig = {
+  key: 'location',
+  storage: AsyncStorage,
+  transforms: [locationPersistTransform],
+};
+
+const persistedLocationReducer = persistReducer(
+  locationPersistConfig,
+  locationReducer,
+);
+
 const rootReducer = combineReducers({
   auth: persistedAuthReducer,
+  location: persistedLocationReducer,
   pos: posReducer,
   network: networkReducer,
   alerts: alertReducer,

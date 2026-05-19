@@ -13,6 +13,8 @@ import ReceiveGrnScreen from '../screens/stock/ReceiveGrnScreen';
 import ExpiringStockScreen from '../screens/stock/ExpiringStockScreen';
 import SerialLookupScreen from '../screens/stock/SerialLookupScreen';
 import ReorderScreen from '../screens/stock/ReorderScreen';
+import StockTransferScreen from '../screens/stock/StockTransferScreen';
+import CreateStockTransferScreen from '../screens/stock/CreateStockTransferScreen';
 
 export type StockStackParamList = {
   StockList: undefined;
@@ -32,6 +34,8 @@ export type StockStackParamList = {
   Expiring: undefined;
   SerialLookup: undefined;
   Reorder: undefined;
+  StockTransfer: undefined;
+  CreateStockTransfer: undefined;
 };
 
 const Stack = createNativeStackNavigator<StockStackParamList>();
@@ -56,6 +60,8 @@ export default function StockNavigator() {
       <Stack.Screen name="Expiring" component={ExpiringStockScreen} options={{title: 'Expiring stock'}} />
       <Stack.Screen name="SerialLookup" component={SerialLookupScreen} options={{title: 'Serial lookup'}} />
       <Stack.Screen name="Reorder" component={ReorderScreen} options={{title: 'Reorder'}} />
+      <Stack.Screen name="StockTransfer" component={StockTransferScreen} options={{title: 'Transfers'}} />
+      <Stack.Screen name="CreateStockTransfer" component={CreateStockTransferScreen} options={{title: 'New transfer'}} />
     </Stack.Navigator>
   );
 }

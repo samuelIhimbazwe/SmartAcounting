@@ -2,6 +2,7 @@ import {createSlice, PayloadAction} from '@reduxjs/toolkit';
 
 interface TillState {
   currentSessionId: string | null;
+  registerId: string | null;
   businessDate: string;
   posRegisterCode: string;
   countedCash: string;
@@ -17,8 +18,9 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 const initialState: TillState = {
   currentSessionId: null,
+  registerId: null,
   businessDate: today(),
-  posRegisterCode: 'REG1',
+  posRegisterCode: 'REG-01',
   countedCash: '0',
   countedMomo: '0',
   countedAirtel: '0',
@@ -40,6 +42,9 @@ const tillSlice = createSlice({
     },
     setTillRegisterCode: (state, action: PayloadAction<string>) => {
       state.posRegisterCode = action.payload;
+    },
+    setRegisterId: (state, action: PayloadAction<string | null>) => {
+      state.registerId = action.payload;
     },
     setTillCounts: (
       state,
@@ -86,6 +91,7 @@ export const {
   clearTillSession,
   setTillBusinessDate,
   setTillRegisterCode,
+  setRegisterId,
   setTillCounts,
   setTillNotes,
   setTillExpectedSnapshot,

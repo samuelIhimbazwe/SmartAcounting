@@ -10,4 +10,10 @@ import java.util.UUID;
 public interface PriceListRepository extends JpaRepository<PriceList, UUID> {
     List<PriceList> findByTenantIdAndDeletedAtIsNullOrderByName(UUID tenantId);
     Optional<PriceList> findByIdAndTenantIdAndDeletedAtIsNull(UUID id, UUID tenantId);
+
+    Optional<PriceList> findFirstByTenantIdAndLocationIdAndDeletedAtIsNull(
+        UUID tenantId, UUID locationId);
+
+    Optional<PriceList> findFirstByTenantIdAndLocationIdIsNullAndScopeAndDeletedAtIsNull(
+        UUID tenantId, String scope);
 }

@@ -20,6 +20,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -27,19 +28,23 @@ import static org.mockito.Mockito.when;
 class TillSessionServiceTest {
     @Mock TillSessionRepository tillSessionRepository;
     @Mock PushNotificationService pushNotificationService;
+    @Mock LocationService locationService;
 
     TillSessionService tillSessionService;
 
     private final UUID tenantId = UUID.randomUUID();
     private final UUID userId = UUID.randomUUID();
+    private final UUID locationId = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
         tillSessionService = new TillSessionService(
             tillSessionRepository,
             pushNotificationService,
+            locationService,
             new BigDecimal("5000"));
         TenantContext.set(tenantId, userId);
+        when(locationService.resolveContextLocationId()).thenReturn(locationId);
     }
 
     @AfterEach
@@ -54,11 +59,12 @@ class TillSessionServiceTest {
         when(tillSessionRepository.save(any(TillSession.class))).thenAnswer(inv -> inv.getArgument(0));
 
         var dto = tillSessionService.openSession(
-            new OpenTillSessionRequest("REG-01", new BigDecimal("50000"), null));
+            new OpenTillSessionRequest("REG-01", new BigDecimal("50000"), null, null, null));
 
         assertThat(dto.posRegisterCode()).isEqualTo("REG-01");
         assertThat(dto.status()).isEqualTo("OPEN");
         verify(tillSessionRepository).save(any(TillSession.class));
+        verify(locationService).requireLocationAccess(locationId);
     }
 
     @Test
@@ -69,7 +75,7 @@ class TillSessionServiceTest {
             .thenReturn(Optional.of(existing));
 
         assertThatThrownBy(() -> tillSessionService.openSession(
-            new OpenTillSessionRequest("REG-01", new BigDecimal("1000"), null)))
+            new OpenTillSessionRequest("REG-01", new BigDecimal("1000"), null, null, null)))
             .isInstanceOf(BusinessException.class)
             .hasMessageContaining("already has an open session");
     }

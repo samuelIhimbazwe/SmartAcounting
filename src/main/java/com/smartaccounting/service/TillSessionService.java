@@ -24,33 +24,55 @@ import java.util.UUID;
 public class TillSessionService {
     private final TillSessionRepository tillSessionRepository;
     private final PushNotificationService pushNotificationService;
+    private final LocationService locationService;
     private final BigDecimal varianceThreshold;
 
     public TillSessionService(
         TillSessionRepository tillSessionRepository,
         PushNotificationService pushNotificationService,
+        LocationService locationService,
         @Value("${smartaccounting.till.variance-threshold:5000}") BigDecimal varianceThreshold
     ) {
         this.tillSessionRepository = tillSessionRepository;
         this.pushNotificationService = pushNotificationService;
+        this.locationService = locationService;
         this.varianceThreshold = varianceThreshold;
     }
 
     public TillSessionDto openSession(OpenTillSessionRequest req) {
         UUID tenantId = requireTenant();
         UUID cashierId = requireUser();
-        String reg = req.posRegisterCode().trim();
-        UUID tillId = tillIdForRegister(tenantId, reg);
+        UUID locationId = req.locationId() != null
+            ? req.locationId()
+            : locationService.resolveContextLocationId();
+        locationService.requireLocationAccess(locationId);
 
-        tillSessionRepository.findByTenantIdAndPosRegisterCodeAndStatus(tenantId, reg, "OPEN")
-            .ifPresent(s -> {
-                throw new BusinessException("Till " + reg + " already has an open session");
-            });
+        String reg = req.posRegisterCode().trim();
+        UUID registerId = req.registerId();
+        if (registerId != null) {
+            var register = locationService.requireRegister(registerId);
+            if (!register.getLocationId().equals(locationId)) {
+                throw new BusinessException("Register does not belong to this location");
+            }
+            reg = register.getName();
+            tillSessionRepository.findByTenantIdAndRegisterIdAndStatus(tenantId, registerId, "OPEN")
+                .ifPresent(s -> {
+                    throw new BusinessException("Register already has an open session");
+                });
+        } else {
+            tillSessionRepository.findByTenantIdAndPosRegisterCodeAndStatus(tenantId, reg, "OPEN")
+                .ifPresent(s -> {
+                    throw new BusinessException("Till " + reg + " already has an open session");
+                });
+        }
+        UUID tillId = tillIdForRegister(tenantId, reg);
 
         TillSession session = new TillSession();
         session.setId(UUID.randomUUID());
         session.setTenantId(tenantId);
         session.setTillId(tillId);
+        session.setLocationId(locationId);
+        session.setRegisterId(registerId);
         session.setPosRegisterCode(reg);
         session.setCashierId(cashierId);
         session.setShiftId(req.shiftId());
@@ -65,6 +87,16 @@ public class TillSessionService {
             throw new BusinessException("Till " + reg + " already has an open session");
         }
         return toDto(session);
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<TillSessionDto> listOpenSessionsAtLocation() {
+        UUID tenantId = requireTenant();
+        UUID locationId = locationService.resolveContextLocationId();
+        return tillSessionRepository.findByTenantIdAndLocationIdAndStatus(tenantId, locationId, "OPEN")
+            .stream()
+            .map(this::toDto)
+            .toList();
     }
 
     @Transactional(readOnly = true)
@@ -122,6 +154,8 @@ public class TillSessionService {
         return new TillSessionDto(
             s.getId(),
             s.getTillId(),
+            s.getLocationId(),
+            s.getRegisterId(),
             s.getPosRegisterCode(),
             s.getCashierId(),
             s.getShiftId(),

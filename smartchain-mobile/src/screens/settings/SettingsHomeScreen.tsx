@@ -9,6 +9,7 @@ type SettingsStackParamList = {
   SettingsHome: undefined;
   LanguageSettings: undefined;
   PrinterSettings: undefined;
+  LocationSettings: undefined;
 };
 
 export function SettingsHomeScreen() {
@@ -29,6 +30,12 @@ export function SettingsHomeScreen() {
           title={t('settings.printer')}
           left={props => <List.Icon {...props} icon="printer" />}
           onPress={() => navigation.navigate('PrinterSettings')}
+        />
+        <List.Item
+          title={t('locations.switchLocation')}
+          description={t('locations.currentLocation')}
+          left={props => <List.Icon {...props} icon="map-marker" />}
+          onPress={() => navigation.navigate('LocationSettings')}
         />
       </List.Section>
       <Button mode="text" onPress={() => navigation.goBack()}>

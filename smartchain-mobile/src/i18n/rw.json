@@ -11,7 +11,24 @@
     "add": "Add",
     "remove": "Remove",
     "notNow": "Not now",
-    "enable": "Enable"
+    "enable": "Enable",
+    "continue": "Komeza"
+  },
+  "locations": {
+    "pickTitle": "Hitamo ahantu",
+    "currentLocation": "Ahantu uherereye",
+    "switchLocation": "Hindura ahantu",
+    "floorView": "Reba ibikoresho byose",
+    "noOpenTills": "Nta cash register ifunguye",
+    "status": "Imiterere",
+    "float": "Amafaranga yo gutangira",
+    "incomingTransfers": "Impapuro zinjira",
+    "noTransfers": "Nta transfer",
+    "receiveTransfer": "Akira",
+    "lines": "Imirongo",
+    "hqDashboard": "Amashami yose",
+    "registers": "Cash registers",
+    "selectRegister": "Hitamo cash register"
   },
   "auth": {
     "appName": "SmartAccounting",

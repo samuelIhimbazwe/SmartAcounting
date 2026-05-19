@@ -20,6 +20,7 @@ import {
   openTillSession,
   suspendTillSession,
 } from '../../api/tillSessions';
+import {fetchRegisters, type RegisterDto} from '../../api/locations';
 import {canManageTillSession} from '../../utils/roles';
 import type {AppRole} from '../../utils/roles';
 import {clearTillSession} from '../../store/slices/tillSlice';
@@ -30,6 +31,7 @@ import {
   setTillBusinessDate,
   setTillExpectedSnapshot,
   setTillRegisterCode,
+  setRegisterId,
 } from '../../store/slices/tillSlice';
 import {setShiftContext} from '../../store/slices/posSlice';
 import type {TillStackParamList} from '../../navigation/TillNavigator';
@@ -41,6 +43,10 @@ export default function TillOpenScreen() {
   const navigation = useNavigation<Nav>();
   const dispatch = useDispatch<AppDispatch>();
   const [tillCode, setTillCode] = useState('REG-01');
+  const [registers, setRegisters] = useState<RegisterDto[]>([]);
+  const [selectedRegisterId, setSelectedRegisterId] = useState<string | null>(null);
+  const locationId = useSelector((s: RootState) => s.location.selectedLocationId);
+  const locationName = useSelector((s: RootState) => s.location.selectedLocationName);
   const [floatAmount, setFloatAmount] = useState('');
   const [cashierName, setCashierName] = useState('');
   const [printerConnected, setPrinterConnected] = useState(
@@ -79,6 +85,21 @@ export default function TillOpenScreen() {
       }
     })();
   }, [dispatch, userName]);
+
+  useEffect(() => {
+    if (!locationId) {
+      return;
+    }
+    void fetchRegisters(locationId).then(regs => {
+      setRegisters(regs);
+      if (regs.length === 1) {
+        setSelectedRegisterId(regs[0].id);
+        setTillCode(regs[0].name);
+        dispatch(setRegisterId(regs[0].id));
+        dispatch(setTillRegisterCode(regs[0].name));
+      }
+    });
+  }, [locationId, dispatch]);
 
   const goToPos = (
     registerCode: string,
@@ -134,6 +155,8 @@ export default function TillOpenScreen() {
       const session = await openTillSession({
         posRegisterCode: tillCode,
         openingFloat: Number(floatAmount),
+        registerId: selectedRegisterId ?? undefined,
+        locationId: locationId ?? undefined,
       });
 
       goToPos(tillCode, Number(floatAmount), session.id, shiftStartTime, name);
@@ -226,6 +249,9 @@ export default function TillOpenScreen() {
           day: 'numeric',
         })}
       </Text>
+      {locationName ? (
+        <Text style={styles.subtitle}>{locationName}</Text>
+      ) : null}
 
       <View style={styles.section}>
         <Text style={styles.label}>{t('till.printerLabel')}</Text>
@@ -252,7 +278,23 @@ export default function TillOpenScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.label}>{t('till.registerLabel')}</Text>
+        <Text style={styles.label}>{t('locations.selectRegister')}</Text>
+        {registers.map(r => (
+          <TouchableOpacity
+            key={r.id}
+            style={[
+              styles.registerChip,
+              selectedRegisterId === r.id && styles.registerChipActive,
+            ]}
+            onPress={() => {
+              setSelectedRegisterId(r.id);
+              setTillCode(r.name);
+              dispatch(setRegisterId(r.id));
+              dispatch(setTillRegisterCode(r.name));
+            }}>
+            <Text>{r.name}</Text>
+          </TouchableOpacity>
+        ))}
         <TextInput
           style={styles.input}
           value={tillCode}
@@ -260,6 +302,13 @@ export default function TillOpenScreen() {
           placeholder={t('till.registerPlaceholder')}
         />
       </View>
+      {canSuspend ? (
+        <TouchableOpacity
+          style={styles.connectBtn}
+          onPress={() => navigation.navigate('FloorView')}>
+          <Text style={styles.connectBtnText}>{t('locations.floorView')}</Text>
+        </TouchableOpacity>
+      ) : null}
 
       <View style={styles.section}>
         <Text style={styles.label}>{t('till.openingFloat')}</Text>
@@ -371,4 +420,13 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   suspendButtonText: {color: '#FFFFFF', fontSize: 16, fontWeight: '600'},
+  registerChip: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 8,
+  },
+  registerChipActive: {borderColor: '#1B6FDB', backgroundColor: '#EFF6FF'},
 });

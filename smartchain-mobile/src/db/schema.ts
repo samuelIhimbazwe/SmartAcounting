@@ -1,7 +1,7 @@
 import {appSchema, tableSchema} from '@nozbe/watermelondb';
 
 export const schema = appSchema({
-  version: 5,
+  version: 6,
   tables: [
     tableSchema({
       name: 'offline_transactions',
@@ -178,6 +178,28 @@ export const schema = appSchema({
         {name: 'valid_from', type: 'string', isOptional: true},
         {name: 'valid_to', type: 'string', isOptional: true},
         {name: 'deleted_at', type: 'string', isOptional: true},
+        {name: 'location_id', type: 'string', isOptional: true},
+        {name: 'scope', type: 'string', isOptional: true},
+      ],
+    }),
+    tableSchema({
+      name: 'locations',
+      columns: [
+        {name: 'server_id', type: 'string', isOptional: true},
+        {name: 'name', type: 'string'},
+        {name: 'location_code', type: 'string'},
+        {name: 'currency_default', type: 'string', isOptional: true},
+        {name: 'is_active', type: 'boolean'},
+      ],
+    }),
+    tableSchema({
+      name: 'registers',
+      columns: [
+        {name: 'server_id', type: 'string', isOptional: true},
+        {name: 'location_id', type: 'string', isIndexed: true},
+        {name: 'name', type: 'string'},
+        {name: 'hardware_id', type: 'string', isOptional: true},
+        {name: 'is_active', type: 'boolean'},
       ],
     }),
     tableSchema({

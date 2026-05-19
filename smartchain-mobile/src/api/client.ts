@@ -44,6 +44,9 @@ function authHeaders(): Record<string, string> {
   if (state.auth.userId) {
     headers['X-User-Id'] = state.auth.userId;
   }
+  if (state.location?.selectedLocationId) {
+    headers['X-Location-Id'] = state.location.selectedLocationId;
+  }
   return headers;
 }
 

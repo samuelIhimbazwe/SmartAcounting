@@ -10,7 +10,31 @@
     "add": "Add",
     "remove": "Remove",
     "notNow": "Not now",
-    "enable": "Enable"
+    "enable": "Enable",
+    "continue": "Continue"
+  },
+  "locations": {
+    "pickTitle": "Select location",
+    "currentLocation": "Current location",
+    "switchLocation": "Switch location",
+    "floorView": "Floor view",
+    "noOpenTills": "No open registers",
+    "status": "Status",
+    "float": "Opening float",
+    "incomingTransfers": "Incoming transfers",
+    "noTransfers": "No transfers in transit",
+    "receiveTransfer": "Receive all lines",
+    "lines": "Lines",
+    "hqDashboard": "All branches",
+    "registers": "Registers",
+    "selectRegister": "Select register",
+    "createTransfer": "Create transfer",
+    "selectDestination": "Destination branch",
+    "submitTransfer": "Submit transfer",
+    "transferCreated": "Transfer submitted",
+    "transferCreateFailed": "Transfer failed",
+    "transferLinesRequired": "Add at least one line with quantity",
+    "phase4Note": "HQ product create/edit gating deferred — view-only at branch until Phase 4+"
   },
   "auth": {
     "appName": "SmartAccounting",

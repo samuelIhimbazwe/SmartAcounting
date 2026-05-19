@@ -59,6 +59,7 @@ public class PosCheckoutService {
     private final PromotionService promotionService;
     private final PriceListService priceListService;
     private final CustomerRetailService customerRetailService;
+    private final LocationService locationService;
 
     public PosCheckoutService(PosCatalogItemRepository catalogRepository,
                               SalesOrderRepository salesOrderRepository,
@@ -74,7 +75,8 @@ public class PosCheckoutService {
                               SalesAnalyticsService salesAnalyticsService,
                               PromotionService promotionService,
                               PriceListService priceListService,
-                              CustomerRetailService customerRetailService) {
+                              CustomerRetailService customerRetailService,
+                              LocationService locationService) {
         this.catalogRepository = catalogRepository;
         this.salesOrderRepository = salesOrderRepository;
         this.saleLineRepository = saleLineRepository;
@@ -90,6 +92,7 @@ public class PosCheckoutService {
         this.promotionService = promotionService;
         this.priceListService = priceListService;
         this.customerRetailService = customerRetailService;
+        this.locationService = locationService;
     }
 
     @Transactional(readOnly = true)
@@ -135,11 +138,12 @@ public class PosCheckoutService {
         String currency = req.currencyCode().toUpperCase(Locale.ROOT);
 
         FinanceCustomer linkedCustomer = null;
-        UUID priceListId = null;
+        UUID customerPriceListId = null;
         if (req.customerId() != null) {
             linkedCustomer = customerRetailService.requireCustomer(req.customerId());
-            priceListId = linkedCustomer.getPriceListId();
+            customerPriceListId = linkedCustomer.getPriceListId();
         }
+        UUID locationId = locationService.resolveContextLocationId();
 
         BigDecimal subtotal = BigDecimal.ZERO;
         UUID orderId = UUID.randomUUID();
@@ -168,9 +172,13 @@ public class PosCheckoutService {
             BigDecimal qty = lineReq.quantity().setScale(4, RoundingMode.HALF_UP);
             BigDecimal unitNative = cat.getUnitPrice().setScale(2, RoundingMode.HALF_UP);
             UUID productId = lineReq.productId() != null ? lineReq.productId() : cat.getProductId();
-            if (priceListId != null && productId != null) {
-                unitNative = priceListService.resolveUnitPrice(
-                    priceListId, productId, lineReq.variantId(), unitNative);
+            if (productId != null) {
+                unitNative = priceListService.resolveCheckoutUnitPrice(
+                    locationId,
+                    customerPriceListId,
+                    productId,
+                    lineReq.variantId(),
+                    unitNative);
             }
             BigDecimal unit = currency.equals(catCur)
                 ? unitNative

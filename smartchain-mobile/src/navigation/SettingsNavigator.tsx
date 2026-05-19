@@ -4,6 +4,7 @@ import {useTranslation} from 'react-i18next';
 import {SettingsHomeScreen} from '../screens/settings/SettingsHomeScreen';
 import {LanguageSettingsScreen} from '../screens/settings/LanguageSettingsScreen';
 import {PrinterSettingsScreen} from '../screens/settings/PrinterSettingsScreen';
+import {LocationSettingsScreen} from '../screens/settings/LocationSettingsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -25,6 +26,11 @@ export default function SettingsNavigator() {
         name="PrinterSettings"
         component={PrinterSettingsScreen}
         options={{title: t('settings.printer')}}
+      />
+      <Stack.Screen
+        name="LocationSettings"
+        component={LocationSettingsScreen}
+        options={{title: t('locations.switchLocation')}}
       />
     </Stack.Navigator>
   );

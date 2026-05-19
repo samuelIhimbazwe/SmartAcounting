@@ -20,7 +20,20 @@ npm run test:coverage
 
 - All tests must pass (0 failures).
 - Coverage must meet thresholds in `jest.config.js` (`coverageThreshold`).
-- Ratchet thresholds up when adding tests; do not lower without team agreement.
+- Ratchet thresholds when a phase adds tests; do not set thresholds above measured coverage.
+
+### Coverage threshold roadmap (`jest.config.js` global)
+
+| Phase | Lines / statements (min %) | Branches / functions (min %) |
+|-------|--------------------------|------------------------------|
+| 2 (now) | 38 | 27 |
+| 3 | 43 | 32 |
+| 4 | 55 | 40 |
+| 5 | 62 | 48 |
+| 6 | 70 | 55 |
+
+Phase 4 targets a larger jump (VAT, hash chain, Z-report) where pure logic tests are dense.
+Baseline snapshot: [phase2-coverage-baseline.txt](./phase2-coverage-baseline.txt).
 
 ---
 

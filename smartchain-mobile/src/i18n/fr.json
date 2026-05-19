@@ -10,7 +10,24 @@
     "add": "Ajouter",
     "remove": "Retirer",
     "notNow": "Plus tard",
-    "enable": "Activer"
+    "enable": "Activer",
+    "continue": "Continuer"
+  },
+  "locations": {
+    "pickTitle": "Choisir un site",
+    "currentLocation": "Site actuel",
+    "switchLocation": "Changer de site",
+    "floorView": "Vue du plancher",
+    "noOpenTills": "Aucune caisse ouverte",
+    "status": "Statut",
+    "float": "Fond de caisse",
+    "incomingTransfers": "Transferts entrants",
+    "noTransfers": "Aucun transfert",
+    "receiveTransfer": "Réceptionner",
+    "lines": "Lignes",
+    "hqDashboard": "Toutes les succursales",
+    "registers": "Caisses",
+    "selectRegister": "Choisir la caisse"
   },
   "auth": {
     "appName": "SmartAccounting",

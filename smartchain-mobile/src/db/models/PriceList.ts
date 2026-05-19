@@ -11,4 +11,6 @@ export class PriceList extends Model {
   @text('valid_from') validFrom?: string;
   @text('valid_to') validTo?: string;
   @text('deleted_at') deletedAt?: string;
+  @text('location_id') locationId?: string;
+  @text('scope') scope?: string;
 }

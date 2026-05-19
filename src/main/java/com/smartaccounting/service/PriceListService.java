@@ -65,6 +65,32 @@ public class PriceListService {
         return base;
     }
 
+    /** Branch list → customer list → global list → fallback base price. */
+    public BigDecimal resolveCheckoutUnitPrice(
+        UUID locationId,
+        UUID customerPriceListId,
+        UUID productId,
+        UUID variantId,
+        BigDecimal fallback
+    ) {
+        UUID tenant = requireTenant();
+        BigDecimal price = fallback;
+        if (locationId != null) {
+            price = priceListRepository
+                .findFirstByTenantIdAndLocationIdAndDeletedAtIsNull(tenant, locationId)
+                .map(list -> resolveUnitPrice(list.getId(), productId, variantId, price))
+                .orElse(price);
+        }
+        if (customerPriceListId != null) {
+            price = resolveUnitPrice(customerPriceListId, productId, variantId, price);
+        }
+        price = priceListRepository
+            .findFirstByTenantIdAndLocationIdIsNullAndScopeAndDeletedAtIsNull(tenant, "GLOBAL")
+            .map(list -> resolveUnitPrice(list.getId(), productId, variantId, price))
+            .orElse(price);
+        return price;
+    }
+
     public List<Map<String, Object>> listPriceLists() {
         UUID tenant = requireTenant();
         return priceListRepository.findByTenantIdAndDeletedAtIsNullOrderByName(tenant).stream()
@@ -80,10 +106,15 @@ public class PriceListService {
         m.put("discountPct", p.getDiscountPct());
         m.put("validFrom", p.getValidFrom());
         m.put("validTo", p.getValidTo());
+        m.put("locationId", p.getLocationId());
+        m.put("scope", p.getScope());
         return m;
     }
 
     private UUID requireTenant() {
-        return UUID.fromString(TenantContext.getTenantId());
+        if (TenantContext.tenantId() == null) {
+            throw new IllegalStateException("Tenant context required");
+        }
+        return TenantContext.tenantId();
     }
 }

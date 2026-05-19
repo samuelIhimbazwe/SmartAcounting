@@ -10,5 +10,7 @@ import java.util.UUID;
 public record OpenTillSessionRequest(
     @NotBlank String posRegisterCode,
     @NotNull @DecimalMin("0") BigDecimal openingFloat,
-    UUID shiftId
+    UUID shiftId,
+    UUID registerId,
+    UUID locationId
 ) {}

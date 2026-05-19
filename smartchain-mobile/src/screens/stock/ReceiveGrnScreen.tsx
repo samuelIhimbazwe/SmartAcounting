@@ -15,8 +15,8 @@ import {
   listActiveSuppliers,
   listProducts,
   postGrnLocally,
-  DEFAULT_LOCATION,
 } from '../../inventory/inventoryRepository';
+import {getSyncLocationCode} from '../../inventory/syncLocation';
 import {createGrnForPo, confirmGrn} from '../../api/procurement';
 import {receiveStock} from '../../api/inventory';
 import {queueOfflineGrnPost} from '../../services/offlineQueue';
@@ -187,7 +187,7 @@ export default function ReceiveGrnScreen() {
           unitCost: l.unitCost,
           lotCode: l.batchNumber,
           expiryDate: l.expiryDate,
-          location: DEFAULT_LOCATION,
+          location: getSyncLocationCode(),
         })),
       };
       const created = await createGrnForPo(poServerId, grnBody);
@@ -201,7 +201,7 @@ export default function ReceiveGrnScreen() {
         const product = products.find(p => p.id === l.productId);
         await receiveStock({
           productId: product?.serverId ?? l.productId,
-          location: DEFAULT_LOCATION,
+          location: getSyncLocationCode(),
           quantity: l.qtyReceived,
           costPrice: l.unitCost,
           supplierRef: supplierId,
@@ -224,7 +224,7 @@ export default function ReceiveGrnScreen() {
                 unitCost: l.unitCost,
                 lotCode: l.batchNumber,
                 expiryDate: l.expiryDate,
-                location: DEFAULT_LOCATION,
+                location: getSyncLocationCode(),
               })),
             }
           : undefined,
@@ -233,7 +233,7 @@ export default function ReceiveGrnScreen() {
               const product = products.find(p => p.id === l.productId);
               return {
                 productId: product?.serverId ?? l.productId,
-                location: DEFAULT_LOCATION,
+                location: getSyncLocationCode(),
                 quantity: l.qtyReceived,
                 costPrice: l.unitCost,
                 supplierRef: supplierId,

@@ -13,6 +13,7 @@ import {
 } from '../../store/slices/inventorySlice';
 import {fetchBalances} from '../../api/inventory';
 import {runInventorySync} from '../../inventory/inventorySync';
+import {getSyncLocationCode} from '../../inventory/syncLocation';
 import {listProducts, variantLabel} from '../../inventory/inventoryRepository';
 import {refreshReorderAlerts} from '../../inventory/reorderCheck';
 import type {StockStackParamList} from '../../navigation/StockNavigator';
@@ -44,13 +45,17 @@ export default function StockScreen() {
   const showLowStock = hasAnyRole(roles, 'OPS_MANAGER', 'ACCOUNTING_CONTROLLER');
   const [rows, setRows] = useState<StockRow[]>([]);
   const [reorderCount, setReorderCount] = useState(0);
+  const locationCode = useSelector(
+    (s: RootState) => s.location.selectedLocationCode,
+  );
 
   const reload = useCallback(async () => {
+    const loc = getSyncLocationCode();
     dispatch(loadBalancesPending());
     try {
-      const apiRows = await fetchBalances();
+      const apiRows = await fetchBalances(loc);
       dispatch(loadBalancesDone(apiRows));
-      await runInventorySync();
+      await runInventorySync(loc);
     } catch (e) {
       dispatch(loadBalancesFailed(String(e)));
     }
@@ -78,7 +83,7 @@ export default function StockScreen() {
     setRows(built);
     const alerts = await refreshReorderAlerts();
     setReorderCount(alerts.length);
-  }, [dispatch]);
+  }, [dispatch, locationCode]);
 
   useFocusEffect(
     useCallback(() => {

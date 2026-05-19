@@ -39,6 +39,12 @@ public class TillSessionController {
         return tillSessionService.getCurrentSessionForUser();
     }
 
+    @GetMapping("/floor")
+    @PreAuthorize("hasAnyRole('CEO','SALES_MANAGER','OPS_MANAGER','ACCOUNTING_CONTROLLER')")
+    public java.util.List<TillSessionDto> floorView() {
+        return tillSessionService.listOpenSessionsAtLocation();
+    }
+
     @PatchMapping("/{id}/close")
     @PreAuthorize("hasAnyRole('CEO','SALES_MANAGER','OPS_MANAGER','ACCOUNTING_CONTROLLER')")
     public TillSessionDto closeSession(

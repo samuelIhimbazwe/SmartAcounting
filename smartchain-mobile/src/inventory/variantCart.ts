@@ -8,7 +8,7 @@ import {
   pickCheckoutBatch,
   variantLabel,
 } from './inventoryRepository';
-import {resolveUnitPrice} from '../pricing/pricingEngine';
+import {resolveCheckoutUnitPrice} from '../pricing/resolveCheckoutPrice';
 
 function mapCurrency(code: string): 'FRW' | 'USD' {
   const u = code?.toUpperCase() ?? 'FRW';
@@ -45,11 +45,21 @@ export async function dispatchVariantToCart(
   dispatch: AppDispatch,
   product: Product,
   variant: ProductVariant,
-  opts?: {serialNumber?: string; quantity?: number; priceListId?: string | null},
+  opts?: {
+    serialNumber?: string;
+    quantity?: number;
+    priceListId?: string | null;
+    locationId?: string | null;
+    branchPriceListId?: string | null;
+    globalPriceListId?: string | null;
+  },
 ): Promise<void> {
   const base = buildCartItemFromVariant(product, variant, opts);
-  const unitPrice = await resolveUnitPrice({
-    priceListId: opts?.priceListId,
+  const unitPrice = await resolveCheckoutUnitPrice({
+    locationId: opts?.locationId,
+    branchPriceListId: opts?.branchPriceListId,
+    customerPriceListId: opts?.priceListId,
+    globalPriceListId: opts?.globalPriceListId,
     productId: product.id,
     variantId: variant.id,
     fallback: base.unitPrice,

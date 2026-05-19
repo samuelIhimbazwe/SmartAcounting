@@ -7,6 +7,8 @@ import java.util.UUID;
 public record TillSessionDto(
     UUID id,
     UUID tillId,
+    UUID locationId,
+    UUID registerId,
     String posRegisterCode,
     UUID cashierId,
     UUID shiftId,
