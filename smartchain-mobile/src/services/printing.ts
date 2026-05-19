@@ -1,10 +1,14 @@
 import {Platform, Alert} from 'react-native';
 import i18n from '../i18n';
 import {printerService} from './printer/BluetoothPrinterService';
+import type {CartItem} from '../store/slices/posSlice';
 
-export async function printReceipt(transactionId: string): Promise<void> {
+export async function printReceipt(
+  transactionId: string,
+  cartLines: CartItem[] = [],
+): Promise<void> {
   if (Platform.OS === 'android') {
-    await printerService.printReceipt(transactionId);
+    await printerService.printReceipt(transactionId, cartLines);
     return;
   }
   Alert.alert(
@@ -13,9 +17,12 @@ export async function printReceipt(transactionId: string): Promise<void> {
   );
 }
 
-export async function printReceiptWithAlert(transactionId: string): Promise<void> {
+export async function printReceiptWithAlert(
+  transactionId: string,
+  cartLines: CartItem[] = [],
+): Promise<void> {
   try {
-    await printReceipt(transactionId);
+    await printReceipt(transactionId, cartLines);
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : i18n.t('printing.failed');

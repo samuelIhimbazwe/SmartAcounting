@@ -1,6 +1,7 @@
 import React, {useState} from 'react';
 import {StyleSheet, View} from 'react-native';
-import {Button, RadioButton, Text} from 'react-native-paper';
+import {Text as RNText} from 'react-native';
+import {Button, RadioButton} from 'react-native-paper';
 import {useTranslation} from 'react-i18next';
 import {
   getAppLanguage,
@@ -30,9 +31,7 @@ export function LanguageSettingsScreen() {
 
   return (
     <View style={styles.wrap}>
-      <Text variant="titleMedium" style={styles.title}>
-        {t('settings.language')}
-      </Text>
+      <RNText style={styles.title}>{t('settings.language')}</RNText>
       <RadioButton.Group
         value={selected}
         onValueChange={v => setSelected(v as AppLanguage)}>

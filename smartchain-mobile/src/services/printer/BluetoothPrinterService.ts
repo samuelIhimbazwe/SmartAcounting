@@ -5,6 +5,8 @@ import {Platform, PermissionsAndroid} from 'react-native';
 import {captureError} from '../crashReporting';
 import {getItem, setItem} from '../../utils/storage';
 import {printReceiptEscPos} from '../../api/pos';
+import {appendReceiptLineExtras} from '../../utils/receiptExtras';
+import type {CartItem} from '../../store/slices/posSlice';
 
 const PREFERRED_PRINTER_KEY = 'preferred_printer';
 
@@ -115,9 +117,12 @@ class BluetoothPrinterService {
     }
   }
 
-  async printReceipt(transactionId: string): Promise<void> {
+  async printReceipt(
+    transactionId: string,
+    cartLines: CartItem[] = [],
+  ): Promise<void> {
     const data = await printReceiptEscPos(transactionId);
-    const escpos = data.escPos ?? '';
+    const escpos = appendReceiptLineExtras(data.escPos ?? '', cartLines);
     await this.printEscPos(escpos);
   }
 

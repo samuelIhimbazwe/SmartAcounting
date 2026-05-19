@@ -4,5 +4,6 @@
     "experimentalDecorators": true,
     "emitDecoratorMetadata": false,
     "useDefineForClassFields": false
-  }
+  },
+  "exclude": ["__tests__", "src/api/__contracts__", "node_modules"]
 }

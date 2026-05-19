@@ -80,6 +80,14 @@ export function canManageTillSession(roles: AppRole[]): boolean {
   );
 }
 
+export function canManageInventory(roles: AppRole[]): boolean {
+  return hasAnyRole(roles, 'CEO', 'OPS_MANAGER', 'ACCOUNTING_CONTROLLER');
+}
+
+export function canManageProcurement(roles: AppRole[]): boolean {
+  return hasAnyRole(roles, 'CEO', 'CFO', 'OPS_MANAGER');
+}
+
 export function canUseOnAccountTender(roles: AppRole[]): boolean {
   return hasAnyRole(
     roles,

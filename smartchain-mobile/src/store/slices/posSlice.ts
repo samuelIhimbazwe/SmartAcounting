@@ -3,15 +3,23 @@ import type {TenderLine, TenderType} from '../../utils/tenderValidation';
 
 export interface CartItem {
   catalogItemId: string;
+  productId?: string;
+  variantId?: string;
   barcode: string;
   sku: string;
   name: string;
+  variantLabel?: string;
+  uomLabel?: string;
   quantity: number;
   unitPrice: number;
   costPrice: number;
   currency: 'FRW' | 'USD';
   lineTotal: number;
   margin: number;
+  serialNumber?: string;
+  batchNumber?: string;
+  batchExpiry?: string;
+  requiresSerial?: boolean;
 }
 
 interface PosState {
@@ -23,6 +31,7 @@ interface PosState {
   posRegisterCode: string;
   isProcessing: boolean;
   lastTransactionId: string | null;
+  lastReceiptLines: CartItem[];
   barcodeInput: string;
   openingFloat: number | null;
   shiftStartTime: string | null;
@@ -39,6 +48,7 @@ const initialState: PosState = {
   posRegisterCode: 'REG1',
   isProcessing: false,
   lastTransactionId: null,
+  lastReceiptLines: [],
   barcodeInput: '',
   openingFloat: null,
   shiftStartTime: null,
@@ -51,10 +61,16 @@ const posSlice = createSlice({
   initialState,
   reducers: {
     addToCart: (state, action: PayloadAction<CartItem>) => {
+      const key =
+        action.payload.variantId ?? action.payload.catalogItemId;
       const existing = state.cart.find(
-        i => i.catalogItemId === action.payload.catalogItemId,
+        i =>
+          (i.variantId ?? i.catalogItemId) === key &&
+          (action.payload.serialNumber
+            ? i.serialNumber === action.payload.serialNumber
+            : !i.serialNumber),
       );
-      if (existing) {
+      if (existing && !action.payload.serialNumber) {
         existing.quantity += action.payload.quantity;
         existing.lineTotal = existing.quantity * existing.unitPrice;
       } else {
@@ -62,18 +78,51 @@ const posSlice = createSlice({
       }
     },
     removeFromCart: (state, action: PayloadAction<string>) => {
-      state.cart = state.cart.filter(i => i.catalogItemId !== action.payload);
+      state.cart = state.cart.filter(
+        i => (i.variantId ?? i.catalogItemId) !== action.payload,
+      );
     },
     updateQuantity: (
       state,
       action: PayloadAction<{catalogItemId: string; quantity: number}>,
     ) => {
       const item = state.cart.find(
-        i => i.catalogItemId === action.payload.catalogItemId,
+        i =>
+          i.catalogItemId === action.payload.catalogItemId ||
+          i.variantId === action.payload.catalogItemId,
       );
       if (item) {
         item.quantity = action.payload.quantity;
         item.lineTotal = item.quantity * item.unitPrice;
+      }
+    },
+    setCartLineSerial: (
+      state,
+      action: PayloadAction<{lineKey: string; serialNumber: string}>,
+    ) => {
+      const item = state.cart.find(
+        i =>
+          (i.variantId ?? i.catalogItemId) === action.payload.lineKey,
+      );
+      if (item) {
+        item.serialNumber = action.payload.serialNumber;
+      }
+    },
+    setCartLineBatch: (
+      state,
+      action: PayloadAction<{
+        lineKey: string;
+        batchNumber: string;
+        batchExpiry?: string;
+      }>,
+    ) => {
+      const item = state.cart.find(
+        i =>
+          (i.variantId ?? i.catalogItemId) === action.payload.lineKey,
+      );
+      if (item) {
+        item.batchNumber = action.payload.batchNumber;
+        item.batchExpiry = action.payload.batchExpiry;
       }
     },
     setDiscount: (state, action: PayloadAction<number>) => {
@@ -100,6 +149,9 @@ const posSlice = createSlice({
     },
     setLastTransaction: (state, action: PayloadAction<string>) => {
       state.lastTransactionId = action.payload;
+    },
+    setLastReceiptLines: (state, action: PayloadAction<CartItem[]>) => {
+      state.lastReceiptLines = action.payload;
     },
     clearCart: state => {
       state.cart = [];
@@ -163,12 +215,15 @@ export const {
   addToCart,
   removeFromCart,
   updateQuantity,
+  setCartLineSerial,
+  setCartLineBatch,
   setDiscount,
   setCustomer,
   setPosRegisterCode,
   setSessionCurrency,
   setProcessing,
   setLastTransaction,
+  setLastReceiptLines,
   clearCart,
   setBarcodeInput,
   setShiftContext,

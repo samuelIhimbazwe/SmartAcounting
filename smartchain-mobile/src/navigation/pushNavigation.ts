@@ -5,6 +5,7 @@ import {isCashierShell} from '../utils/roles';
 /** Maps backend push data routes to mobile tab/screen targets. */
 const PUSH_ROUTE_MAP: Record<string, {tab: string; screen?: string}> = {
   '/stock': {tab: 'Stock', screen: 'StockList'},
+  '/stock/expiring': {tab: 'Stock', screen: 'Expiring'},
   '/till': {tab: 'Till', screen: 'TillOpen'},
   '/pos': {tab: 'POS', screen: 'Checkout'},
   '/anomaly/cases': {tab: 'Dashboard'},

@@ -5,7 +5,9 @@ export type OfflineOperationType =
   | 'POS_CHECKOUT'
   | 'POS_RETURN'
   | 'STOCK_COUNT'
-  | 'TILL_CLOSE';
+  | 'TILL_CLOSE'
+  | 'PO_CREATE'
+  | 'GRN_POST';
 
 export class OfflineTransaction extends Model {
   static table = 'offline_transactions';

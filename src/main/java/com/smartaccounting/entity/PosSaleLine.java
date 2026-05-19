@@ -21,6 +21,10 @@ public class PosSaleLine {
     private BigDecimal lineTotal;
     private UUID inventoryBatchId;
     private BigDecimal costPrice;
+    private UUID productIdSnapshot;
+    private UUID variantId;
+    private String serialNumber;
+    private String lotCode;
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
@@ -44,4 +48,12 @@ public class PosSaleLine {
     public void setInventoryBatchId(UUID inventoryBatchId) { this.inventoryBatchId = inventoryBatchId; }
     public BigDecimal getCostPrice() { return costPrice; }
     public void setCostPrice(BigDecimal costPrice) { this.costPrice = costPrice; }
+    public UUID getProductIdSnapshot() { return productIdSnapshot; }
+    public void setProductIdSnapshot(UUID productIdSnapshot) { this.productIdSnapshot = productIdSnapshot; }
+    public UUID getVariantId() { return variantId; }
+    public void setVariantId(UUID variantId) { this.variantId = variantId; }
+    public String getSerialNumber() { return serialNumber; }
+    public void setSerialNumber(String serialNumber) { this.serialNumber = serialNumber; }
+    public String getLotCode() { return lotCode; }
+    public void setLotCode(String lotCode) { this.lotCode = lotCode; }
 }

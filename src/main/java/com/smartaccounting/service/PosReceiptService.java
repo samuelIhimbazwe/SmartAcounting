@@ -136,6 +136,12 @@ public class PosReceiptService {
                 .append(padLeft(line.getUnitPrice().setScale(2, RoundingMode.HALF_UP).toPlainString(), 12))
                 .append(padLeft(line.getLineTotal().setScale(2, RoundingMode.HALF_UP).toPlainString(), 16))
                 .append("\n");
+            if (line.getLotCode() != null && !line.getLotCode().isBlank()) {
+                b.append("  Lot: ").append(trimTo(line.getLotCode(), 40)).append("\n");
+            }
+            if (line.getSerialNumber() != null && !line.getSerialNumber().isBlank()) {
+                b.append("  SN: ").append(trimTo(line.getSerialNumber(), 40)).append("\n");
+            }
         }
         b.append(repeat("-", 48)).append("\n");
         for (PosPaymentTender t : tenders) {

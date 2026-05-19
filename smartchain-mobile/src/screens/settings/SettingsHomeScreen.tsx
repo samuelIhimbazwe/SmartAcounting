@@ -1,5 +1,5 @@
 import React from 'react';
-import {StyleSheet, View} from 'react-native';
+import {StyleSheet, Text, View} from 'react-native';
 import {Button, List} from 'react-native-paper';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -19,7 +19,7 @@ export function SettingsHomeScreen() {
   return (
     <View style={styles.wrap}>
       <List.Section>
-        <List.Subheader>{t('settings.title')}</List.Subheader>
+        <Text style={styles.section}>{t('settings.title')}</Text>
         <List.Item
           title={t('settings.language')}
           left={props => <List.Icon {...props} icon="translate" />}
@@ -40,4 +40,5 @@ export function SettingsHomeScreen() {
 
 const styles = StyleSheet.create({
   wrap: {flex: 1, paddingTop: 8},
+  section: {fontSize: 14, fontWeight: '600', marginLeft: 16, marginTop: 8, color: '#666'},
 });

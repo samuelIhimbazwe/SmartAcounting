@@ -8,8 +8,14 @@ import {postSyncFlush, postSyncQueue} from '../api/sync';
 import {apiClient, apiCall, isApiError} from '../api/client';
 import {closeTillSession} from '../api/tillSessions';
 import {postTillClose} from '../api/retail';
+import {createGrnForPo, confirmGrn} from '../api/procurement';
+import {syncPoCreateToServer} from '../inventory/poSync';
+import {Supplier} from '../db/models/Supplier';
+import {receiveStock} from '../api/inventory';
 import {getDeviceId} from '../utils/deviceId';
 import type {AppRole} from '../utils/roles';
+import {postGrnLocally} from '../inventory/inventoryRepository';
+import type {POLineRequest} from '../utils/procurementPayload';
 
 const MAX_RETRIES = 5;
 
@@ -65,6 +71,18 @@ export async function queueOfflineTillClose(
   payload: Record<string, unknown>,
 ): Promise<void> {
   await enqueue('TILL_CLOSE', payload);
+}
+
+export async function queueOfflinePoCreate(
+  payload: Record<string, unknown>,
+): Promise<void> {
+  await enqueue('PO_CREATE', payload);
+}
+
+export async function queueOfflineGrnPost(
+  payload: Record<string, unknown>,
+): Promise<void> {
+  await enqueue('GRN_POST', payload);
 }
 
 export async function getPendingTransactions(): Promise<OfflineTransaction[]> {
@@ -142,6 +160,45 @@ async function processRecord(record: OfflineTransaction): Promise<void> {
           headers,
         });
       }
+      return;
+    }
+    case 'PO_CREATE': {
+      const localPoId = String(payload.localPoId);
+      const supplierLocalId = String(payload.supplierLocalId);
+      const supplier = await database
+        .get<Supplier>('suppliers')
+        .find(supplierLocalId);
+      await syncPoCreateToServer({
+        supplier,
+        lines: payload.lines as POLineRequest[],
+        notes: payload.notes as string | undefined,
+        localPoId,
+        sendAfter: Boolean(payload.sendAfter),
+      });
+      return;
+    }
+    case 'GRN_POST': {
+      const grnId = String(payload.localGrnId);
+      const poServerId = payload.poServerId as string | undefined;
+      if (poServerId && payload.grnBody) {
+        const created = await createGrnForPo(
+          poServerId,
+          payload.grnBody as Parameters<typeof createGrnForPo>[1],
+        );
+        const serverGrnId = String(
+          (created as {id?: string}).id ?? (created as {grnId?: string}).grnId,
+        );
+        if (serverGrnId) {
+          await confirmGrn(serverGrnId);
+        }
+      } else if (payload.receiveBodies) {
+        for (const body of payload.receiveBodies as Array<
+          Parameters<typeof receiveStock>[0]
+        >) {
+          await receiveStock(body);
+        }
+      }
+      await postGrnLocally(grnId);
       return;
     }
     default:

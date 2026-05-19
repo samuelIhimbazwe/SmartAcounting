@@ -81,12 +81,35 @@ public class PurchaseOrderService {
         UUID tid = requireTenant();
         String poNumber = generatePoNumber(tid);
 
+        UUID supplierId;
+        String supplierName;
+        if (request.supplier() != null) {
+            supplierName = request.supplier().name();
+            FinanceSupplier supplier = financeSupplierRepository
+                .findFirstByTenantIdAndSupplierNameIgnoreCase(tid, supplierName)
+                .orElseGet(() -> {
+                    FinanceSupplier created = new FinanceSupplier();
+                    created.setId(UUID.randomUUID());
+                    created.setTenantId(tid);
+                    created.setSupplierName(supplierName);
+                    created.setCreatedAt(Instant.now());
+                    created.setUpdatedAt(Instant.now());
+                    return financeSupplierRepository.save(created);
+                });
+            supplierId = supplier.getId();
+        } else if (request.supplierId() != null) {
+            supplierId = request.supplierId();
+            supplierName = request.supplierName() != null ? request.supplierName() : "Supplier";
+        } else {
+            throw new IllegalArgumentException("supplier or supplierId is required");
+        }
+
         PurchaseOrder po = new PurchaseOrder();
         po.setId(UUID.randomUUID());
         po.setTenantId(tid);
         po.setPoNumber(poNumber);
-        po.setSupplierId(request.supplierId());
-        po.setSupplierName(request.supplierName());
+        po.setSupplierId(supplierId);
+        po.setSupplierName(supplierName);
         po.setStatus("DRAFT");
         po.setOrderDate(LocalDate.now());
         po.setExpectedDeliveryDate(request.expectedDeliveryDate());
@@ -99,16 +122,24 @@ public class PurchaseOrderService {
 
         BigDecimal total = BigDecimal.ZERO;
         for (PurchaseOrderLineRequest line : request.lines()) {
-            BigDecimal lineTotal = line.unitCost().multiply(line.orderedQuantity());
+            Product product = productRepository.findByIdAndTenantId(line.productId(), tid)
+                .orElseThrow(() -> new IllegalArgumentException("Product not found: " + line.productId()));
+            String sku = line.sku() != null && !line.sku().isBlank()
+                ? line.sku()
+                : (product.getSku() != null ? product.getSku() : product.getId().toString());
+            String productName = line.productName() != null && !line.productName().isBlank()
+                ? line.productName()
+                : product.getName();
+            BigDecimal lineTotal = line.unitCost().multiply(line.orderedQty());
             total = total.add(lineTotal);
             PurchaseOrderLine pol = new PurchaseOrderLine();
             pol.setId(UUID.randomUUID());
             pol.setTenantId(tid);
             pol.setPurchaseOrderId(po.getId());
             pol.setProductId(line.productId());
-            pol.setSku(line.sku());
-            pol.setProductName(line.productName());
-            pol.setOrderedQuantity(line.orderedQuantity());
+            pol.setSku(sku);
+            pol.setProductName(productName);
+            pol.setOrderedQuantity(line.orderedQty());
             pol.setReceivedQuantity(BigDecimal.ZERO);
             pol.setUnitCost(line.unitCost());
             pol.setTotalCost(lineTotal);
@@ -148,9 +179,11 @@ public class PurchaseOrderService {
             null,
             List.of(new PurchaseOrderLineRequest(
                 product.getId(),
+                null,
+                suggestedQty.max(BigDecimal.ONE),
+                null,
                 product.getSku() != null ? product.getSku() : product.getId().toString(),
                 product.getName(),
-                suggestedQty.max(BigDecimal.ONE),
                 inventoryService.getLastCostPrice(tid, productId)
             ))
         );

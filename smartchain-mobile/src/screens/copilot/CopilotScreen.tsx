@@ -19,6 +19,9 @@ import {
 import {streamCopilotAgent} from '../../services/copilot/streamCopilotAgent';
 import {approveCopilotAction, rejectCopilotAction} from '../../api/copilot';
 import {useTranslation} from 'react-i18next';
+import {useNavigation} from '@react-navigation/native';
+import {fetchExpiringItems} from '../../inventory/inventorySync';
+import {refreshReorderAlerts} from '../../inventory/reorderCheck';
 
 const SUGGESTIONS: Record<string, string[]> = {
   CEO: [
@@ -41,9 +44,9 @@ const SUGGESTIONS: Record<string, string[]> = {
   ],
   OPS_MANAGER: [
     'What is low on stock?',
-    'Any items expiring this week?',
+    'Show expiring stock',
     'Which supplier costs have increased?',
-    'What needs to be reordered today?',
+    'What needs reordering?',
   ],
   ACCOUNTING_CONTROLLER: [
     'Any till variances today?',
@@ -66,6 +69,7 @@ type PendingApproval = {
 
 export default function CopilotScreen() {
   const {t} = useTranslation();
+  const navigation = useNavigation();
   const [messages, setMessages] = useState<CopilotMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -86,9 +90,61 @@ export default function CopilotScreen() {
 
   const suggestions = SUGGESTIONS[role || 'CEO'] ?? SUGGESTIONS.CEO;
 
+  const handleInventoryShortcut = useCallback(
+    async (text: string): Promise<boolean> => {
+      const q = text.toLowerCase();
+      if (q.includes('expiring')) {
+        const rows = await fetchExpiringItems(30);
+        const summary = rows
+          .slice(0, 10)
+          .map(r => {
+            const row = r as Record<string, unknown>;
+            return `${String(row.productName ?? row.pname ?? 'Item')} · ${String(row.expiryDate ?? '')}`;
+          })
+          .join('\n');
+        setMessages(prev => [
+          ...prev,
+          {id: String(Date.now()), role: 'user', content: text, timestamp: new Date()},
+          {
+            id: String(Date.now() + 1),
+            role: 'assistant',
+            content: summary || t('inventory.noExpiring'),
+            timestamp: new Date(),
+          },
+        ]);
+        navigation.navigate('Stock' as never, {screen: 'Expiring'} as never);
+        return true;
+      }
+      if (q.includes('reorder')) {
+        const alerts = await refreshReorderAlerts();
+        const summary = alerts
+          .map(a => `${a.productName}: ${a.stockQty} ≤ ${a.reorderPoint}`)
+          .join('\n');
+        setMessages(prev => [
+          ...prev,
+          {id: String(Date.now()), role: 'user', content: text, timestamp: new Date()},
+          {
+            id: String(Date.now() + 1),
+            role: 'assistant',
+            content: summary || t('inventory.noReorder'),
+            timestamp: new Date(),
+          },
+        ]);
+        navigation.navigate('Stock' as never, {screen: 'Reorder'} as never);
+        return true;
+      }
+      return false;
+    },
+    [navigation, t],
+  );
+
   const sendMessage = useCallback(
     async (text: string) => {
       if (!text.trim() || loading) {
+        return;
+      }
+
+      if (await handleInventoryShortcut(text.trim())) {
         return;
       }
 
@@ -215,7 +271,7 @@ export default function CopilotScreen() {
         setLoading(false);
       }
     },
-    [loading, role, agentMode, accessToken, tenantId, userId, t],
+    [loading, role, agentMode, accessToken, tenantId, userId, t, handleInventoryShortcut],
   );
 
   const resolveApproval = async (approved: boolean) => {

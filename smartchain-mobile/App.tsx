@@ -31,7 +31,7 @@ export default function App(): React.JSX.Element {
     void initI18n().finally(() => setReady(true));
   }, []);
   if (!ready) {
-    return null;
+    return <></>;
   }
   return (
     <GestureHandlerRootView style={{flex: 1}}>

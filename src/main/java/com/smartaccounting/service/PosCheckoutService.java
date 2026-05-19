@@ -166,12 +166,17 @@ public class PosCheckoutService {
             sl.setQuantity(qty);
             sl.setUnitPrice(unit);
             sl.setLineTotal(lineTotal);
+            sl.setProductIdSnapshot(lineReq.productId() != null ? lineReq.productId() : cat.getProductId());
+            sl.setVariantId(lineReq.variantId());
+            sl.setSerialNumber(lineReq.serialNumber());
+            sl.setLotCode(lineReq.batchNumber());
             saleLineRepository.save(sl);
 
             subtotal = subtotal.add(lineTotal);
-            if (cat.getProductId() != null) {
+            UUID promoProductId = lineReq.productId() != null ? lineReq.productId() : cat.getProductId();
+            if (promoProductId != null) {
                 cartItems.add(new PromotionCartItem(
-                    cat.getProductId(),
+                    promoProductId,
                     cat.getSku(),
                     null,
                     lineTotal,
@@ -263,14 +268,18 @@ public class PosCheckoutService {
             PosCatalogItem cat = catalogRepository.findById(sl.getCatalogItemId())
                 .filter(c -> tenant.equals(c.getTenantId()))
                 .orElseThrow(() -> new IllegalStateException("Catalog row missing for sale line"));
-            if (cat.getProductId() != null) {
+            UUID invProductId = sl.getProductIdSnapshot() != null
+                ? sl.getProductIdSnapshot()
+                : cat.getProductId();
+            if (invProductId != null) {
                 try {
                     List<InventoryService.BatchCostAllocation> allocations = inventoryService.deductForPosSale(
-                        cat.getProductId(),
+                        invProductId,
                         sl.getQuantity(),
                         orderId,
                         cat.getBarcode(),
-                        cat.getReorderPoint()
+                        cat.getReorderPoint(),
+                        sl.getLotCode()
                     );
                     applyBatchCostsToSaleLines(sl, allocations);
                 } catch (IllegalArgumentException ex) {

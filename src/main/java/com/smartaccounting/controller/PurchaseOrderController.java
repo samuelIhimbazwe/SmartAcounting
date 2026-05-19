@@ -33,9 +33,15 @@ public class PurchaseOrderController {
         this.purchaseOrderService = purchaseOrderService;
     }
 
-    @PostMapping("/create")
+    @PostMapping
     @PreAuthorize("hasAnyRole('CEO', 'CFO', 'OPS_MANAGER')")
     public ResponseEntity<PurchaseOrder> createPo(@RequestBody @Valid WorkflowCreatePurchaseOrderRequest request) {
+        return ResponseEntity.ok(purchaseOrderService.createPurchaseOrder(request, currentUserId()));
+    }
+
+    @PostMapping("/create")
+    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'OPS_MANAGER')")
+    public ResponseEntity<PurchaseOrder> createPoLegacy(@RequestBody @Valid WorkflowCreatePurchaseOrderRequest request) {
         return ResponseEntity.ok(purchaseOrderService.createPurchaseOrder(request, currentUserId()));
     }
 

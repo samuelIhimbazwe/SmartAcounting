@@ -322,6 +322,15 @@ public class InventoryService {
                                                       UUID salesOrderId,
                                                       String barcodeLabel,
                                                       BigDecimal catalogReorderPoint) {
+        return deductForPosSale(productId, quantity, salesOrderId, barcodeLabel, catalogReorderPoint, null);
+    }
+
+    public List<BatchCostAllocation> deductForPosSale(UUID productId,
+                                                      BigDecimal quantity,
+                                                      UUID salesOrderId,
+                                                      String barcodeLabel,
+                                                      BigDecimal catalogReorderPoint,
+                                                      String preferredLotCode) {
         if (productId == null) {
             return List.of();
         }
@@ -346,7 +355,8 @@ public class InventoryService {
                 "Insufficient stock for " + barcodeLabel + ": on hand " + onHand + ", sale qty " + quantity
             );
         }
-        List<BatchCostAllocation> allocations = consumeBatchesFefoForPosSale(tenant, productId, from, sink, quantity, salesOrderId, barcodeLabel);
+        List<BatchCostAllocation> allocations = consumeBatchesFefoForPosSale(
+            tenant, productId, from, sink, quantity, salesOrderId, barcodeLabel, preferredLotCode);
         if (catalogReorderPoint == null || catalogReorderPoint.compareTo(BigDecimal.ZERO) <= 0) {
             return allocations;
         }
@@ -413,12 +423,32 @@ public class InventoryService {
                                                                     BigDecimal quantity,
                                                                     UUID salesOrderId,
                                                                     String barcodeLabel) {
+        return consumeBatchesFefoForPosSale(
+            tenant, productId, from, sink, quantity, salesOrderId, barcodeLabel, null);
+    }
+
+    private List<BatchCostAllocation> consumeBatchesFefoForPosSale(UUID tenant,
+                                                                    UUID productId,
+                                                                    String from,
+                                                                    String sink,
+                                                                    BigDecimal quantity,
+                                                                    UUID salesOrderId,
+                                                                    String barcodeLabel,
+                                                                    String preferredLotCode) {
         BigDecimal remaining = quantity;
         List<BatchCostAllocation> allocations = new ArrayList<>();
+        if (preferredLotCode != null && !preferredLotCode.isBlank()) {
+            remaining = consumePreferredLot(
+                tenant, productId, from, sink, remaining, preferredLotCode.trim(), allocations);
+        }
         List<InventoryBatch> batches = inventoryBatchRepository
             .findByTenantIdAndProductIdAndLocationCodeOrderByExpiryDateAscCreatedAtAsc(tenant, productId, from);
         for (InventoryBatch batch : batches) {
             if (remaining.compareTo(BigDecimal.ZERO) <= 0) break;
+            if (preferredLotCode != null
+                && preferredLotCode.equalsIgnoreCase(batch.getLotCode())) {
+                continue;
+            }
             BigDecimal avail = batch.getQuantityOnHand() == null ? BigDecimal.ZERO : batch.getQuantityOnHand();
             if (avail.compareTo(BigDecimal.ZERO) <= 0) continue;
             BigDecimal take = avail.min(remaining);
@@ -444,6 +474,35 @@ public class InventoryService {
             throw new IllegalArgumentException("Insufficient FEFO batch stock for " + (barcodeLabel != null ? barcodeLabel : productId));
         }
         return allocations;
+    }
+
+    private BigDecimal consumePreferredLot(UUID tenant,
+                                           UUID productId,
+                                           String from,
+                                           String sink,
+                                           BigDecimal remaining,
+                                           String lotCode,
+                                           List<BatchCostAllocation> allocations) {
+        return inventoryBatchRepository
+            .findByTenantIdAndProductIdAndLocationCodeAndLotCode(tenant, productId, from, lotCode)
+            .map(batch -> {
+                BigDecimal avail = batch.getQuantityOnHand() == null
+                    ? BigDecimal.ZERO : batch.getQuantityOnHand();
+                if (avail.compareTo(BigDecimal.ZERO) <= 0) {
+                    return remaining;
+                }
+                BigDecimal take = avail.min(remaining);
+                batch.setQuantityOnHand(avail.subtract(take));
+                batch.setUpdatedAt(Instant.now());
+                inventoryBatchRepository.save(batch);
+                BigDecimal costPrice = batch.getCostPrice() == null
+                    ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+                    : batch.getCostPrice().setScale(2, RoundingMode.HALF_UP);
+                allocations.add(new BatchCostAllocation(batch.getId(), take, costPrice));
+                recordPosSaleMovement(tenant, productId, from, sink, take);
+                return remaining.subtract(take);
+            })
+            .orElse(remaining);
     }
 
     private void recordPosSaleMovement(UUID tenant,

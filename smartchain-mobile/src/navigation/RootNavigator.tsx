@@ -1,4 +1,5 @@
-import React, {useEffect} from 'react';
+import React, {useEffect, useRef} from 'react';
+import {AppState} from 'react-native';
 import {NavigationContainer} from '@react-navigation/native';
 import {navigationRef} from './navigationRef';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
@@ -12,6 +13,8 @@ import {
   offerBiometricUnlockAfterLogin,
   shouldOfferBiometricUnlock,
 } from '../services/biometricUnlock';
+import {runInventorySync} from '../inventory/inventorySync';
+import {refreshReorderAlerts} from '../inventory/reorderCheck';
 
 const Stack = createNativeStackNavigator();
 
@@ -42,6 +45,24 @@ export default function RootNavigator() {
     stopSseListener();
     return undefined;
   }, [token, tenantId, role]);
+
+  const appState = useRef(AppState.currentState);
+  useEffect(() => {
+    if (!token) {
+      return undefined;
+    }
+    void runInventorySync().then(() => refreshReorderAlerts());
+    const sub = AppState.addEventListener('change', next => {
+      if (
+        appState.current.match(/inactive|background/) &&
+        next === 'active'
+      ) {
+        void runInventorySync().then(() => refreshReorderAlerts());
+      }
+      appState.current = next;
+    });
+    return () => sub.remove();
+  }, [token]);
 
   return (
     <NavigationContainer ref={navigationRef}>

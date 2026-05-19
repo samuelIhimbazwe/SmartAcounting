@@ -16,13 +16,21 @@ import {
   setCustomer,
   setDiscount,
   setLastTransaction,
+  setLastReceiptLines,
   setPosRegisterCode,
   setProcessing,
   setSessionCurrency,
   updateQuantity,
   updateTenderLine,
   setTenderLineType,
+  setCartLineSerial,
+  setCartLineBatch,
 } from '../../store/slices/posSlice';
+import {
+  consumeBatchQty,
+  markSerialSold,
+  pickCheckoutBatch,
+} from '../../inventory/inventoryRepository';
 import type {PosStackParamList} from '../../navigation/PosNavigator';
 import {useBarcode} from '../../hooks/useBarcode';
 import {useWakeLock} from '../../hooks/useWakeLock';
@@ -102,10 +110,21 @@ export default function CheckoutScreen() {
       return;
     }
 
+    for (const item of cart) {
+      if (item.requiresSerial && !item.serialNumber?.trim()) {
+        Toast.show({type: 'error', text1: t('inventory.serialRequired')});
+        return;
+      }
+    }
+
     const hasOnAccount = tenderLines.some(l => l.tenderType === 'ON_ACCOUNT');
     const lines = cart.map(i => ({
       barcode: i.barcode,
       quantity: Math.max(0.001, Number(i.quantity.toFixed(4))),
+      variantId: i.variantId,
+      productId: i.productId,
+      serialNumber: i.serialNumber,
+      batchNumber: i.batchNumber,
     }));
     const body = {
       customerName: customerName?.trim() || null,
@@ -131,12 +150,22 @@ export default function CheckoutScreen() {
         if (sid != null) {
           dispatch(setLastTransaction(String(sid)));
         }
+        for (const item of cart) {
+          if (item.variantId && item.batchNumber) {
+            await consumeBatchQty(item.variantId, item.batchNumber, item.quantity);
+          }
+          if (item.serialNumber && item.variantId) {
+            await markSerialSold(item.serialNumber, String(sid ?? Date.now()));
+          }
+        }
         Toast.show({type: 'success', text1: t('pos.saleCompleted')});
+        dispatch(setLastReceiptLines([...cart]));
         dispatch(clearCart());
         navigation.navigate('Receipt');
       } else {
         await queueOfflineCheckout(body);
         Toast.show({type: 'info', text1: t('pos.savedOffline')});
+        dispatch(setLastReceiptLines([...cart]));
         dispatch(clearCart());
       }
     } catch (e: unknown) {
@@ -312,11 +341,73 @@ export default function CheckoutScreen() {
       </Button>
 
       <Text style={[styles.section, styles.sectionTitle]}>{t('pos.cart')}</Text>
-      {cart.map(item => (
-        <Card key={item.catalogItemId} style={styles.card}>
-          <Card.Title title={item.name} subtitle={`SKU ${item.sku}`} />
+      {cart.map(item => {
+        const lineKey = item.variantId ?? item.catalogItemId;
+        return (
+        <Card key={`${lineKey}-${item.serialNumber ?? ''}`} style={styles.card}>
+          <Card.Title
+            title={item.name}
+            subtitle={
+              item.variantLabel
+                ? `${item.variantLabel} · ${item.sku}`
+                : `SKU ${item.sku}`
+            }
+          />
           <Card.Content>
             <Text style={styles.bodySmall}>{item.barcode}</Text>
+            {item.uomLabel ? (
+              <Text style={styles.bodySmall}>{t('inventory.uom')}: {item.uomLabel}</Text>
+            ) : null}
+            {item.batchNumber ? (
+              <Text style={styles.bodySmall}>
+                {t('inventory.batch')}: {item.batchNumber}
+                {item.batchExpiry ? ` · ${item.batchExpiry}` : ''}
+              </Text>
+            ) : null}
+            {item.requiresSerial ? (
+              <TextInput
+                label={t('inventory.serialNumber')}
+                value={item.serialNumber ?? ''}
+                onChangeText={v =>
+                  dispatch(setCartLineSerial({lineKey, serialNumber: v}))
+                }
+                style={styles.field}
+              />
+            ) : null}
+            {item.variantId && !item.batchNumber ? (
+              <Button
+                compact
+                onPress={async () => {
+                  const pick = await pickCheckoutBatch(item.variantId!, item.quantity);
+                  if (pick) {
+                    dispatch(
+                      setCartLineBatch({
+                        lineKey,
+                        batchNumber: pick.batchNumber,
+                        batchExpiry: pick.expiryDate,
+                      }),
+                    );
+                  }
+                }}>
+                {t('inventory.applyFefoBatch')}
+              </Button>
+            ) : null}
+            {item.variantId ? (
+              <TextInput
+                label={t('inventory.batchOverride')}
+                value={item.batchNumber ?? ''}
+                onChangeText={v =>
+                  dispatch(
+                    setCartLineBatch({
+                      lineKey,
+                      batchNumber: v,
+                      batchExpiry: item.batchExpiry,
+                    }),
+                  )
+                }
+                style={styles.field}
+              />
+            ) : null}
             <Text style={styles.bodyMedium}>
               {formatMoney(item.unitPrice, item.currency)} ×{' '}
               <TextInput
@@ -335,12 +426,13 @@ export default function CheckoutScreen() {
               />{' '}
               = {formatMoney(item.lineTotal, item.currency)}
             </Text>
-            <Button onPress={() => dispatch(removeFromCart(item.catalogItemId))}>
+            <Button onPress={() => dispatch(removeFromCart(lineKey))}>
               {t('common.remove')}
             </Button>
           </Card.Content>
         </Card>
-      ))}
+        );
+      })}
 
       <View style={styles.footer}>
         <Text style={styles.bodyMedium}>

@@ -10,12 +10,13 @@ import {testIds} from '../../e2e/testIds';
 export default function ReceiptScreen() {
   const {t} = useTranslation();
   const txId = useSelector((s: RootState) => s.pos.lastTransactionId);
+  const receiptLines = useSelector((s: RootState) => s.pos.lastReceiptLines);
 
   const onPrint = async () => {
     if (!txId) {
       return;
     }
-    await printReceiptWithAlert(txId);
+    await printReceiptWithAlert(txId, receiptLines);
   };
 
   const onShare = async () => {

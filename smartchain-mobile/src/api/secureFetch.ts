@@ -26,14 +26,14 @@ async function executePinnedFetch(
 ): Promise<{status: number; bodyString?: string}> {
   const pinnedMethod = method as PinnedMethod;
   return pinnedFetch(url, {
-    method: pinnedMethod,
+    method: pinnedMethod as 'GET',
     headers,
     body,
     sslPinning: {
       certs: ['smartaccounting-cert'],
     },
     timeoutInterval: 15000,
-  });
+  } as Parameters<typeof pinnedFetch>[1]);
 }
 
 function toResponse(pinned: {status: number; bodyString?: string}): Response {
