@@ -12,6 +12,7 @@ import {useSelector} from 'react-redux';
 import {apiClient, isApiError} from '../../api/client';
 import type {RootState} from '../../store';
 import {queueOfflineStockCount} from '../../services/offlineQueue';
+import {useTranslation} from 'react-i18next';
 
 interface CountItem {
   productId: string;
@@ -24,6 +25,7 @@ interface CountItem {
 }
 
 export default function StockCountScreen() {
+  const {t} = useTranslation();
   const online = useSelector((s: RootState) => s.network.online);
   const [items, setItems] = useState<CountItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,12 +61,12 @@ export default function StockCountScreen() {
         ? String((error.body as {message?: string})?.message ?? error.message)
         : error instanceof Error
           ? error.message
-          : 'Failed to load inventory';
-      Alert.alert('Error', message);
+          : t('stock.loadFailed');
+      Alert.alert(t('common.error'), message);
     } finally {
       setLoading(false);
     }
-  }, [location]);
+  }, [location, t]);
 
   useEffect(() => {
     void loadInventory();
@@ -98,10 +100,13 @@ export default function StockCountScreen() {
       if (found) {
         setSearchQuery(found.name);
       } else {
-        Alert.alert('Not found', `SKU ${barcode} not in this location`);
+        Alert.alert(
+          t('stock.notFound'),
+          t('stock.notFoundSku', {sku: barcode}),
+        );
       }
     },
-    [items],
+    [items, t],
   );
 
   const doSubmit = async () => {
@@ -145,9 +150,9 @@ export default function StockCountScreen() {
       if (!online) {
         await queueOfflineStockCount({adjustments: queuedAdjustments});
         Alert.alert(
-          'Count queued',
-          `${adjustments.length} adjustments saved offline`,
-          [{text: 'OK', onPress: () => void loadInventory()}],
+          t('stock.queued'),
+          t('stock.queuedBody', {count: adjustments.length}),
+          [{text: t('common.ok'), onPress: () => void loadInventory()}],
         );
         return;
       }
@@ -161,17 +166,17 @@ export default function StockCountScreen() {
       }
 
       Alert.alert(
-        'Count submitted',
-        `${adjustments.length} adjustments posted successfully`,
-        [{text: 'OK', onPress: () => void loadInventory()}],
+        t('stock.submitted'),
+        t('stock.submittedBody', {count: adjustments.length}),
+        [{text: t('common.ok'), onPress: () => void loadInventory()}],
       );
     } catch (error: unknown) {
       const message = isApiError(error)
         ? String((error.body as {message?: string})?.message ?? error.message)
         : error instanceof Error
           ? error.message
-          : 'Submit failed';
-      Alert.alert('Error', message);
+          : t('stock.submitFailed');
+      Alert.alert(t('common.error'), message);
     } finally {
       setSubmitting(false);
     }
@@ -180,19 +185,20 @@ export default function StockCountScreen() {
   const submitCount = () => {
     const counted = items.filter(i => i.counted);
     if (counted.length === 0) {
-      Alert.alert('Nothing to submit', 'Count at least one item first');
+      Alert.alert(t('stock.nothingToSubmit'), t('stock.countOneFirst'));
       return;
     }
 
     const withVariance = counted.filter(i => i.variance !== 0);
     Alert.alert(
-      'Submit stock count?',
-      `${counted.length} items counted.\n` +
-        `${withVariance.length} items have variances.\n\n` +
-        'Variances will be posted as adjustments.',
+      t('stock.confirmTitle'),
+      t('stock.confirmBody', {
+        counted: counted.length,
+        variances: withVariance.length,
+      }),
       [
-        {text: 'Cancel', style: 'cancel'},
-        {text: 'Submit', onPress: () => void doSubmit()},
+        {text: t('common.cancel'), style: 'cancel'},
+        {text: t('common.submit'), onPress: () => void doSubmit()},
       ],
     );
   };
@@ -219,15 +225,18 @@ export default function StockCountScreen() {
           {item.name}
         </Text>
         <Text style={styles.itemSku}>{item.sku}</Text>
-        <Text style={styles.itemSystem}>System: {item.systemQuantity} units</Text>
+        <Text style={styles.itemSystem}>
+          {t('stock.systemQty', {qty: item.systemQuantity})}
+        </Text>
         {item.variance !== null && item.variance !== 0 ? (
           <Text
             style={[
               styles.variance,
               {color: item.variance > 0 ? '#16A34A' : '#DC2626'},
             ]}>
-            Variance: {item.variance > 0 ? '+' : ''}
-            {item.variance}
+            {t('stock.varianceLine', {
+              value: `${item.variance > 0 ? '+' : ''}${item.variance}`,
+            })}
           </Text>
         ) : null}
       </View>
@@ -235,7 +244,7 @@ export default function StockCountScreen() {
         style={styles.countInput}
         value={item.countedQuantity?.toString() ?? ''}
         onChangeText={v => updateCount(item.productId, v)}
-        placeholder="Count"
+        placeholder={t('stock.countPlaceholder')}
         keyboardType="numeric"
         selectTextOnFocus
         onSubmitEditing={() => {
@@ -250,7 +259,7 @@ export default function StockCountScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <Text style={styles.loadingText}>Loading inventory…</Text>
+        <Text style={styles.loadingText}>{t('stock.loadingInventory')}</Text>
       </View>
     );
   }
@@ -260,13 +269,13 @@ export default function StockCountScreen() {
       <View style={styles.statsRow}>
         <View style={styles.stat}>
           <Text style={styles.statValue}>{items.length}</Text>
-          <Text style={styles.statLabel}>Total items</Text>
+          <Text style={styles.statLabel}>{t('stock.totalItems')}</Text>
         </View>
         <View style={styles.stat}>
           <Text style={[styles.statValue, {color: '#1B6FDB'}]}>
             {countedCount}
           </Text>
-          <Text style={styles.statLabel}>Counted</Text>
+          <Text style={styles.statLabel}>{t('stock.counted')}</Text>
         </View>
         <View style={styles.stat}>
           <Text
@@ -276,7 +285,7 @@ export default function StockCountScreen() {
             ]}>
             {varianceCount}
           </Text>
-          <Text style={styles.statLabel}>Variances</Text>
+          <Text style={styles.statLabel}>{t('stock.variances')}</Text>
         </View>
       </View>
 
@@ -284,7 +293,7 @@ export default function StockCountScreen() {
         style={styles.search}
         value={searchQuery}
         onChangeText={setSearchQuery}
-        placeholder="Search by name or SKU..."
+        placeholder={t('stock.searchPlaceholder')}
       />
 
       <FlatList
@@ -301,8 +310,8 @@ export default function StockCountScreen() {
         disabled={submitting}>
         <Text style={styles.submitText}>
           {submitting
-            ? 'Submitting...'
-            : `Submit Count (${countedCount} items)`}
+            ? t('stock.submitting')
+            : t('stock.submitCount', {count: countedCount})}
         </Text>
       </TouchableOpacity>
     </View>

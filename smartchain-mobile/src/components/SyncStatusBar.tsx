@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useState} from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
+import {useTranslation} from 'react-i18next';
 import {useSelector} from 'react-redux';
 import type {RootState} from '../store';
 import type {AppRole} from '../utils/roles';
@@ -10,17 +11,8 @@ import {
 } from '../services/offlineQueue';
 import {useSyncStatus} from '../hooks/useSyncStatus';
 
-/**
- * Status bar pinned to the top of the authenticated shell.
- *
- * Renders nothing when the device is online *and* there are no pending
- * records, so it is safe to mount unconditionally above every screen.
- *
- * Behaviour matches the web `OfflineBanner` and the desktop offline-banner
- * IPC surface — all three platforms share the same wire contract and the
- * same UX language ("Offline — N saved locally", "Syncing N…", "Back online").
- */
 export function SyncStatusBar() {
+  const {t} = useTranslation();
   const [isOnline, setIsOnline] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
@@ -38,6 +30,7 @@ export function SyncStatusBar() {
       setLastItemError(err ?? null);
     } catch {
       setPendingCount(0);
+      setLastItemError(null);
     }
   }, []);
 
@@ -79,7 +72,17 @@ export function SyncStatusBar() {
     isOnline && (serverPending > 0 || serverAlerts > 0);
   const showOfflineBar = !isOnline || pendingCount > 0 || syncing;
 
-  if (!showOfflineBar && !showServerBadges) return null;
+  if (!showOfflineBar && !showServerBadges) {
+    return null;
+  }
+
+  const statusText = syncing
+    ? t('sync.syncing', {count: pendingCount})
+    : isOnline
+      ? lastItemError
+        ? t('sync.syncError', {message: lastItemError.slice(0, 80)})
+        : t('sync.backOnline')
+      : t('sync.offline', {count: pendingCount});
 
   return (
     <View>
@@ -87,27 +90,19 @@ export function SyncStatusBar() {
         <View style={styles.serverBar}>
           {serverPending > 0 ? (
             <Text style={styles.badgeText}>
-              {serverPending} approval{serverPending !== 1 ? 's' : ''}
+              {t('sync.approvals', {count: serverPending})}
             </Text>
           ) : null}
           {serverAlerts > 0 ? (
             <Text style={styles.badgeText}>
-              {serverAlerts} alert{serverAlerts !== 1 ? 's' : ''}
+              {t('sync.alerts', {count: serverAlerts})}
             </Text>
           ) : null}
         </View>
       ) : null}
       {showOfflineBar ? (
         <View style={[styles.bar, isOnline ? styles.syncing : styles.offline]}>
-          <Text style={styles.text}>
-            {syncing
-              ? `Syncing ${pendingCount} item${pendingCount !== 1 ? 's' : ''}…`
-              : isOnline
-                ? lastItemError
-                  ? `Sync error: ${lastItemError.slice(0, 80)}`
-                  : 'Back online'
-                : `Offline — ${pendingCount} item${pendingCount !== 1 ? 's' : ''} queued`}
-          </Text>
+          <Text style={styles.text}>{statusText}</Text>
         </View>
       ) : null}
     </View>

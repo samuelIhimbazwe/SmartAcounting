@@ -1,22 +1,36 @@
+# Maestro smoke — run with EN locale; credentials via env vars.
+# Example: MAESTRO_USERNAME=cashier MAESTRO_PASSWORD=secret maestro test e2e/smoke.yaml
 appId: com.smartaccounting.mobile
 ---
 - launchApp
-- tapOn: "Username"
+- tapOn:
+    id: auth.username
 - inputText: "${MAESTRO_USERNAME}"
-- tapOn: "Password"
+- tapOn:
+    id: auth.password
 - inputText: "${MAESTRO_PASSWORD}"
-- tapOn: "Sign in"
+- tapOn:
+    id: auth.sign-in
 - tapOn: "Till"
-- tapOn: "Opening float"
+- tapOn:
+    id: till.open-float
 - inputText: "50000"
-- tapOn: "Open Till"
+- tapOn:
+    id: till.open-submit
 - tapOn: "POS"
-- tapOn: "Barcode"
+- tapOn:
+    id: checkout.barcode
 - inputText: "TEST-SKU-001"
-- tapOn: "Add"
-- tapOn: "Cash"
-- tapOn: "Complete sale"
-- tapOn: "Print receipt"
+- tapOn:
+    id: checkout.add
+- tapOn:
+    id: checkout.tender-cash
+- tapOn:
+    id: checkout.complete-sale
+- tapOn:
+    id: receipt.print
 - tapOn: "Till"
-- tapOn: "Close till"
-- tapOn: "Submit till close"
+- tapOn:
+    id: till.close-nav
+- tapOn:
+    id: till.close-submit

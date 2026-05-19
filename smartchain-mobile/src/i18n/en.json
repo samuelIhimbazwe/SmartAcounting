@@ -5,7 +5,12 @@
     "error": "Error",
     "success": "Success",
     "loading": "Loading…",
-    "retry": "Retry"
+    "retry": "Retry",
+    "ok": "OK",
+    "add": "Add",
+    "remove": "Remove",
+    "notNow": "Not now",
+    "enable": "Enable"
   },
   "auth": {
     "appName": "SmartAccounting",
@@ -14,8 +19,11 @@
     "tenantId": "Tenant ID",
     "userId": "User ID",
     "signIn": "Sign in",
-    "biometricEnable": "Enable biometric unlock",
-    "biometricPrompt": "Unlock SmartAccounting"
+    "biometricEnableTitle": "Enable biometric unlock",
+    "biometricEnableMessage": "Use Face ID / fingerprint to unlock the app on this device?",
+    "biometricPrompt": "Unlock SmartAccounting",
+    "biometricFaceId": "Use Face ID",
+    "biometricFingerprint": "Use fingerprint"
   },
   "settings": {
     "title": "Settings",
@@ -28,6 +36,8 @@
   },
   "till": {
     "openTitle": "Start Shift",
+    "sessionOpen": "Till session is open",
+    "continueToPos": "Continue to POS",
     "closeTitle": "Close till",
     "countedTotals": "Counted totals",
     "cash": "Cash",
@@ -36,7 +46,16 @@
     "card": "Card",
     "onAccount": "On account",
     "notes": "Notes",
+    "registerLabel": "Till / Register",
+    "registerPlaceholder": "REG-01",
     "openingFloat": "Opening float (FRW)",
+    "floatPlaceholder": "e.g. 50000",
+    "floatHint": "Count the cash in the till and enter the total",
+    "floatRequired": "Please enter the opening float amount",
+    "openFailed": "Could not open till",
+    "cashierName": "Your Name",
+    "cashierPlaceholder": "Enter your name",
+    "printerLabel": "Receipt Printer",
     "openButton": "Open Till & Start Shift",
     "opening": "Opening…",
     "closeButton": "Submit till close",
@@ -50,7 +69,12 @@
     "printerConnected": "Connected",
     "printerNotConnected": "Not connected",
     "connectPrinter": "Connect",
-    "viewShifts": "View shift schedule"
+    "viewShifts": "View shift schedule",
+    "checklistTitle": "Before you start:",
+    "checklistFloat": "Cash float counted and confirmed",
+    "checklistPrinter": "Receipt printer is on and connected",
+    "checklistScanner": "Barcode scanner is working",
+    "checklistInternet": "Internet connection is active"
   },
   "pos": {
     "checkoutTitle": "Checkout",
@@ -62,27 +86,57 @@
     "discount": "Discount (same currency)",
     "scanBarcode": "Scan or enter barcode",
     "barcode": "Barcode",
+    "openScanner": "Open camera scanner",
+    "cart": "Cart",
     "cartEmpty": "Cart is empty",
     "saleCompleted": "Sale completed",
     "savedOffline": "Saved offline — will sync when online",
     "checkoutFailed": "Checkout failed",
     "tenderUnderpaid": "Tender total is less than sale total",
-    "addTenderLine": "Add payment line",
+    "removeTenderLine": "Remove line",
     "tenderAmount": "Amount",
     "tenderTotal": "Tender total",
     "saleTotal": "Sale total",
+    "subtotal": "Subtotal",
+    "total": "Total",
     "tenderCash": "Cash",
     "tenderMomo": "MoMo",
     "tenderAirtel": "Airtel",
     "tenderCard": "Card",
     "tenderOnAccount": "On account",
-    "completeSale": "Complete sale"
+    "completeSale": "Complete sale",
+    "queueOfflineSale": "Queue offline sale",
+    "returnProcessed": "Return processed",
+    "returnQueued": "Return queued",
+    "returnProcessedBody": "Refund of {{amount}} FRW processed successfully.",
+    "returnQueuedBody": "Return saved offline — will sync when online.",
+    "returnFailed": "Return failed",
+    "returnNeedsApproval": "This return requires manager approval. A manager has been notified."
   },
   "stock": {
     "countTitle": "Stock count",
     "loadFailed": "Failed to load inventory",
+    "loadingInventory": "Loading inventory…",
     "submitFailed": "Stock count submit failed",
-    "submitted": "Stock count submitted"
+    "submitted": "Count submitted",
+    "submittedBody": "{{count}} adjustments posted successfully",
+    "queued": "Count queued",
+    "queuedBody": "{{count}} adjustments saved offline",
+    "nothingToSubmit": "Nothing to submit",
+    "countOneFirst": "Count at least one item first",
+    "confirmTitle": "Submit stock count?",
+    "confirmBody": "{{counted}} items counted.\n{{variances}} items have variances.\n\nVariances will be posted as adjustments.",
+    "notFound": "Not found",
+    "notFoundSku": "SKU {{sku}} not in this location",
+    "searchPlaceholder": "Search by name or SKU…",
+    "totalItems": "Total items",
+    "counted": "Counted",
+    "variances": "Variances",
+    "systemQty": "System: {{qty}} units",
+    "varianceLine": "Variance: {{value}}",
+    "countPlaceholder": "Count",
+    "submitting": "Submitting…",
+    "submitCount": "Submit Count ({{count}} items)"
   },
   "copilot": {
     "title": "AI Copilot",
@@ -95,23 +149,32 @@
     "thinking": "Thinking…",
     "streamFallback": "Live streaming unavailable; showing full response",
     "errorRetry": "Sorry, I could not process that. Please try again.",
-    "approvalTitle": "Action requires approval",
     "approvalWaiting": "Waiting for approval…",
     "approve": "Approve",
-    "reject": "Reject"
+    "reject": "Reject",
+    "emptyHello": "Hello, {{name}} 👋",
+    "emptyThere": "there",
+    "emptySubtitle": "I have access to your sales, inventory, and financial data. What would you like to know?",
+    "suggestionsTitle": "Try asking:"
   },
   "sync": {
-    "offline": "Offline — {{count}} sale(s) saved locally",
-    "syncing": "Syncing {{count}} sale(s)…",
+    "offline": "Offline — {{count}} queued",
+    "syncing": "Syncing {{count}}…",
     "backOnline": "Back online",
+    "syncError": "Sync error: {{message}}",
     "approvals": "{{count}} approval(s)",
-    "alerts": "{{count}} alert(s)",
-    "syncError": "Sync error: {{message}}"
+    "alerts": "{{count}} alert(s)"
   },
   "receipt": {
     "title": "Last transaction",
     "print": "Print receipt",
     "shareIos": "Share / AirPrint",
-    "iosPrintAlert": "Bluetooth printing is Android-only. Use Share for AirPrint or save the receipt."
+    "iosPrintTitle": "Printing",
+    "iosPrintAlert": "Bluetooth printing is Android-only. Use AirPrint from the receipt screen.",
+    "printFailed": "Print failed",
+    "printFailedBody": "{{message}}\n\nThe sale was recorded successfully."
+  },
+  "printing": {
+    "failed": "Print failed"
   }
 }

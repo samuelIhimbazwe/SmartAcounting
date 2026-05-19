@@ -15,6 +15,7 @@ import {apiClient, isApiError} from '../../api/client';
 import type {RootState} from '../../store';
 import type {PosStackParamList} from '../../navigation/PosNavigator';
 import {queueOfflineReturn} from '../../services/offlineQueue';
+import {useTranslation} from 'react-i18next';
 
 const RETURN_REASONS = [
   'DAMAGED',
@@ -42,6 +43,7 @@ interface ReturnLineForm {
 }
 
 export default function ReturnsScreen() {
+  const {t} = useTranslation();
   const navigation = useNavigation<Nav>();
   const posRegisterCode = useSelector((s: RootState) => s.pos.posRegisterCode);
   const online = useSelector((s: RootState) => s.network.online);
@@ -114,18 +116,19 @@ export default function ReturnsScreen() {
       }
 
       Alert.alert(
-        online ? 'Return processed' : 'Return queued',
+        online ? t('pos.returnProcessed') : t('pos.returnQueued'),
         online
-          ? `Refund of ${totalRefund.toLocaleString()} FRW processed successfully.`
-          : 'Return saved offline — will sync when online.',
-        [{text: 'OK', onPress: () => navigation.goBack()}],
+          ? t('pos.returnProcessedBody', {
+              amount: totalRefund.toLocaleString(),
+            })
+          : t('pos.returnQueuedBody'),
+        [{text: t('common.ok'), onPress: () => navigation.goBack()}],
       );
     } catch (error: unknown) {
-      let msg = 'Return failed';
+      let msg = t('pos.returnFailed');
       if (isApiError(error)) {
         if (error.status === 403) {
-          msg =
-            'This return requires manager approval. A manager has been notified.';
+          msg = t('pos.returnNeedsApproval');
         } else {
           msg = String((error.body as {message?: string})?.message ?? error.message);
         }

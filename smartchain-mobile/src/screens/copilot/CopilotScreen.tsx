@@ -205,8 +205,7 @@ export default function CopilotScreen() {
             m.id === assistantId
               ? {
                   ...m,
-                  content:
-                    'Sorry, I could not process that. Please try again.',
+                  content: t('copilot.errorRetry'),
                   isStreaming: false,
                 }
               : m,
@@ -216,7 +215,7 @@ export default function CopilotScreen() {
         setLoading(false);
       }
     },
-    [loading, role, agentMode, accessToken, tenantId, userId],
+    [loading, role, agentMode, accessToken, tenantId, userId, t],
   );
 
   const resolveApproval = async (approved: boolean) => {
@@ -253,14 +252,12 @@ export default function CopilotScreen() {
         ) : null}
       </Text>
       {item.streamFallback && !item.isStreaming ? (
-        <Text style={styles.fallbackNote}>
-          Live streaming unavailable; showing full response
-        </Text>
+        <Text style={styles.fallbackNote}>{t('copilot.streamFallback')}</Text>
       ) : null}
       {item.isStreaming && !item.content ? (
         <View style={styles.typingRow}>
           <ActivityIndicator size="small" color="#1B6FDB" />
-          <Text style={styles.typingText}>Thinking...</Text>
+          <Text style={styles.typingText}>{t('copilot.thinking')}</Text>
         </View>
       ) : null}
       <Text style={styles.messageTime}>
@@ -278,14 +275,10 @@ export default function CopilotScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={90}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>AI Copilot</Text>
-        <Text style={styles.headerSubtitle}>
-          Ask anything about your business
-        </Text>
+        <Text style={styles.headerTitle}>{t('copilot.title')}</Text>
+        <Text style={styles.headerSubtitle}>{t('copilot.subtitle')}</Text>
         {streamFallback ? (
-          <Text style={styles.headerFallback}>
-            Live streaming unavailable; showing full response
-          </Text>
+          <Text style={styles.headerFallback}>{t('copilot.streamFallback')}</Text>
         ) : null}
       </View>
 
@@ -357,7 +350,7 @@ export default function CopilotScreen() {
           style={styles.input}
           value={input}
           onChangeText={setInput}
-          placeholder="Ask about your business..."
+          placeholder={t('copilot.placeholder')}
           multiline
           maxLength={500}
           returnKeyType="send"

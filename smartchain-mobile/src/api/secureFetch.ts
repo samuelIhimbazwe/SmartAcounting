@@ -16,6 +16,35 @@ function assertProductionPinningConfigured(): void {
   }
 }
 
+type PinnedMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+
+async function executePinnedFetch(
+  url: string,
+  method: string,
+  headers: Record<string, string>,
+  body?: string,
+): Promise<{status: number; bodyString?: string}> {
+  const pinnedMethod = method as PinnedMethod;
+  return pinnedFetch(url, {
+    method: pinnedMethod,
+    headers,
+    body,
+    sslPinning: {
+      certs: ['smartaccounting-cert'],
+    },
+    timeoutInterval: 15000,
+  });
+}
+
+function toResponse(pinned: {status: number; bodyString?: string}): Response {
+  return {
+    ok: pinned.status >= 200 && pinned.status < 300,
+    status: pinned.status,
+    json: async () => JSON.parse(pinned.bodyString ?? '{}'),
+    text: async () => pinned.bodyString ?? '',
+  } as Response;
+}
+
 export async function secureApiCall(
   endpoint: string,
   options: RequestInit & {headers?: Record<string, string>},
@@ -29,24 +58,22 @@ export async function secureApiCall(
   }
 
   const method = (options.method || 'GET').toUpperCase();
-  // react-native-ssl-pinning does not support PATCH; use system fetch for PATCH only.
-  if (method === 'PATCH') {
-    return fetch(url, options);
-  }
-  const pinned = await pinnedFetch(url, {
-    method: method as 'GET' | 'POST' | 'PUT' | 'DELETE',
-    headers: options.headers || {},
-    body: options.body as string | undefined,
-    sslPinning: {
-      certs: ['smartaccounting-cert'],
-    },
-    timeoutInterval: 15000,
-  });
+  const headers = options.headers || {};
+  const body = options.body as string | undefined;
 
-  return {
-    ok: pinned.status >= 200 && pinned.status < 300,
-    status: pinned.status,
-    json: async () => JSON.parse(pinned.bodyString ?? '{}'),
-    text: async () => pinned.bodyString ?? '',
-  } as Response;
+  try {
+    const pinned = await executePinnedFetch(url, method, headers, body);
+    return toResponse(pinned);
+  } catch (pinErr) {
+    if (method === 'PATCH') {
+      if (__DEV__) {
+        console.warn(
+          'Pinned PATCH failed; retrying with system fetch:',
+          pinErr,
+        );
+      }
+      return fetch(url, options);
+    }
+    throw pinErr;
+  }
 }

@@ -15,6 +15,7 @@ import {postTillClose} from '../../api/retail';
 import {closeTillSession} from '../../api/tillSessions';
 import {queueOfflineTillClose} from '../../services/offlineQueue';
 import {isApiError} from '../../api/client';
+import {testIds} from '../../e2e/testIds';
 
 export default function TillCloseScreen() {
   const {t} = useTranslation();
@@ -132,10 +133,12 @@ export default function TillCloseScreen() {
         style={styles.field}
       />
       <Button
+        testID={testIds.tillCloseSubmit}
         mode="contained"
         onPress={() => void submit()}
         disabled={!till.currentSessionId}
-        contentStyle={styles.btnInner}>
+        contentStyle={styles.btnInner}
+        accessibilityLabel={t('till.closeButton')}>
         {t('till.closeButton')}
       </Button>
     </ScrollView>

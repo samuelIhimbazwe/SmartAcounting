@@ -5,6 +5,7 @@ import {useTranslation} from 'react-i18next';
 import {useSelector} from 'react-redux';
 import type {RootState} from '../../store';
 import {printReceiptWithAlert} from '../../services/printing';
+import {testIds} from '../../e2e/testIds';
 
 export default function ReceiptScreen() {
   const {t} = useTranslation();
@@ -34,10 +35,12 @@ export default function ReceiptScreen() {
         {txId ?? '—'}
       </Text>
       <Button
+        testID={testIds.receiptPrint}
         mode="contained"
         disabled={!txId}
         onPress={() => void onPrint()}
-        contentStyle={styles.btnInner}>
+        contentStyle={styles.btnInner}
+        accessibilityLabel={t('receipt.print')}>
         {t('receipt.print')}
       </Button>
       {Platform.OS === 'ios' ? (

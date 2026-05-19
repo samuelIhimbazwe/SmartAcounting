@@ -16,6 +16,7 @@ import {
   isBiometricUnlockEnabled,
   loadRefreshTokenWithBiometric,
 } from '../../services/biometricUnlock';
+import {testIds} from '../../e2e/testIds';
 
 type Nav = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
@@ -67,6 +68,7 @@ export default function LoginScreen() {
         </Button>
       ) : null}
       <TextInput
+        testID={testIds.authUsername}
         label={t('auth.username')}
         value={form.username}
         onChangeText={v => dispatch(updateLoginForm({username: v}))}
@@ -74,6 +76,7 @@ export default function LoginScreen() {
         style={styles.field}
       />
       <TextInput
+        testID={testIds.authPassword}
         label={t('auth.password')}
         value={form.password}
         onChangeText={v => dispatch(updateLoginForm({password: v}))}
@@ -96,12 +99,14 @@ export default function LoginScreen() {
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <Button
+        testID={testIds.authSignIn}
         mode="contained"
         loading={loading}
         disabled={loading}
         onPress={() => dispatch(loginWithPassword())}
         style={styles.button}
-        contentStyle={styles.buttonInner}>
+        contentStyle={styles.buttonInner}
+        accessibilityLabel={t('auth.signIn')}>
         {t('auth.signIn')}
       </Button>
     </View>

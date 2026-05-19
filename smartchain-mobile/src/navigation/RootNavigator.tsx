@@ -1,4 +1,4 @@
-import React, {useEffect, useRef} from 'react';
+import React, {useEffect} from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {navigationRef} from './navigationRef';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
@@ -8,6 +8,10 @@ import AuthNavigator from './AuthNavigator';
 import AppNavigator from './AppNavigator';
 import {registerPushNotifications} from '../services/notifications';
 import {startSseListener, stopSseListener} from '../services/sseListener';
+import {
+  offerBiometricUnlockAfterLogin,
+  shouldOfferBiometricUnlock,
+} from '../services/biometricUnlock';
 
 const Stack = createNativeStackNavigator();
 
@@ -17,18 +21,9 @@ export default function RootNavigator() {
   const userName = useSelector((state: RootState) => state.auth.userName);
   const tenantId = useSelector((state: RootState) => state.auth.tenantId);
   const role = useSelector((state: RootState) => state.auth.role);
-  const biometricOffered = useRef(false);
-
   useEffect(() => {
-    if (token && refreshToken && userName && !biometricOffered.current) {
-      const {
-        isBiometricUnlockEnabled,
-        offerBiometricUnlockAfterLogin,
-      } = require('../services/biometricUnlock') as typeof import('../services/biometricUnlock');
-      if (!isBiometricUnlockEnabled()) {
-        biometricOffered.current = true;
-        void offerBiometricUnlockAfterLogin(refreshToken, userName);
-      }
+    if (token && refreshToken && userName && shouldOfferBiometricUnlock()) {
+      void offerBiometricUnlockAfterLogin(refreshToken, userName);
     }
   }, [token, refreshToken, userName]);
 

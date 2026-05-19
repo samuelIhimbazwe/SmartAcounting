@@ -37,6 +37,7 @@ import {
   validateTendersForTotal,
   type TenderType,
 } from '../../utils/tenderValidation';
+import {testIds} from '../../e2e/testIds';
 
 type Nav = NativeStackNavigationProp<PosStackParamList, 'Checkout'>;
 
@@ -195,6 +196,7 @@ export default function CheckoutScreen() {
               <Button
                 key={tt}
                 compact
+                testID={tt === 'CASH' ? testIds.checkoutTenderCash : undefined}
                 mode={line.tenderType === tt ? 'contained' : 'outlined'}
                 onPress={() =>
                   dispatch(setTenderLineType({index, tenderType: tt}))
@@ -221,7 +223,7 @@ export default function CheckoutScreen() {
           />
           {tenderLines.length > 1 ? (
             <Button onPress={() => dispatch(removeTenderLine(index))}>
-              Remove line
+              {t('pos.removeTenderLine')}
             </Button>
           ) : null}
         </View>
@@ -275,6 +277,7 @@ export default function CheckoutScreen() {
       </Text>
       <View style={styles.row}>
         <TextInput
+          testID={testIds.checkoutBarcode}
           label={t('pos.barcode')}
           value={barcodeInput}
           onChangeText={v => dispatch(setBarcodeInput(v))}
@@ -287,6 +290,7 @@ export default function CheckoutScreen() {
           }}
         />
         <Button
+          testID={testIds.checkoutAdd}
           mode="contained-tonal"
           onPress={() => {
             if (barcodeInput.trim()) {
@@ -296,7 +300,7 @@ export default function CheckoutScreen() {
           }}
           style={styles.addBtn}
           contentStyle={styles.btnInner}>
-          Add
+          {t('common.add')}
         </Button>
       </View>
       <Button
@@ -304,10 +308,10 @@ export default function CheckoutScreen() {
         onPress={() => navigation.navigate('Barcode')}
         style={styles.field}
         contentStyle={styles.btnInner}>
-        Open camera scanner
+        {t('pos.openScanner')}
       </Button>
 
-      <Text style={[styles.section, styles.sectionTitle]}>Cart</Text>
+      <Text style={[styles.section, styles.sectionTitle]}>{t('pos.cart')}</Text>
       {cart.map(item => (
         <Card key={item.catalogItemId} style={styles.card}>
           <Card.Title title={item.name} subtitle={`SKU ${item.sku}`} />
@@ -332,7 +336,7 @@ export default function CheckoutScreen() {
               = {formatMoney(item.lineTotal, item.currency)}
             </Text>
             <Button onPress={() => dispatch(removeFromCart(item.catalogItemId))}>
-              Remove
+              {t('common.remove')}
             </Button>
           </Card.Content>
         </Card>
@@ -340,19 +344,23 @@ export default function CheckoutScreen() {
 
       <View style={styles.footer}>
         <Text style={styles.bodyMedium}>
-          Subtotal {formatMoney(subtotal, sessionCurrency)}
+          {t('pos.subtotal')} {formatMoney(subtotal, sessionCurrency)}
         </Text>
-        <Text style={styles.bodyMedium}>Discount {discount}</Text>
+        <Text style={styles.bodyMedium}>
+          {t('pos.discount')} {discount}
+        </Text>
         <Text style={styles.total}>
-          Total {formatMoney(total, sessionCurrency)}
+          {t('pos.total')} {formatMoney(total, sessionCurrency)}
         </Text>
         <Button
+          testID={testIds.checkoutComplete}
           mode="contained"
           loading={processing}
           disabled={processing || tenderSum + 0.001 < total}
           onPress={() => void submitCheckout()}
-          contentStyle={styles.btnInner}>
-          {online ? t('pos.completeSale') : t('pos.savedOffline')}
+          contentStyle={styles.btnInner}
+          accessibilityLabel={t('pos.completeSale')}>
+          {online ? t('pos.completeSale') : t('pos.queueOfflineSale')}
         </Button>
       </View>
     </ScrollView>

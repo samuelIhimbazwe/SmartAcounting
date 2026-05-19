@@ -1,4 +1,5 @@
 import {Platform, Alert} from 'react-native';
+import i18n from '../i18n';
 import {printerService} from './printer/BluetoothPrinterService';
 
 export async function printReceipt(transactionId: string): Promise<void> {
@@ -7,8 +8,8 @@ export async function printReceipt(transactionId: string): Promise<void> {
     return;
   }
   Alert.alert(
-    'Printing',
-    'Bluetooth printing is Android-only. Use AirPrint from the receipt screen.',
+    i18n.t('receipt.iosPrintTitle'),
+    i18n.t('receipt.iosPrintAlert'),
   );
 }
 
@@ -17,11 +18,11 @@ export async function printReceiptWithAlert(transactionId: string): Promise<void
     await printReceipt(transactionId);
   } catch (error: unknown) {
     const message =
-      error instanceof Error ? error.message : 'Print failed';
+      error instanceof Error ? error.message : i18n.t('printing.failed');
     Alert.alert(
-      'Print failed',
-      `${message}\n\nThe sale was recorded successfully.`,
-      [{text: 'OK'}],
+      i18n.t('receipt.printFailed'),
+      i18n.t('receipt.printFailedBody', {message}),
+      [{text: i18n.t('common.ok')}],
     );
   }
 }

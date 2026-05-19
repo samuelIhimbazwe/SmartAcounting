@@ -33,6 +33,7 @@ import {
 } from '../../store/slices/tillSlice';
 import {setShiftContext} from '../../store/slices/posSlice';
 import type {TillStackParamList} from '../../navigation/TillNavigator';
+import {testIds} from '../../e2e/testIds';
 
 type Nav = NativeStackNavigationProp<TillStackParamList, 'TillOpen'>;
 
@@ -100,7 +101,7 @@ export default function TillOpenScreen() {
 
   const openTill = async () => {
     if (!floatAmount || Number.isNaN(Number(floatAmount))) {
-      Alert.alert('Error', 'Please enter the opening float amount');
+      Alert.alert(t('common.error'), t('till.floatRequired'));
       return;
     }
 
@@ -141,8 +142,8 @@ export default function TillOpenScreen() {
         ? String((error.body as {message?: string})?.message ?? error.message)
         : error instanceof Error
           ? error.message
-          : 'Could not open till';
-      Alert.alert('Error', message);
+          : t('till.openFailed');
+      Alert.alert(t('common.error'), message);
     } finally {
       setOpening(false);
     }
@@ -178,7 +179,7 @@ export default function TillOpenScreen() {
     return (
       <View style={styles.loading}>
         <ActivityIndicator size="large" color="#1B6FDB" />
-        <Text style={styles.loadingText}>Checking till session…</Text>
+        <Text style={styles.loadingText}>{t('till.checkingSession')}</Text>
       </View>
     );
   }
@@ -187,15 +188,17 @@ export default function TillOpenScreen() {
     return (
       <ScrollView style={styles.container}>
         <Text style={styles.title}>{t('till.openTitle')}</Text>
-        <Text style={styles.subtitle}>Till session is open</Text>
+        <Text style={styles.subtitle}>{t('till.sessionOpen')}</Text>
         <TouchableOpacity
+          testID={testIds.tillContinuePos}
           style={styles.openButton}
           onPress={() =>
             navigation.getParent()?.navigate('POS', {screen: 'Checkout'})
           }>
-          <Text style={styles.openButtonText}>Continue to POS</Text>
+          <Text style={styles.openButtonText}>{t('till.continueToPos')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
+          testID={testIds.tillCloseNav}
           style={styles.linkButton}
           onPress={() => navigation.navigate('TillClose')}>
           <Text style={styles.linkButtonText}>{t('till.closeTitle')}</Text>
@@ -214,7 +217,7 @@ export default function TillOpenScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Start Shift</Text>
+      <Text style={styles.title}>{t('till.openTitle')}</Text>
       <Text style={styles.subtitle}>
         {new Date().toLocaleDateString('en-RW', {
           weekday: 'long',
@@ -225,7 +228,7 @@ export default function TillOpenScreen() {
       </Text>
 
       <View style={styles.section}>
-        <Text style={styles.label}>Receipt Printer</Text>
+        <Text style={styles.label}>{t('till.printerLabel')}</Text>
         <View style={styles.printerRow}>
           <View
             style={[
@@ -234,72 +237,76 @@ export default function TillOpenScreen() {
             ]}
           />
           <Text style={styles.printerStatus}>
-            {printerConnected ? 'Connected' : 'Not connected'}
+            {printerConnected
+              ? t('till.printerConnected')
+              : t('till.printerNotConnected')}
           </Text>
           {!printerConnected ? (
             <TouchableOpacity style={styles.connectBtn} onPress={connectPrinter}>
-              <Text style={styles.connectBtnText}>Connect</Text>
+              <Text style={styles.connectBtnText}>
+                {t('till.connectPrinter')}
+              </Text>
             </TouchableOpacity>
           ) : null}
         </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.label}>Till / Register</Text>
+        <Text style={styles.label}>{t('till.registerLabel')}</Text>
         <TextInput
           style={styles.input}
           value={tillCode}
           onChangeText={setTillCode}
-          placeholder="REG-01"
+          placeholder={t('till.registerPlaceholder')}
         />
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.label}>Opening Float (FRW)</Text>
+        <Text style={styles.label}>{t('till.openingFloat')}</Text>
         <TextInput
+          testID={testIds.tillOpenFloat}
           style={styles.input}
           value={floatAmount}
           onChangeText={setFloatAmount}
-          placeholder="e.g. 50000"
+          placeholder={t('till.floatPlaceholder')}
           keyboardType="numeric"
+          accessibilityLabel={t('till.openingFloat')}
         />
-        <Text style={styles.hint}>
-          Count the cash in the till and enter the total
-        </Text>
+        <Text style={styles.hint}>{t('till.floatHint')}</Text>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.label}>Your Name</Text>
+        <Text style={styles.label}>{t('till.cashierName')}</Text>
         <TextInput
           style={styles.input}
           value={cashierName}
           onChangeText={setCashierName}
-          placeholder={userName || 'Enter your name'}
+          placeholder={userName || t('till.cashierPlaceholder')}
         />
       </View>
 
       <View style={styles.checklist}>
-        <Text style={styles.checklistTitle}>Before you start:</Text>
-        <Text style={styles.checklistItem}>✓ Cash float counted and confirmed</Text>
-        <Text style={styles.checklistItem}>
-          ✓ Receipt printer is on and connected
-        </Text>
-        <Text style={styles.checklistItem}>✓ Barcode scanner is working</Text>
-        <Text style={styles.checklistItem}>✓ Internet connection is active</Text>
+        <Text style={styles.checklistTitle}>{t('till.checklistTitle')}</Text>
+        <Text style={styles.checklistItem}>✓ {t('till.checklistFloat')}</Text>
+        <Text style={styles.checklistItem}>✓ {t('till.checklistPrinter')}</Text>
+        <Text style={styles.checklistItem}>✓ {t('till.checklistScanner')}</Text>
+        <Text style={styles.checklistItem}>✓ {t('till.checklistInternet')}</Text>
       </View>
 
       <TouchableOpacity
         style={styles.linkButton}
         onPress={() => navigation.navigate('Shifts')}>
-        <Text style={styles.linkButtonText}>View shift schedule</Text>
+        <Text style={styles.linkButtonText}>{t('till.viewShifts')}</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
+        testID={testIds.tillOpenSubmit}
         style={[styles.openButton, opening && styles.openButtonDisabled]}
         onPress={() => void openTill()}
-        disabled={opening}>
+        disabled={opening}
+        accessibilityLabel={t('till.openButton')}>
         <Text style={styles.openButtonText}>
-          {opening ? 'Opening...' : 'Open Till & Start Shift'}
+          {opening ? t('till.opening') : t('till.openButton')}
         </Text>
       </TouchableOpacity>
     </ScrollView>
