@@ -1,7 +1,7 @@
 # Pre Go-Live Checklist
 
 Consolidated deferred work, integration TODOs, and manual QA across Phases 1–6.  
-**Tags:** `phase6-complete` @ `6e1e08b` (move tag to HEAD after final commit), `phase6-hardened`.
+**Tags:** `phase6-complete` @ `b019861`, `phase6-hardened` @ `6e1e08b`.
 
 **Coverage (scoped `collectCoverageFrom`, 2026-05-19):** Statements **84.94%** · Branches **74.48%** · Functions **78.43%** · Lines **84.65%**  
 Command: `cd smartchain-mobile && npx jest --coverage --coverageReporters=text-summary`  
@@ -163,8 +163,8 @@ See [mobile-phase-gates.md](./mobile-phase-gates.md).
 | `phase3-complete` / `phase3-hardened` | Location sync, multi-register | Store hardening |
 | `phase4-complete` | RRA fiscal, VAT, EFD mock, audit chain | Compliance |
 | `phase5-complete` / `phase5-hardened` | Printers, PLU, labels, hardware | Hardware |
-| `phase6-complete` | AI layer + scale features | Intelligence |
-| `phase6-hardened` | Wired approvals, PO batch, integrations config | Hardening |
+| `phase6-complete` | `b019861` | AI layer + scale + go-live checklist |
+| `phase6-hardened` | `6e1e08b` | Wired approvals, PO batch, integrations config |
 
 ---
 
