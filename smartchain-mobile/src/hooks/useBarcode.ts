@@ -1,6 +1,7 @@
 import {useCallback} from 'react';
 import {Alert} from 'react-native';
-import {useDispatch} from 'react-redux';
+import {useDispatch, useSelector} from 'react-redux';
+import type {RootState} from '../store';
 import {scanCatalog} from '../api/pos';
 import {
   findVariantByBarcode,
@@ -20,9 +21,13 @@ function mapCurrency(code: string): 'FRW' | 'USD' {
 
 export function useBarcode() {
   const dispatch = useDispatch();
+  const priceListId = useSelector(
+    (s: RootState) => s.pos.selectedCustomer?.priceListId,
+  );
 
   const lookupAndAddProduct = useCallback(
     async (barcode: string, opts?: {serialNumber?: string}) => {
+      const cartOpts = {...opts, priceListId};
       const trimmed = barcode.trim();
       if (!trimmed) {
         return;
@@ -30,7 +35,7 @@ export function useBarcode() {
 
       const local = await findVariantByBarcode(trimmed);
       if (local) {
-        await dispatchVariantToCart(dispatch, local.product, local.variant, opts);
+        await dispatchVariantToCart(dispatch, local.product, local.variant, cartOpts);
         return;
       }
 
@@ -49,13 +54,13 @@ export function useBarcode() {
         const {variants} = await getProductWithVariants(product.id);
         if (variants.length > 1) {
           showVariantPickerAlert(product, variants, variant => {
-            void dispatchVariantToCart(dispatch, product, variant, opts);
+            void dispatchVariantToCart(dispatch, product, variant, cartOpts);
           });
           return;
         }
 
         if (variants.length === 1) {
-          await dispatchVariantToCart(dispatch, product, variants[0], opts);
+          await dispatchVariantToCart(dispatch, product, variants[0], cartOpts);
           return;
         }
 
@@ -81,7 +86,7 @@ export function useBarcode() {
         Alert.alert('Not found', `No product for barcode ${trimmed}`);
       }
     },
-    [dispatch],
+    [dispatch, priceListId],
   );
 
   return {lookupAndAddProduct};

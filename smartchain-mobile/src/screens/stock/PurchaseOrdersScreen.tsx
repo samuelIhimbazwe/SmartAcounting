@@ -36,7 +36,7 @@ export default function PurchaseOrdersScreen() {
             onPress={() => navigation.navigate('PoDetail', {poId: item.id})}>
             <Card.Content>
               <Text style={styles.name}>{item.status}</Text>
-              <Text>{new Date(item.createdAt).toLocaleString()}</Text>
+              <Text>{new Date(item.orderedAt).toLocaleString()}</Text>
               {item.needsSync ? (
                 <Text style={styles.pending}>{t('inventory.pendingSync')}</Text>
               ) : null}

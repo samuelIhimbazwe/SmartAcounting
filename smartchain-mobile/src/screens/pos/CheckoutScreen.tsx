@@ -1,4 +1,4 @@
-import React, {useMemo} from 'react';
+import React, {useEffect, useMemo} from 'react';
 import {ScrollView, StyleSheet, Text, View} from 'react-native';
 import {Button, Card, TextInput} from 'react-native-paper';
 import {useNavigation} from '@react-navigation/native';
@@ -25,7 +25,11 @@ import {
   setTenderLineType,
   setCartLineSerial,
   setCartLineBatch,
+  setPromotionResult,
+  setLoyaltyRedeemPoints,
 } from '../../store/slices/posSlice';
+import {evaluatePromotions} from '../../pricing/promotionEngine';
+import {discountFromRedeemPoints} from '../../pricing/loyalty';
 import {
   consumeBatchQty,
   markSerialSold,
@@ -36,6 +40,10 @@ import {useBarcode} from '../../hooks/useBarcode';
 import {useWakeLock} from '../../hooks/useWakeLock';
 import {postCheckout} from '../../api/pos';
 import {queueOfflineCheckout} from '../../services/offlineQueue';
+import {
+  createLayaway,
+  minLayawayDeposit,
+} from '../../customers/layawayRepository';
 import {formatMoney} from '../../utils/currency';
 import type {AppRole} from '../../utils/roles';
 import {canUseOnAccountTender} from '../../utils/roles';
@@ -60,6 +68,10 @@ export default function CheckoutScreen() {
 
   const cart = useSelector((s: RootState) => s.pos.cart);
   const discount = useSelector((s: RootState) => s.pos.discount);
+  const promotionDiscount = useSelector((s: RootState) => s.pos.promotionDiscount);
+  const promotionLines = useSelector((s: RootState) => s.pos.promotionLines);
+  const loyaltyRedeemPoints = useSelector((s: RootState) => s.pos.loyaltyRedeemPoints);
+  const selectedCustomer = useSelector((s: RootState) => s.pos.selectedCustomer);
   const sessionCurrency = useSelector((s: RootState) => s.pos.sessionCurrency);
   const customerName = useSelector((s: RootState) => s.pos.customerName);
   const posRegisterCode = useSelector((s: RootState) => s.pos.posRegisterCode);
@@ -69,16 +81,31 @@ export default function CheckoutScreen() {
   const online = useSelector((s: RootState) => s.network.online);
   const roles = useSelector((s: RootState) => s.auth.roles) as AppRole[];
 
-  const showOnAccount = canUseOnAccountTender(roles);
+  const showOnAccount =
+    canUseOnAccountTender(roles) && (selectedCustomer?.creditLimit ?? 0) > 0;
   const tenderOptions = showOnAccount
     ? [...BASE_TENDERS, 'ON_ACCOUNT' as TenderType]
     : BASE_TENDERS;
+
+  useEffect(() => {
+    void evaluatePromotions(cart).then(r =>
+      dispatch(setPromotionResult({lines: r.lines, totalDiscount: r.totalDiscount})),
+    );
+  }, [cart, dispatch]);
+
+  const loyaltyDiscount = useMemo(
+    () => discountFromRedeemPoints(loyaltyRedeemPoints),
+    [loyaltyRedeemPoints],
+  );
 
   const subtotal = useMemo(
     () => cart.reduce((a, b) => a + b.lineTotal, 0),
     [cart],
   );
-  const total = useMemo(() => cartTotal(subtotal, discount), [subtotal, discount]);
+  const total = useMemo(
+    () => cartTotal(subtotal, discount + promotionDiscount + loyaltyDiscount),
+    [subtotal, discount, promotionDiscount, loyaltyDiscount],
+  );
   const tenderSum = useMemo(() => sumTenderLines(tenderLines), [tenderLines]);
 
   const tenderLabel = (type: TenderType) => {
@@ -90,6 +117,46 @@ export default function CheckoutScreen() {
       ON_ACCOUNT: t('pos.tenderOnAccount'),
     };
     return map[type];
+  };
+
+  const submitLayaway = async () => {
+    if (!selectedCustomer) {
+      Toast.show({type: 'error', text1: t('customers.selectForLayaway')});
+      return;
+    }
+    if (cart.length === 0) {
+      Toast.show({type: 'error', text1: t('pos.cartEmpty')});
+      return;
+    }
+    const minDeposit = minLayawayDeposit(total);
+    if (tenderSum + 0.001 < minDeposit) {
+      Toast.show({
+        type: 'error',
+        text1: t('customers.layawayMinDeposit'),
+        text2: String(minDeposit),
+      });
+      return;
+    }
+    try {
+      dispatch(setProcessing(true));
+      await createLayaway({
+        customerId: selectedCustomer.customerId,
+        currencyCode: sessionCurrency,
+        cartJson: JSON.stringify(cart),
+        totalAmount: total,
+        depositAmount: tenderSum,
+      });
+      Toast.show({type: 'success', text1: t('customers.layawayCreated')});
+      dispatch(clearCart());
+    } catch (e: unknown) {
+      Toast.show({
+        type: 'error',
+        text1: t('customers.layawayCreateFailed'),
+        text2: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      dispatch(setProcessing(false));
+    }
   };
 
   const submitCheckout = async () => {
@@ -118,6 +185,10 @@ export default function CheckoutScreen() {
     }
 
     const hasOnAccount = tenderLines.some(l => l.tenderType === 'ON_ACCOUNT');
+    if (hasOnAccount && !selectedCustomer) {
+      Toast.show({type: 'error', text1: t('customers.selectForOnAccount')});
+      return;
+    }
     const lines = cart.map(i => ({
       barcode: i.barcode,
       quantity: Math.max(0.001, Number(i.quantity.toFixed(4))),
@@ -128,6 +199,7 @@ export default function CheckoutScreen() {
     }));
     const body = {
       customerName: customerName?.trim() || null,
+      customerId: selectedCustomer?.serverId ?? selectedCustomer?.customerId ?? null,
       currencyCode: sessionCurrency,
       posRegisterCode,
       lines,
@@ -140,6 +212,8 @@ export default function CheckoutScreen() {
         })),
       onAccountCustomerName: hasOnAccount ? customerName?.trim() || null : null,
       managerOverride: hasOnAccount,
+      loyaltyPointsRedeemed: loyaltyRedeemPoints > 0 ? loyaltyRedeemPoints : null,
+      saleType: 'NORMAL',
     };
 
     try {
@@ -280,20 +354,37 @@ export default function CheckoutScreen() {
         {t('pos.saleTotal')}: {formatMoney(total, sessionCurrency)}
       </Text>
 
-      <TextInput
-        label={t('pos.customerOptional')}
-        value={customerName ?? ''}
-        onChangeText={v =>
-          dispatch(
-            setCustomer(
-              v.trim()
-                ? {customerId: 'WALK_IN', customerName: v.trim()}
-                : null,
-            ),
-          )
-        }
-        style={styles.field}
-      />
+      <Button
+        mode="outlined"
+        onPress={() => navigation.navigate('CustomerLookup', {selectForCheckout: true})}
+        style={styles.field}>
+        {selectedCustomer
+          ? `${t('customers.selected')}: ${selectedCustomer.customerName}`
+          : t('customers.addCustomerAtCheckout')}
+      </Button>
+      {selectedCustomer ? (
+        <Text style={styles.bodySmall}>
+          {t('customers.credit')}: {selectedCustomer.creditBalance} /{' '}
+          {selectedCustomer.creditLimit} · {t('customers.loyaltyPoints')}:{' '}
+          {selectedCustomer.loyaltyPoints}
+        </Text>
+      ) : null}
+      {promotionLines.map(p => (
+        <Text key={p.id} style={styles.promo}>
+          {p.name}: {formatMoney(p.amount, sessionCurrency)}
+        </Text>
+      ))}
+      {selectedCustomer?.loyaltyEnabled ? (
+        <TextInput
+          label={t('customers.redeemPoints')}
+          keyboardType="number-pad"
+          value={loyaltyRedeemPoints ? String(loyaltyRedeemPoints) : ''}
+          onChangeText={v =>
+            dispatch(setLoyaltyRedeemPoints(parseInt(v, 10) || 0))
+          }
+          style={styles.field}
+        />
+      ) : null}
       <TextInput
         label={t('pos.discount')}
         keyboardType="decimal-pad"
@@ -454,6 +545,16 @@ export default function CheckoutScreen() {
           accessibilityLabel={t('pos.completeSale')}>
           {online ? t('pos.completeSale') : t('pos.queueOfflineSale')}
         </Button>
+        {selectedCustomer && cart.length > 0 ? (
+          <Button
+            mode="outlined"
+            loading={processing}
+            disabled={processing}
+            onPress={() => void submitLayaway()}
+            contentStyle={styles.btnInner}>
+            {t('customers.createLayaway')}
+          </Button>
+        ) : null}
       </View>
     </ScrollView>
   );
@@ -480,6 +581,7 @@ const styles = StyleSheet.create({
   footer: {paddingVertical: 12, gap: 4},
   sectionTitle: {fontSize: 18, fontWeight: '600'},
   bodySmall: {fontSize: 12},
+  promo: {fontSize: 13, color: '#059669'},
   bodyMedium: {fontSize: 15},
   total: {fontSize: 22, fontWeight: '700'},
 });

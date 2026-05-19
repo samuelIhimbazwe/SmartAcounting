@@ -319,7 +319,7 @@ export async function createDraftPo(input: {
     const po = await database.get<PurchaseOrder>('purchase_orders').create(p => {
       p.supplierId = input.supplierId;
       p.status = 'DRAFT';
-      p.createdAt = new Date().toISOString();
+      p.orderedAt = new Date().toISOString();
       p.expectedDeliveryDate = input.expectedDeliveryDate;
       p.notes = input.notes;
       p.createdBy = input.createdBy;
@@ -364,7 +364,7 @@ export async function updatePoStatus(
 export async function listPurchaseOrders(): Promise<PurchaseOrder[]> {
   return database
     .get<PurchaseOrder>('purchase_orders')
-    .query(Q.sortBy('created_at', Q.desc))
+    .query(Q.sortBy('ordered_at', Q.desc))
     .fetch();
 }
 

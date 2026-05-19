@@ -20,6 +20,13 @@ import {streamCopilotAgent} from '../../services/copilot/streamCopilotAgent';
 import {approveCopilotAction, rejectCopilotAction} from '../../api/copilot';
 import {useTranslation} from 'react-i18next';
 import {useNavigation} from '@react-navigation/native';
+import type {NavigationProp} from '@react-navigation/native';
+import type {NavigatorScreenParams} from '@react-navigation/native';
+import type {StockStackParamList} from '../../navigation/StockNavigator';
+
+type CopilotTabParamList = {
+  Stock: NavigatorScreenParams<StockStackParamList>;
+};
 import {fetchExpiringItems} from '../../inventory/inventorySync';
 import {refreshReorderAlerts} from '../../inventory/reorderCheck';
 
@@ -69,7 +76,7 @@ type PendingApproval = {
 
 export default function CopilotScreen() {
   const {t} = useTranslation();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<CopilotTabParamList>>();
   const [messages, setMessages] = useState<CopilotMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -112,7 +119,7 @@ export default function CopilotScreen() {
             timestamp: new Date(),
           },
         ]);
-        navigation.navigate('Stock' as never, {screen: 'Expiring'} as never);
+        navigation.navigate('Stock', {screen: 'Expiring'});
         return true;
       }
       if (q.includes('reorder')) {
@@ -130,7 +137,7 @@ export default function CopilotScreen() {
             timestamp: new Date(),
           },
         ]);
-        navigation.navigate('Stock' as never, {screen: 'Reorder'} as never);
+        navigation.navigate('Stock', {screen: 'Reorder'});
         return true;
       }
       return false;

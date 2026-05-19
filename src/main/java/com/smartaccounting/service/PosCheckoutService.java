@@ -57,6 +57,8 @@ public class PosCheckoutService {
     private final EbmService ebmService;
     private final SalesAnalyticsService salesAnalyticsService;
     private final PromotionService promotionService;
+    private final PriceListService priceListService;
+    private final CustomerRetailService customerRetailService;
 
     public PosCheckoutService(PosCatalogItemRepository catalogRepository,
                               SalesOrderRepository salesOrderRepository,
@@ -70,7 +72,9 @@ public class PosCheckoutService {
                               PosVatService posVatService,
                               EbmService ebmService,
                               SalesAnalyticsService salesAnalyticsService,
-                              PromotionService promotionService) {
+                              PromotionService promotionService,
+                              PriceListService priceListService,
+                              CustomerRetailService customerRetailService) {
         this.catalogRepository = catalogRepository;
         this.salesOrderRepository = salesOrderRepository;
         this.saleLineRepository = saleLineRepository;
@@ -84,6 +88,8 @@ public class PosCheckoutService {
         this.ebmService = ebmService;
         this.salesAnalyticsService = salesAnalyticsService;
         this.promotionService = promotionService;
+        this.priceListService = priceListService;
+        this.customerRetailService = customerRetailService;
     }
 
     @Transactional(readOnly = true)
@@ -128,6 +134,13 @@ public class PosCheckoutService {
         UUID tenant = requireTenant();
         String currency = req.currencyCode().toUpperCase(Locale.ROOT);
 
+        FinanceCustomer linkedCustomer = null;
+        UUID priceListId = null;
+        if (req.customerId() != null) {
+            linkedCustomer = customerRetailService.requireCustomer(req.customerId());
+            priceListId = linkedCustomer.getPriceListId();
+        }
+
         BigDecimal subtotal = BigDecimal.ZERO;
         UUID orderId = UUID.randomUUID();
         List<PromotionCartItem> cartItems = new ArrayList<>();
@@ -135,7 +148,10 @@ public class PosCheckoutService {
         SalesOrder order = new SalesOrder();
         order.setId(orderId);
         order.setTenantId(tenant);
-        order.setCustomerName(req.customerName() != null ? req.customerName() : "Walk-in");
+        String displayName = linkedCustomer != null
+            ? linkedCustomer.getCustomerName()
+            : (req.customerName() != null ? req.customerName() : "Walk-in");
+        order.setCustomerName(displayName);
         order.setStatus("COMPLETED");
         order.setCurrencyCode(currency);
         order.setSalesChannel("POS");
@@ -151,6 +167,11 @@ public class PosCheckoutService {
             String catCur = cat.getCurrencyCode().toUpperCase(Locale.ROOT);
             BigDecimal qty = lineReq.quantity().setScale(4, RoundingMode.HALF_UP);
             BigDecimal unitNative = cat.getUnitPrice().setScale(2, RoundingMode.HALF_UP);
+            UUID productId = lineReq.productId() != null ? lineReq.productId() : cat.getProductId();
+            if (priceListId != null && productId != null) {
+                unitNative = priceListService.resolveUnitPrice(
+                    priceListId, productId, lineReq.variantId(), unitNative);
+            }
             BigDecimal unit = currency.equals(catCur)
                 ? unitNative
                 : currencyService.convertAmount(unitNative, catCur, currency).setScale(2, RoundingMode.HALF_UP);
@@ -173,7 +194,7 @@ public class PosCheckoutService {
             saleLineRepository.save(sl);
 
             subtotal = subtotal.add(lineTotal);
-            UUID promoProductId = lineReq.productId() != null ? lineReq.productId() : cat.getProductId();
+            UUID promoProductId = productId;
             if (promoProductId != null) {
                 cartItems.add(new PromotionCartItem(
                     promoProductId,
@@ -193,6 +214,12 @@ public class PosCheckoutService {
             ApplicablePromotion best = promos.get(0);
             discountAmount = best.discountAmount();
             appliedPromotionId = best.promotionId();
+        }
+        if (linkedCustomer != null && req.loyaltyPointsRedeemed() != null && req.loyaltyPointsRedeemed() > 0) {
+            BigDecimal loyaltyDisc = new BigDecimal(
+                customerRetailService.loyaltyDiscountFromPoints(req.loyaltyPointsRedeemed()));
+            discountAmount = discountAmount.add(loyaltyDisc);
+            customerRetailService.redeemLoyaltyPoints(linkedCustomer, req.loyaltyPointsRedeemed());
         }
         BigDecimal total = subtotal.subtract(discountAmount).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
 
@@ -237,11 +264,16 @@ public class PosCheckoutService {
             }
         }
         if (onAccountTotal.signum() > 0) {
-            String acct = req.onAccountCustomerName();
-            if (acct == null || acct.isBlank()) {
-                throw new IllegalArgumentException("onAccountCustomerName is required when using ON_ACCOUNT tender");
+            FinanceCustomer customer;
+            if (linkedCustomer != null) {
+                customer = linkedCustomer;
+            } else {
+                String acct = req.onAccountCustomerName();
+                if (acct == null || acct.isBlank()) {
+                    throw new IllegalArgumentException("onAccountCustomerName is required when using ON_ACCOUNT tender");
+                }
+                customer = receivablesPayablesService.resolveOrCreateCustomerForOnAccount(acct.trim());
             }
-            FinanceCustomer customer = receivablesPayablesService.resolveOrCreateCustomerForOnAccount(acct.trim());
             BigDecimal currentBalance = receivablesPayablesService.openArBalance(customer.getId());
             BigDecimal creditLimit = customer.getCreditLimit() == null
                 ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
@@ -256,11 +288,17 @@ public class PosCheckoutService {
                 throw new CreditLimitExceededException(currentBalance, creditLimit, availableCredit);
             }
             receivablesPayablesService.createInvoice(new CreateInvoiceRequest(
-                acct.trim(),
+                customer.getCustomerName(),
                 onAccountTotal.setScale(2, RoundingMode.HALF_UP),
                 currency,
                 LocalDate.now().plusDays(14)
             ));
+            customerRetailService.applyOnAccountCharge(customer, onAccountTotal);
+        }
+
+        if (linkedCustomer != null) {
+            customerRetailService.earnLoyaltyPoints(
+                linkedCustomer, orderId, total);
         }
 
         List<PosSaleLine> committedLines = saleLineRepository.findByTenantIdAndSalesOrderIdOrderByIdAsc(tenant, orderId);

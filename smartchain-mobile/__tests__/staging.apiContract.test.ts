@@ -1,9 +1,12 @@
 /**
  * Live staging API contract checks for mobile-critical endpoints.
- * Skipped unless STAGING_API_URL is set (CI: configure repo secrets).
  *
- * Required env:
- *   STAGING_API_URL  e.g. https://staging.example.com/api/v1
+ * NOT a device/E2E test — runs in Node/Jest against a real staging URL.
+ * The whole suite is skipped when STAGING_API_URL is unset (local dev default).
+ * Individual login/session cases also skip when CONTRACT_* creds are missing.
+ *
+ * To run locally or in CI:
+ *   STAGING_API_URL=https://staging.example.com/api/v1
  *   CONTRACT_USERNAME, CONTRACT_PASSWORD, CONTRACT_TENANT_ID, CONTRACT_USER_ID
  */
 

@@ -8,6 +8,7 @@ import {
   pickCheckoutBatch,
   variantLabel,
 } from './inventoryRepository';
+import {resolveUnitPrice} from '../pricing/pricingEngine';
 
 function mapCurrency(code: string): 'FRW' | 'USD' {
   const u = code?.toUpperCase() ?? 'FRW';
@@ -44,9 +45,16 @@ export async function dispatchVariantToCart(
   dispatch: AppDispatch,
   product: Product,
   variant: ProductVariant,
-  opts?: {serialNumber?: string; quantity?: number},
+  opts?: {serialNumber?: string; quantity?: number; priceListId?: string | null},
 ): Promise<void> {
   const base = buildCartItemFromVariant(product, variant, opts);
+  const unitPrice = await resolveUnitPrice({
+    priceListId: opts?.priceListId,
+    productId: product.id,
+    variantId: variant.id,
+    fallback: base.unitPrice,
+  });
+  base.unitPrice = unitPrice;
   const uomLabel = await getSaleUomLabel(product.id);
   const batch = await pickCheckoutBatch(variant.id, base.quantity);
   dispatch(
@@ -54,7 +62,7 @@ export async function dispatchVariantToCart(
       ...base,
       uomLabel,
       costPrice: 0,
-      lineTotal: base.unitPrice * base.quantity,
+      lineTotal: unitPrice * base.quantity,
       margin: 0,
       batchNumber: batch?.batchNumber,
       batchExpiry: batch?.expiryDate,

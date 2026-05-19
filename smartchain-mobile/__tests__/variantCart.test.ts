@@ -5,6 +5,12 @@ jest.mock('../src/inventory/inventoryRepository', () => ({
     v.attributes?.size ? `Size ${v.attributes.size}` : v.name,
 }));
 
+jest.mock('../src/pricing/pricingEngine', () => ({
+  resolveUnitPrice: jest.fn(
+    async (input: {fallback: number}) => input.fallback,
+  ),
+}));
+
 import {buildCartItemFromVariant} from '../src/inventory/variantCart';
 import type {Product} from '../src/db/models/Product';
 import type {ProductVariant} from '../src/db/models/ProductVariant';

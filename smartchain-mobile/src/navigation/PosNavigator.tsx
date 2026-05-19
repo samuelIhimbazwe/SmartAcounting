@@ -4,12 +4,14 @@ import CheckoutScreen from '../screens/pos/CheckoutScreen';
 import BarcodeScreen from '../screens/pos/BarcodeScreen';
 import ReceiptScreen from '../screens/pos/ReceiptScreen';
 import ReturnsScreen from '../screens/pos/ReturnsScreen';
+import CustomerLookupScreen from '../screens/customers/CustomerLookupScreen';
 
 export type PosStackParamList = {
   Checkout: undefined;
   Barcode: undefined;
   Receipt: undefined;
   Returns: undefined;
+  CustomerLookup: {selectForCheckout?: boolean};
 };
 
 const Stack = createNativeStackNavigator<PosStackParamList>();
@@ -21,6 +23,7 @@ export default function PosNavigator() {
       <Stack.Screen name="Barcode" component={BarcodeScreen} options={{title: 'Scan barcode'}} />
       <Stack.Screen name="Receipt" component={ReceiptScreen} options={{title: 'Receipt'}} />
       <Stack.Screen name="Returns" component={ReturnsScreen} options={{title: 'Returns'}} />
+      <Stack.Screen name="CustomerLookup" component={CustomerLookupScreen} options={{title: 'Customer'}} />
     </Stack.Navigator>
   );
 }

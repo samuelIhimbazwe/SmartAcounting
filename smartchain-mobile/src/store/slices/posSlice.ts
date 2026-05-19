@@ -22,12 +22,33 @@ export interface CartItem {
   requiresSerial?: boolean;
 }
 
+export type SelectedCustomer = {
+  customerId: string;
+  serverId?: string;
+  customerName: string;
+  priceListId?: string;
+  creditLimit: number;
+  creditBalance: number;
+  loyaltyPoints: number;
+  loyaltyEnabled: boolean;
+};
+
+export type PromotionDiscountLine = {
+  id: string;
+  name: string;
+  amount: number;
+};
+
 interface PosState {
   cart: CartItem[];
   sessionCurrency: 'FRW' | 'USD';
   discount: number;
+  promotionDiscount: number;
+  promotionLines: PromotionDiscountLine[];
+  loyaltyRedeemPoints: number;
   customerId: string | null;
   customerName: string | null;
+  selectedCustomer: SelectedCustomer | null;
   posRegisterCode: string;
   isProcessing: boolean;
   lastTransactionId: string | null;
@@ -43,8 +64,12 @@ const initialState: PosState = {
   cart: [],
   sessionCurrency: 'FRW',
   discount: 0,
+  promotionDiscount: 0,
+  promotionLines: [],
+  loyaltyRedeemPoints: 0,
   customerId: null,
   customerName: null,
+  selectedCustomer: null,
   posRegisterCode: 'REG1',
   isProcessing: false,
   lastTransactionId: null,
@@ -128,12 +153,23 @@ const posSlice = createSlice({
     setDiscount: (state, action: PayloadAction<number>) => {
       state.discount = action.payload;
     },
-    setCustomer: (
-      state,
-      action: PayloadAction<{customerId: string; customerName: string} | null>,
-    ) => {
+    setCustomer: (state, action: PayloadAction<SelectedCustomer | null>) => {
+      state.selectedCustomer = action.payload;
       state.customerId = action.payload?.customerId ?? null;
       state.customerName = action.payload?.customerName ?? null;
+    },
+    setPromotionResult: (
+      state,
+      action: PayloadAction<{
+        lines: PromotionDiscountLine[];
+        totalDiscount: number;
+      }>,
+    ) => {
+      state.promotionLines = action.payload.lines;
+      state.promotionDiscount = action.payload.totalDiscount;
+    },
+    setLoyaltyRedeemPoints: (state, action: PayloadAction<number>) => {
+      state.loyaltyRedeemPoints = Math.max(0, action.payload);
     },
     setPosRegisterCode: (state, action: PayloadAction<string>) => {
       state.posRegisterCode = action.payload;
@@ -153,11 +189,38 @@ const posSlice = createSlice({
     setLastReceiptLines: (state, action: PayloadAction<CartItem[]>) => {
       state.lastReceiptLines = action.payload;
     },
+    loadCartFromQuote: (
+      state,
+      action: PayloadAction<{
+        cart: CartItem[];
+        customer?: SelectedCustomer | null;
+        currency?: 'FRW' | 'USD';
+      }>,
+    ) => {
+      state.cart = action.payload.cart;
+      state.discount = 0;
+      state.promotionDiscount = 0;
+      state.promotionLines = [];
+      state.loyaltyRedeemPoints = 0;
+      if (action.payload.currency) {
+        state.sessionCurrency = action.payload.currency;
+      }
+      if (action.payload.customer !== undefined) {
+        state.selectedCustomer = action.payload.customer;
+        state.customerId = action.payload.customer?.customerId ?? null;
+        state.customerName = action.payload.customer?.customerName ?? null;
+      }
+      state.tenderLines = [{tenderType: 'CASH', amount: 0}];
+    },
     clearCart: state => {
       state.cart = [];
       state.discount = 0;
+      state.promotionDiscount = 0;
+      state.promotionLines = [];
+      state.loyaltyRedeemPoints = 0;
       state.customerId = null;
       state.customerName = null;
+      state.selectedCustomer = null;
       state.isProcessing = false;
       state.barcodeInput = '';
       state.tenderLines = [{tenderType: 'CASH', amount: 0}];
@@ -219,11 +282,14 @@ export const {
   setCartLineBatch,
   setDiscount,
   setCustomer,
+  setPromotionResult,
+  setLoyaltyRedeemPoints,
   setPosRegisterCode,
   setSessionCurrency,
   setProcessing,
   setLastTransaction,
   setLastReceiptLines,
+  loadCartFromQuote,
   clearCart,
   setBarcodeInput,
   setShiftContext,

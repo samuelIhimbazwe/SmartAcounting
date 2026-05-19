@@ -201,7 +201,10 @@ public class SyncService {
             req.onAccountCustomerName(),
             false,
             req.cashierName(),
-            req.outOfStockAttempts()
+            req.outOfStockAttempts(),
+            req.customerId(),
+            req.loyaltyPointsRedeemed(),
+            req.saleType()
         );
         posCheckoutService.checkout(replayReq);
         for (PosTenderRequest t : tenders) {

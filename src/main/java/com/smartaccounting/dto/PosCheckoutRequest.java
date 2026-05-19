@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
+import java.util.UUID;
 
 public record PosCheckoutRequest(
     String customerName,
@@ -19,5 +20,11 @@ public record PosCheckoutRequest(
     /** Optional cashier display name for sales analytics. */
     String cashierName,
     /** Lines that could not be fulfilled due to stock-out (lost sales tracking). */
-    java.util.List<PosOutOfStockAttemptRequest> outOfStockAttempts
+    java.util.List<PosOutOfStockAttemptRequest> outOfStockAttempts,
+    /** Linked finance customer for price list, loyalty, and ON_ACCOUNT. */
+    java.util.UUID customerId,
+    /** Points to redeem on this sale (deducted before total). */
+    Integer loyaltyPointsRedeemed,
+    /** NORMAL or LAYAWAY (layaway uses separate flow when not NORMAL). */
+    String saleType
 ) {}

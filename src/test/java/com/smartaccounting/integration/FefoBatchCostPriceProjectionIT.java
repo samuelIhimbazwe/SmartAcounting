@@ -106,6 +106,9 @@ class FefoBatchCostPriceProjectionIT extends AbstractPostgresSpringBootIntegrati
             null,
             false,
             null,
+            null,
+            null,
+            null,
             null
         ));
 

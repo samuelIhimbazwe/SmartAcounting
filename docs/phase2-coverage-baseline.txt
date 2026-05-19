@@ -1,0 +1,42 @@
+﻿# Phase 2 Jest coverage baseline (2026-05-19)
+# Command: cd smartchain-mobile && npx jest --coverage
+# Note: exit code 1 because global coverageThreshold in jest.config.js is not met (39% vs 45% lines).
+# Compare future runs to this file — do not treat threshold failures as test failures.
+
+PASS src/api/__contracts__/procurement.test.ts
+PASS __tests__/variantCart.test.ts (5.503 s)
+PASS __tests__/secureFetch.patch.test.ts
+PASS __tests__/posSlice.test.ts (5.52 s)
+PASS __tests__/inventorySync.test.ts
+PASS __tests__/inventoryMath.test.ts
+PASS __tests__/tillSlice.test.ts
+PASS __tests__/promotionEngine.test.ts
+PASS __tests__/loyalty.test.ts
+PASS __tests__/secureFetch.present.test.ts
+PASS __tests__/modelHelpers.test.ts
+PASS __tests__/tenderValidation.test.ts
+PASS __tests__/receiptExtras.test.ts
+PASS __tests__/secureFetch.test.ts
+PASS __tests__/pricingEngine.test.ts
+----------------------|---------|----------|---------|---------|-----------------------------------
+File                  | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                 
+----------------------|---------|----------|---------|---------|-----------------------------------
+All files             |   39.39 |    27.77 |   27.65 |   38.46 |                                   
+ api                  |   73.07 |    54.54 |   66.66 |   73.07 |                                   
+  secureFetch.ts      |   73.07 |    54.54 |   66.66 |   73.07 | 7,10,43-44,57,70,77               
+ store/slices         |    26.8 |     9.09 |   16.21 |   26.04 |                                   
+  posSlice.ts         |      25 |     9.09 |   10.71 |      25 | 93,99-100,106-150,157-213,229-272 
+  tillSlice.ts        |   33.33 |      100 |   33.33 |      30 | 39-65,71-79                       
+ utils                |   77.77 |    66.66 |      75 |      75 |                                   
+  tenderValidation.ts |   77.77 |    66.66 |      75 |      75 | 15,31                             
+----------------------|---------|----------|---------|---------|-----------------------------------
+Jest: "global" coverage threshold for statements (45%) not met: 39.39%
+Jest: "global" coverage threshold for branches (35%) not met: 27.77%
+Jest: "global" coverage threshold for lines (45%) not met: 38.46%
+Jest: "global" coverage threshold for functions (30%) not met: 27.65%
+
+Test Suites: 1 skipped, 16 passed, 16 of 17 total
+Tests:       4 skipped, 34 passed, 38 total
+Snapshots:   0 total
+Time:        10.017 s
+Ran all test suites.

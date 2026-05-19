@@ -17,7 +17,7 @@ export class PurchaseOrder extends Model {
   @text('supplier_id') supplierId!: string;
   @text('status') status!: PoStatus;
   @text('created_by') createdBy?: string;
-  @text('created_at') createdAt!: string;
+  @text('ordered_at') orderedAt!: string;
   @text('expected_delivery_date') expectedDeliveryDate?: string;
   @text('notes') notes?: string;
   @field('needs_sync') needsSync!: boolean;

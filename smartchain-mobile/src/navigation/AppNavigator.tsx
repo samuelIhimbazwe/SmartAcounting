@@ -14,6 +14,7 @@ import TillNavigator from './TillNavigator';
 import OwnerDashboardScreen from '../screens/dashboard/OwnerDashboardScreen';
 import SettingsNavigator from './SettingsNavigator';
 import CopilotScreen from '../screens/copilot/CopilotScreen';
+import CustomerNavigator from './CustomerNavigator';
 
 const Tab = createBottomTabNavigator();
 
@@ -82,6 +83,9 @@ export default function AppNavigator() {
   const showDashboard =
     !cashierShell && hasAnyRole(roles, 'CEO', 'CFO');
   const showCopilot = !cashierShell;
+  const showCustomers =
+    !cashierShell &&
+    hasAnyRole(roles, 'CEO', 'SALES_MANAGER', 'OPS_MANAGER', 'ACCOUNTING_CONTROLLER');
 
   const initialRouteName = resolveInitialRoute(role, {
     showTill,
@@ -125,6 +129,15 @@ export default function AppNavigator() {
               component={StockNavigator}
               options={{
                 tabBarIcon: p => tabIcon('package-variant', p.color, p.size),
+              }}
+            />
+          ) : null}
+          {showCustomers ? (
+            <Tab.Screen
+              name="Customers"
+              component={CustomerNavigator}
+              options={{
+                tabBarIcon: p => tabIcon('account-group', p.color, p.size),
               }}
             />
           ) : null}

@@ -7,5 +7,5 @@ export class PendingReceipt extends Model {
   @text('transaction_id') transactionId!: string;
   @text('receipt_data') receiptData!: string;
   @field('printed') printed!: boolean;
-  @text('created_at') createdAt!: string;
+  @text('saved_at') savedAt!: string;
 }

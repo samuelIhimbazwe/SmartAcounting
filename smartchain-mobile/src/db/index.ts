@@ -14,6 +14,12 @@ import {PurchaseOrder} from './models/PurchaseOrder';
 import {PurchaseOrderLine} from './models/PurchaseOrderLine';
 import {Grn} from './models/Grn';
 import {GrnLine} from './models/GrnLine';
+import {Customer} from './models/Customer';
+import {PriceList} from './models/PriceList';
+import {PriceListLine} from './models/PriceListLine';
+import {PromotionCache} from './models/PromotionCache';
+import {LayawayOrder} from './models/LayawayOrder';
+import {SalesQuote} from './models/SalesQuote';
 
 const adapter = new SQLiteAdapter({
   schema,
@@ -37,5 +43,11 @@ export const database = new Database({
     PurchaseOrderLine,
     Grn,
     GrnLine,
+    Customer,
+    PriceList,
+    PriceListLine,
+    PromotionCache,
+    LayawayOrder,
+    SalesQuote,
   ],
 });
