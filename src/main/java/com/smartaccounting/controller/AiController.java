@@ -24,6 +24,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.scheduler.Schedulers;
 
+import java.util.List;
+
 import java.io.IOException;
 import java.util.Map;
 import java.util.UUID;
@@ -220,6 +222,22 @@ public class AiController {
     @GetMapping("/reorder-suggestions")
     public Map<String, Object> reorderSuggestions() {
         return aiAnalyticsService.reorderSuggestions();
+    }
+
+    @PostMapping("/reorder-suggestions/approve-all")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('CEO', 'CFO', 'OPS_MANAGER')")
+    public Map<String, Object> approveAllReorderSuggestions() {
+        return aiAnalyticsService.approveAllReorderSuggestions(com.smartaccounting.tenant.TenantContext.userId());
+    }
+
+    @PostMapping("/analytics/demand-forecast/create-pos")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('CEO', 'CFO', 'OPS_MANAGER')")
+    public Map<String, Object> createPosFromForecast(@RequestBody(required = false) Map<String, Object> body) {
+        @SuppressWarnings("unchecked")
+        List<String> productIds = body != null && body.get("productIds") instanceof List<?> list
+            ? list.stream().map(String::valueOf).toList()
+            : List.of();
+        return aiAnalyticsService.approveForecastGaps(productIds, com.smartaccounting.tenant.TenantContext.userId());
     }
 
     @PostMapping("/analytics/cash-flow-forecast")

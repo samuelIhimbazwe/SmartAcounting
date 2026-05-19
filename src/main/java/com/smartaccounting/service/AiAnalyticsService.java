@@ -2,6 +2,7 @@ package com.smartaccounting.service;
 
 import com.smartaccounting.config.PosProperties;
 import com.smartaccounting.entity.Product;
+import com.smartaccounting.entity.PurchaseOrder;
 import com.smartaccounting.repository.ProductRepository;
 import com.smartaccounting.repository.StockMovementRepository;
 import com.smartaccounting.tenant.TenantContext;
@@ -27,15 +28,18 @@ public class AiAnalyticsService {
     private final ProductRepository productRepository;
     private final StockMovementRepository stockMovementRepository;
     private final PosProperties posProperties;
+    private final PurchaseOrderService purchaseOrderService;
 
     public AiAnalyticsService(InventoryService inventoryService,
                               ProductRepository productRepository,
                               StockMovementRepository stockMovementRepository,
-                              PosProperties posProperties) {
+                              PosProperties posProperties,
+                              PurchaseOrderService purchaseOrderService) {
         this.inventoryService = inventoryService;
         this.productRepository = productRepository;
         this.stockMovementRepository = stockMovementRepository;
         this.posProperties = posProperties;
+        this.purchaseOrderService = purchaseOrderService;
     }
 
     @Transactional(readOnly = true)
@@ -118,6 +122,65 @@ public class AiAnalyticsService {
             "generatedAt", Instant.now().toString(),
             "suggestions", suggestions
         );
+    }
+
+    @Transactional
+    public Map<String, Object> approveAllReorderSuggestions(UUID createdBy) {
+        UUID userId = createdBy != null ? createdBy : TenantContext.userId();
+        if (userId == null) {
+            throw new IllegalStateException("User context is required to create purchase orders");
+        }
+        List<Map<String, Object>> created = new ArrayList<>();
+        List<Map<String, Object>> failed = new ArrayList<>();
+        for (Map<String, Object> low : inventoryService.lowStock(null)) {
+            UUID productId = (UUID) low.get("productId");
+            if (productId == null) {
+                continue;
+            }
+            try {
+                PurchaseOrder po = purchaseOrderService.createFromLowStock(productId, userId);
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("productId", productId);
+                row.put("purchaseOrderId", po.getId());
+                row.put("status", po.getStatus());
+                created.add(row);
+            } catch (Exception ex) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("productId", productId);
+                row.put("error", ex.getMessage());
+                failed.add(row);
+            }
+        }
+        return Map.of(
+            "createdCount", created.size(),
+            "failedCount", failed.size(),
+            "created", created,
+            "failed", failed,
+            "generatedAt", Instant.now().toString()
+        );
+    }
+
+    @Transactional
+    public Map<String, Object> approveForecastGaps(List<String> productIds, UUID createdBy) {
+        UUID userId = createdBy != null ? createdBy : TenantContext.userId();
+        if (userId == null) {
+            throw new IllegalStateException("User context is required");
+        }
+        List<Map<String, Object>> created = new ArrayList<>();
+        List<Map<String, Object>> failed = new ArrayList<>();
+        for (String raw : productIds) {
+            if (raw == null || raw.isBlank()) {
+                continue;
+            }
+            UUID productId = UUID.fromString(raw.trim());
+            try {
+                PurchaseOrder po = purchaseOrderService.createFromLowStock(productId, userId);
+                created.add(Map.of("productId", productId, "purchaseOrderId", po.getId()));
+            } catch (Exception ex) {
+                failed.add(Map.of("productId", productId, "error", ex.getMessage()));
+            }
+        }
+        return Map.of("createdCount", created.size(), "failedCount", failed.size(), "created", created, "failed", failed);
     }
 
     @Transactional(readOnly = true)

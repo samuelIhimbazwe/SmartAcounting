@@ -31,9 +31,18 @@
 2. Sale history → scroll loads pages; max 50 rows in memory.
 3. Barcode scan miss → **Identify by camera** or catalog search fallback.
 
+## Phase 6.1 hardening (wired)
+- Anomaly **Mark reviewed** → `POST /anomaly/alerts/reviewed` (creates case if needed).
+- Anomaly **Escalate** → action queue item `ANOMALY_ESCALATION`.
+- Reorder **Approve all** → `POST /ai/reorder-suggestions/approve-all` (draft PO per low-stock SKU).
+- Forecast **Create PO** → `POST /ai/analytics/demand-forecast/create-pos`.
+
 ## Automated gates
 ```bash
 cd smartchain-mobile && npm install --legacy-peer-deps && npx tsc --noEmit && npm test
 ./gradlew compileJava
 maestro test e2e/smoke.yaml
+maestro test e2e/smoke-full.yaml   # OPS_MANAGER / CEO staging user
 ```
+
+Integration env vars: [integrations.md](./integrations.md) and `.env.example`.

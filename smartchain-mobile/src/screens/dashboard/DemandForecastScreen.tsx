@@ -8,6 +8,7 @@ import {useTranslation} from 'react-i18next';
 import Toast from 'react-native-toast-message';
 import type {DashboardStackParamList} from '../../navigation/DashboardNavigator';
 import {
+  createPosFromForecastGaps,
   fetchDemandForecast,
   type DemandForecastItem,
 } from '../../api/aiAnalytics';
@@ -41,7 +42,7 @@ export default function DemandForecastScreen() {
   return (
     <View style={styles.wrap}>
       <Text style={styles.h}>{loading ? t('common.loading') : t('intelligence.forecastTitle')}</Text>
-      <Button mode="contained" onPress={() => void createPoForGaps()}>
+      <Button mode="contained" onPress={() => void createPoForGaps()} testID="forecast.create-pos">
         {t('intelligence.createPoFromForecast')}
       </Button>
       <FlatList

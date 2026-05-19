@@ -1,0 +1,49 @@
+# Extended Maestro smoke — ops/CEO path: reorder approve → PO list → sale → copilot.
+# Requires staging user with Stock + Copilot tabs (e.g. OPS_MANAGER or CEO).
+# Example:
+#   MAESTRO_USERNAME=ops@demo.local MAESTRO_PASSWORD=secret maestro test e2e/smoke-full.yaml
+appId: com.smartaccounting.mobile
+---
+- launchApp
+- tapOn:
+    id: auth.username
+- inputText: "${MAESTRO_USERNAME}"
+- tapOn:
+    id: auth.password
+- inputText: "${MAESTRO_PASSWORD}"
+- tapOn:
+    id: auth.sign-in
+- tapOn: "Dashboard"
+- tapOn:
+    text: "Approve all"
+    optional: true
+- tapOn: "Stock"
+- tapOn: "Purchase orders"
+- back
+- tapOn: "Till"
+- tapOn:
+    id: till.open-float
+- inputText: "50000"
+- tapOn:
+    id: till.open-submit
+- tapOn: "POS"
+- tapOn:
+    id: checkout.barcode
+- inputText: "TEST-SKU-001"
+- tapOn:
+    id: checkout.add
+- tapOn:
+    id: checkout.tender-cash
+- tapOn:
+    id: checkout.complete-sale
+- tapOn:
+    id: receipt.print
+- tapOn: "Copilot"
+- tapOn:
+    text: "Send"
+    optional: true
+- tapOn: "Till"
+- tapOn:
+    id: till.close-nav
+- tapOn:
+    id: till.close-submit

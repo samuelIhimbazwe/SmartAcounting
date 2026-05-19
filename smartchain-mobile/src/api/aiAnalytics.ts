@@ -46,3 +46,24 @@ export async function fetchCashFlowForecast() {
     series: Array<{date: string; cashIn: number; cashOut: number; balance: number}>;
   }>('/ai/analytics/cash-flow-forecast', {method: 'POST', body: JSON.stringify({days: 30})});
 }
+
+export async function approveAllReorderSuggestions() {
+  return apiCall<{
+    createdCount: number;
+    failedCount: number;
+    created: Array<{productId: string; purchaseOrderId: string}>;
+    failed: Array<{productId: string; error: string}>;
+  }>('/ai/reorder-suggestions/approve-all', {method: 'POST'});
+}
+
+export async function createPosFromForecastGaps(productIds: string[]) {
+  return apiCall<{
+    createdCount: number;
+    failedCount: number;
+    created: Array<{productId: string; purchaseOrderId: string}>;
+    failed: Array<{productId: string; error: string}>;
+  }>('/ai/analytics/demand-forecast/create-pos', {
+    method: 'POST',
+    body: JSON.stringify({productIds}),
+  });
+}

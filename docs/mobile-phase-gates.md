@@ -35,7 +35,9 @@ npm run test:coverage
 
 Phase 4 targets a larger jump (VAT, hash chain, Z-report) where pure logic tests are dense.
 
-Baseline snapshots: [phase2-coverage-baseline.txt](./phase2-coverage-baseline.txt), [phase4-coverage-baseline.txt](./phase4-coverage-baseline.txt), [phase5-coverage-baseline.txt](./phase5-coverage-baseline.txt).
+Baseline snapshots: [phase2-coverage-baseline.txt](./phase2-coverage-baseline.txt), [phase4-coverage-baseline.txt](./phase4-coverage-baseline.txt), [phase5-coverage-baseline.txt](./phase5-coverage-baseline.txt), [phase6-coverage-baseline.txt](./phase6-coverage-baseline.txt).
+
+Extended E2E: `e2e/smoke-full.yaml` (dashboard reorder → stock → sale → copilot).
 
 **Local “4 skipped”:** the staging API contract suite (`staging.apiContract.test.ts`) skips when `STAGING_API_URL` is not set — not hardware gaps. See comments in that file (`STAGING_ENV_REQUIRED`).
 

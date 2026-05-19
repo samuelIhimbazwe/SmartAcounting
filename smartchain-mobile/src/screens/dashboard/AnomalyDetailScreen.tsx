@@ -1,10 +1,12 @@
-import React from 'react';
+import React, {useState} from 'react';
 import {ScrollView, StyleSheet, Text} from 'react-native';
 import {Button, Card} from 'react-native-paper';
-import {useRoute} from '@react-navigation/native';
+import {useNavigation, useRoute} from '@react-navigation/native';
 import type {RouteProp} from '@react-navigation/native';
 import {useTranslation} from 'react-i18next';
+import Toast from 'react-native-toast-message';
 import type {DashboardStackParamList} from '../../navigation/DashboardNavigator';
+import {escalateAnomalyAlert, reviewAnomalyAlert} from '../../api/anomaly';
 
 type Route = RouteProp<DashboardStackParamList, 'AnomalyDetail'>;
 
@@ -43,8 +45,10 @@ const ANOMALY_COPY: Record<string, {title: string; detail: string; action: strin
 
 export default function AnomalyDetailScreen() {
   const {t} = useTranslation();
+  const navigation = useNavigation();
   const route = useRoute<Route>();
   const alert = route.params.alert;
+  const [busy, setBusy] = useState(false);
   const type = String(alert.anomalyType ?? alert.type ?? 'unknown').toLowerCase();
   const copy = ANOMALY_COPY[type] ?? {
     title: type,
@@ -52,6 +56,46 @@ export default function AnomalyDetailScreen() {
     action: t('intelligence.reviewTransactions'),
   };
   const txs = (alert.affectedTransactions as unknown[]) ?? alert.transactions ?? [];
+
+  const markReviewed = async () => {
+    setBusy(true);
+    try {
+      const res = await reviewAnomalyAlert(alert);
+      Toast.show({
+        type: 'success',
+        text1: t('intelligence.markReviewed'),
+        text2: res.anomalyCaseId,
+      });
+      navigation.goBack();
+    } catch (e: unknown) {
+      Toast.show({
+        type: 'error',
+        text1: e instanceof Error ? e.message : t('common.error'),
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const escalate = async () => {
+    setBusy(true);
+    try {
+      const res = await escalateAnomalyAlert(alert, copy.action);
+      Toast.show({
+        type: 'success',
+        text1: t('intelligence.escalate'),
+        text2: res.actionId,
+      });
+      navigation.goBack();
+    } catch (e: unknown) {
+      Toast.show({
+        type: 'error',
+        text1: e instanceof Error ? e.message : t('common.error'),
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <ScrollView contentContainerStyle={styles.wrap}>
@@ -69,10 +113,10 @@ export default function AnomalyDetailScreen() {
           </Card.Content>
         </Card>
       ))}
-      <Button mode="contained" onPress={() => {}}>
+      <Button mode="contained" loading={busy} disabled={busy} onPress={() => void markReviewed()}>
         {t('intelligence.markReviewed')}
       </Button>
-      <Button mode="outlined" onPress={() => {}}>
+      <Button mode="outlined" loading={busy} disabled={busy} onPress={() => void escalate()}>
         {t('intelligence.escalate')}
       </Button>
     </ScrollView>

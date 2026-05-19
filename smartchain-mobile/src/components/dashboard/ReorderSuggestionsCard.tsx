@@ -5,7 +5,7 @@ import {useNavigation} from '@react-navigation/native';
 import {useTranslation} from 'react-i18next';
 import {useSelector, useDispatch} from 'react-redux';
 import type {RootState, AppDispatch} from '../../store';
-import {fetchReorderSuggestions} from '../../api/aiAnalytics';
+import {approveAllReorderSuggestions} from '../../api/aiAnalytics';
 import {dismissReorderSuggestion} from '../../store/slices/intelligenceSlice';
 import Toast from 'react-native-toast-message';
 
@@ -22,10 +22,14 @@ export function ReorderSuggestionsCard() {
 
   const approveAll = async () => {
     try {
-      const res = await fetchReorderSuggestions();
+      const res = await approveAllReorderSuggestions();
       Toast.show({
-        type: 'success',
-        text1: t('intelligence.reorderApproved', {count: res.count}),
+        type: res.failedCount > 0 ? 'info' : 'success',
+        text1: t('intelligence.reorderApproved', {count: res.createdCount}),
+        text2:
+          res.failedCount > 0
+            ? `${res.failedCount} failed (missing preferred supplier)`
+            : undefined,
       });
     } catch (e: unknown) {
       Toast.show({

@@ -33,4 +33,35 @@ public class AnomalyCaseController {
                                   @RequestParam(defaultValue = "20") int size) {
         return service.listOpen(role, page, size);
     }
+
+    @PostMapping("/cases/{caseId}/reviewed")
+    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'OPS_MANAGER', 'ACCOUNTING_CONTROLLER')")
+    public Map<String, Object> markReviewed(@PathVariable UUID caseId) {
+        return service.markReviewed(caseId);
+    }
+
+    @PostMapping("/cases/{caseId}/escalate")
+    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'OPS_MANAGER', 'ACCOUNTING_CONTROLLER')")
+    public Map<String, Object> escalate(@PathVariable UUID caseId,
+                                        @RequestBody(required = false) Map<String, String> body) {
+        String note = body != null ? body.get("note") : null;
+        return service.escalate(caseId, note);
+    }
+
+    @PostMapping("/alerts/reviewed")
+    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'OPS_MANAGER', 'ACCOUNTING_CONTROLLER')")
+    public Map<String, Object> reviewAlert(@RequestBody Map<String, Object> alert) {
+        return service.reviewAlert(alert);
+    }
+
+    @PostMapping("/alerts/escalate")
+    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'OPS_MANAGER', 'ACCOUNTING_CONTROLLER')")
+    public Map<String, Object> escalateAlert(@RequestBody Map<String, Object> body) {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> alert = body.get("alert") instanceof Map<?, ?> m
+            ? (Map<String, Object>) m
+            : body;
+        String note = body.get("note") != null ? String.valueOf(body.get("note")) : null;
+        return service.escalateAlert(alert, note);
+    }
 }
