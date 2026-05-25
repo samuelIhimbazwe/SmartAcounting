@@ -3,6 +3,7 @@ package com.smartaccounting.entity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Column;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -20,6 +21,7 @@ public class TaxConfig {
     /** ALL | CATEGORY | PRODUCT */
     private String appliesTo;
     private String categoryCode;
+    @Column(name = "is_active")
     private boolean active;
     private Instant createdAt;
 
