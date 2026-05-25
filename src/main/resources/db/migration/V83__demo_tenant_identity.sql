@@ -1,6 +1,8 @@
 -- Demo tenant identity: rebrand seed data as a realistic Rwanda retail business.
 -- (Requested as V80; V80__roles_add_emoji.sql already exists — applied as V83.)
 
+SELECT set_config('app.tenant_id', '11111111-1111-4111-8111-111111111111', true);
+
 -- ---------------------------------------------------------------------------
 -- Schema: add profile columns if Hibernate / prior envs have not created them
 -- ---------------------------------------------------------------------------

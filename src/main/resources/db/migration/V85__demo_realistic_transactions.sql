@@ -1,6 +1,8 @@
 -- Requested as V82; V82__migrate_existing_user_roles.sql exists — applied as V85.
 -- Demo tenant 11111111-1111-4111-8111-111111111111: realistic Kigali supermarket data.
 
+SELECT set_config('app.tenant_id', '11111111-1111-4111-8111-111111111111', true);
+
 -- ---------------------------------------------------------------------
 -- 1. Product names (barcodes unchanged)
 -- ---------------------------------------------------------------------

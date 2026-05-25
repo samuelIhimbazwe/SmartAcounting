@@ -15,6 +15,8 @@
 -- accounting -- all with password "password". Tenant UUID above.
 -- =====================================================================
 
+SELECT set_config('app.tenant_id', '11111111-1111-4111-8111-111111111111', true);
+
 -- ---------------------------------------------------------------------
 -- 0. Secondary tenant for cross-tenant / data-sharing scenarios
 -- ---------------------------------------------------------------------

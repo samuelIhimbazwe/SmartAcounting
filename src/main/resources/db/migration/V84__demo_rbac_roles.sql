@@ -2,6 +2,8 @@
 -- (Requested as V81; V81__seed_permissions.sql already exists — applied as V84.)
 -- Idempotent: clears prior demo-tenant roles from V82 legacy migration, then re-seeds.
 
+SELECT set_config('app.tenant_id', '11111111-1111-4111-8111-111111111111', true);
+
 -- ---------------------------------------------------------------------------
 -- Reset demo-tenant RBAC (V82 may have created Business Owner / CFO / etc.)
 -- ---------------------------------------------------------------------------

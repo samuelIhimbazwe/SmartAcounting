@@ -2,6 +2,8 @@
 -- Intended for local UX testing. Login continues to use in-memory users (see README / AuthUsersConfig).
 -- Set VITE_DEFAULT_TENANT_ID on the frontend to this tenant UUID so JWT tenant context matches these rows.
 
+SELECT set_config('app.tenant_id', '11111111-1111-4111-8111-111111111111', true);
+
 INSERT INTO tenants (id, name, status, created_at, plan, phone_verified)
 VALUES (
     '11111111-1111-4111-8111-111111111111'::uuid,
