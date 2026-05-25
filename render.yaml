@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: api
+    name: smartaccounting-api
     runtime: docker
     plan: free
     region: frankfurt
@@ -83,12 +83,20 @@ services:
 
   - type: web
     name: smartaccounting-web
-    runtime: docker
+    runtime: static
     plan: free
     region: frankfurt
-    dockerfilePath: ./frontend/Dockerfile
-    dockerContext: .
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
     autoDeploy: true
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://smartaccounting-api.onrender.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
 
   - type: keyvalue
     name: smartaccounting-redis

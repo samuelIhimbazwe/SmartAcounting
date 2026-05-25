@@ -14,5 +14,5 @@ RUN chown -R app:app /app
 USER app
 EXPOSE 8080
 HEALTHCHECK --interval=15s --timeout=5s --start-period=120s --retries=8 \
-  CMD curl -sf http://localhost:8080/actuator/health/liveness || exit 1
+  CMD sh -c 'curl -sf "http://localhost:${PORT:-8080}/actuator/health/liveness" || exit 1'
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
