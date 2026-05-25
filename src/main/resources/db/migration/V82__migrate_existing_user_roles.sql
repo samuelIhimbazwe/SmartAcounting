@@ -71,6 +71,7 @@ BEGIN
                      AND  ts.completed_at IS NOT NULL
                )
     LOOP
+        PERFORM set_config('app.tenant_id', v_tenant_id::text, true);
         -- Ensure owner role exists
         IF NOT EXISTS (
             SELECT 1 FROM roles
@@ -136,6 +137,7 @@ BEGIN
                    WHERE  ur.user_id = u.id
                )
     LOOP
+        PERFORM set_config('app.tenant_id', v_user.tenant_id::text, true);
         v_role_id := NULL;
 
         CASE upper(trim(v_user.role))
