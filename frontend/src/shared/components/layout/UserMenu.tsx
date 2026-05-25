@@ -9,7 +9,6 @@ import {
 } from '../../../features/auth/subscriptionPlans'
 import { useAuthStore } from '../../stores/authStore'
 import { useIntlStore } from '../../stores/intlStore'
-import { ThemePreferenceControl } from '../ui/ThemePreferenceControl'
 import type { Role } from '../../types/roles'
 
 interface UserMenuProps {
@@ -30,6 +29,8 @@ export function UserMenu({ role, open, onClose }: UserMenuProps) {
   const navigate = useNavigate()
   const clearSession = useAuthStore((state) => state.clearSession)
   const tenantId = useAuthStore((state) => state.tenantId)
+  const permissions = useAuthStore((state) => state.permissions)
+  const effectiveRoleProfile = useAuthStore((state) => state.effectiveRoleProfile)
   const locale = useIntlStore((state) => state.locale)
   const setLocale = useIntlStore((state) => state.setLocale)
   const menuRef = useRef<HTMLDivElement | null>(null)
@@ -66,7 +67,11 @@ export function UserMenu({ role, open, onClose }: UserMenuProps) {
   const initials = role.slice(0, 2).toUpperCase()
   const planId: PlanId | 'TRIAL' = intendedPlan?.plan ?? 'TRIAL'
   const cycle: BillingCycle = intendedPlan?.cycle ?? 'MONTHLY'
-  const canAccessAdmin = role === 'CEO' || role === 'CFO' || role === 'HR'
+  const canAccessAdmin =
+    permissions.includes('TENANT_CONFIG') ||
+    permissions.includes('USER_MANAGE') ||
+    permissions.includes('ROLE_MANAGE') ||
+    effectiveRoleProfile.navItemIds.includes('users-tenants')
   const tenantShort = tenantId ? tenantId.slice(0, 8).toUpperCase() : '—'
 
   function handleSignOut() {
@@ -105,11 +110,6 @@ export function UserMenu({ role, open, onClose }: UserMenuProps) {
       </div>
 
       <div className="user-menu__section">
-        <div className="user-menu__section-label">{t('userMenu.appearance')}</div>
-        <ThemePreferenceControl />
-      </div>
-
-      <div className="user-menu__section">
         <div className="user-menu__section-label">{t('userMenu.language')}</div>
         <div className="user-menu__segmented" role="group" aria-label={t('userMenu.language') ?? 'Language'}>
           <button
@@ -131,6 +131,16 @@ export function UserMenu({ role, open, onClose }: UserMenuProps) {
             }}
           >
             <Languages size={13} strokeWidth={2} /> FR
+          </button>
+          <button
+            type="button"
+            data-active={locale === 'rw'}
+            onClick={() => {
+              setLocale('rw')
+              void i18n.changeLanguage('rw')
+            }}
+          >
+            <Languages size={13} strokeWidth={2} /> RW
           </button>
         </div>
       </div>

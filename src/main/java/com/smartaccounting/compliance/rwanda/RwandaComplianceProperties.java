@@ -19,6 +19,8 @@ public class RwandaComplianceProperties {
     private String eisSubmitPath = "/eis/v1/invoice";
     /** Placeholder path for periodic VAT return submission (distinct from per-invoice EIS). */
     private String vatReturnSubmitPath = "/eis/v1/vat-return";
+    /** RRA TIN lookup (placeholder until certified path is confirmed). */
+    private String tinValidatePath = "/eis/v1/tin/validate";
     /** Process environment variable name that holds the bearer token for EIS. */
     private String apiTokenEnvironmentVariable = "RRA_EIS_API_TOKEN";
     /** Standard VAT rate (since 2013) – 18%. */
@@ -38,6 +40,8 @@ public class RwandaComplianceProperties {
     public void setEisSubmitPath(String eisSubmitPath) { this.eisSubmitPath = eisSubmitPath; }
     public String getVatReturnSubmitPath() { return vatReturnSubmitPath; }
     public void setVatReturnSubmitPath(String vatReturnSubmitPath) { this.vatReturnSubmitPath = vatReturnSubmitPath; }
+    public String getTinValidatePath() { return tinValidatePath; }
+    public void setTinValidatePath(String tinValidatePath) { this.tinValidatePath = tinValidatePath; }
     public String getApiTokenEnvironmentVariable() { return apiTokenEnvironmentVariable; }
     public void setApiTokenEnvironmentVariable(String apiTokenEnvironmentVariable) { this.apiTokenEnvironmentVariable = apiTokenEnvironmentVariable; }
     public BigDecimal getVatRatePercent() { return vatRatePercent; }

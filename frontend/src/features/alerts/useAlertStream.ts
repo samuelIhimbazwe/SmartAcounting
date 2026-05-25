@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { useSSEStream } from '../../shared/hooks/useSSEStream'
+import { normalizeIncomingAlert } from '../../shared/alerts/alertUtils'
 import { useAlertStore } from '../../shared/stores/alertStore'
 import type { AlertEvent } from '../../shared/types/dashboard'
 import { roleApiMap, type Role } from '../../shared/types/roles'
@@ -9,9 +10,12 @@ export function useAlertStream(role: Role | null, enabled = true) {
 
   const onMessage = useCallback(
     (alert: AlertEvent) => {
-      addAlert(alert)
+      const normalized = normalizeIncomingAlert(alert, role)
+      if (normalized) {
+        addAlert(normalized)
+      }
     },
-    [addAlert],
+    [addAlert, role],
   )
 
   useSSEStream<AlertEvent>({

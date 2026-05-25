@@ -47,7 +47,7 @@ export function createTray(): Tray | null {
   const menu = Menu.buildFromTemplate([
     { label: 'Open SmartAccounting', click: () => navigate('/') },
     { type: 'separator' },
-    { label: 'POS', click: () => navigate('/retail') },
+    { label: 'POS', click: () => navigate('/pos') },
     { label: 'Dashboard', click: () => navigate('/dashboard') },
     { type: 'separator' },
     { label: 'Quit', click: () => app.quit() },

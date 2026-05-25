@@ -34,6 +34,7 @@ const authPersistTransform = createTransform(
     tenantId: inbound.tenantId,
     userId: inbound.userId,
     roles: inbound.roles,
+    permissions: inbound.permissions ?? [],
     role: inbound.role,
     userName: inbound.userName,
   }),

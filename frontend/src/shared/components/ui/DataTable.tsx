@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Download } from 'lucide-react'
 import { exportRowsToCsv, exportRowsToExcel } from '../../utils/export'
+import { Pagination } from './Pagination'
 
 export interface DataTableColumn<T> {
   key: keyof T
@@ -85,7 +86,7 @@ export function DataTable<T extends object>({
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         {showSearch ? (
           <input
-            className="w-full max-w-sm rounded-md border border-[var(--border-default)] px-3 py-1.5 text-sm transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+            className="ui-input max-w-sm"
             value={query}
             onChange={(event) => {
               setQuery(event.target.value)
@@ -127,7 +128,7 @@ export function DataTable<T extends object>({
           : `Showing ${showingCount} of ${filtered.length} ${filtered.length === 1 ? 'row' : 'rows'}`}
       </p>
 
-      <div className="overflow-auto rounded-lg border border-[var(--border-subtle)]">
+      <div className="table-scroll rounded-lg border border-[var(--border-subtle)]">
         <table className="w-full border-collapse text-sm" aria-label={tableAriaLabel}>
           <thead className="bg-[var(--surface-overlay)]">
             <tr>
@@ -193,29 +194,15 @@ export function DataTable<T extends object>({
         </table>
       </div>
 
-      {showPagination && (
-        <div className="mt-2 flex items-center justify-end gap-2 text-xs text-neutral-600">
-          <button
-            type="button"
-            className="rounded border border-[var(--border-default)] px-2 py-1 transition-colors hover:bg-[var(--surface-overlay)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] disabled:opacity-50"
-            disabled={currentPage <= 1 || isLoading}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-          >
-            Prev
-          </button>
-          <span>
-            {currentPage}/{totalPages}
-          </span>
-          <button
-            type="button"
-            className="rounded border border-[var(--border-default)] px-2 py-1 transition-colors hover:bg-[var(--surface-overlay)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] disabled:opacity-50"
-            disabled={currentPage >= totalPages || isLoading}
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-          >
-            Next
-          </button>
-        </div>
-      )}
+      {showPagination ? (
+        <Pagination
+          page={currentPage}
+          totalPages={totalPages}
+          totalItems={filtered.length}
+          disabled={isLoading}
+          onPageChange={setPage}
+        />
+      ) : null}
     </div>
   )
 }

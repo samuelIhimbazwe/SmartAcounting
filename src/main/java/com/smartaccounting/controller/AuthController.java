@@ -2,11 +2,13 @@ package com.smartaccounting.controller;
 
 import com.smartaccounting.dto.AuthRequest;
 import com.smartaccounting.dto.AuthResponse;
+import com.smartaccounting.dto.AuthSessionProfile;
 import com.smartaccounting.dto.MfaChallengeRequest;
 import com.smartaccounting.dto.MfaChallengeResponse;
 import com.smartaccounting.dto.OAuthAuthResponse;
 import com.smartaccounting.dto.OAuthLoginRequest;
 import com.smartaccounting.dto.RefreshRequest;
+import com.smartaccounting.service.AuthSessionService;
 import com.smartaccounting.service.OidcAuthService;
 import com.smartaccounting.signup.DbUserLoginValidator;
 import com.smartaccounting.signup.LoginIdentityService;
@@ -20,12 +22,14 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
@@ -40,6 +44,7 @@ public class AuthController {
     private final OidcAuthService oidcAuthService;
     private final LoginIdentityService loginIdentityService;
     private final JwtRevocationService jwtRevocationService;
+    private final AuthSessionService authSessionService;
 
     public AuthController(AuthenticationManager authenticationManager,
                           UserDetailsService userDetailsService,
@@ -49,7 +54,8 @@ public class AuthController {
                           DbUserLoginValidator dbUserLoginValidator,
                           OidcAuthService oidcAuthService,
                           LoginIdentityService loginIdentityService,
-                          JwtRevocationService jwtRevocationService) {
+                          JwtRevocationService jwtRevocationService,
+                          AuthSessionService authSessionService) {
         this.authenticationManager = authenticationManager;
         this.userDetailsService = userDetailsService;
         this.jwtService = jwtService;
@@ -59,6 +65,17 @@ public class AuthController {
         this.oidcAuthService = oidcAuthService;
         this.loginIdentityService = loginIdentityService;
         this.jwtRevocationService = jwtRevocationService;
+        this.authSessionService = authSessionService;
+    }
+
+    @GetMapping("/me")
+    public AuthSessionProfile me() {
+        UUID tenantId = TenantContext.tenantId();
+        UUID userId = TenantContext.userId();
+        if (tenantId == null || userId == null) {
+            throw new IllegalStateException("Authenticated session required");
+        }
+        return authSessionService.buildSession(tenantId, userId);
     }
 
     @PostMapping("/oauth-login")
@@ -90,16 +107,20 @@ public class AuthController {
                     request.otpCode()
                 );
             }
-            String accessToken = jwtService.generateToken(userDetails, tenantId, userId);
+            AuthSessionProfile session = authSessionService.buildSession(identity.tenantId(), identity.userId());
+            Set<String> permissions = authSessionService.loadEffectivePermissions(
+                identity.tenantId(),
+                identity.userId(),
+                identity.role()
+            );
+            String accessToken = jwtService.generateToken(userDetails, tenantId, userId, permissions);
             String refreshToken = refreshTokenService.issue(tenantId, userId, userDetails);
-            return new AuthResponse(
+            return AuthResponse.fromSession(
                 accessToken,
                 "Bearer",
                 jwtService.expirationSeconds(),
                 refreshToken,
-                identity.role(),
-                tenantId,
-                userId
+                session
             );
         } finally {
             TenantContext.clear();
@@ -134,9 +155,23 @@ public class AuthController {
             UserDetails userDetails = userDetailsService.loadUserByUsername(consumed.getUsername());
             String tenantId = consumed.getTenantId().toString();
             String userId = consumed.getUserId().toString();
-            String accessToken = jwtService.generateToken(userDetails, tenantId, userId);
+            UUID tenantUuid = consumed.getTenantId();
+            UUID userUuid = consumed.getUserId();
+            AuthSessionProfile session = authSessionService.buildSession(tenantUuid, userUuid);
+            Set<String> permissions = authSessionService.loadEffectivePermissions(
+                tenantUuid,
+                userUuid,
+                null
+            );
+            String accessToken = jwtService.generateToken(userDetails, tenantId, userId, permissions);
             String nextRefresh = refreshTokenService.issue(tenantId, userId, userDetails);
-            return new AuthResponse(accessToken, "Bearer", jwtService.expirationSeconds(), nextRefresh);
+            return AuthResponse.fromSession(
+                accessToken,
+                "Bearer",
+                jwtService.expirationSeconds(),
+                nextRefresh,
+                session
+            );
         } finally {
             TenantContext.clear();
         }

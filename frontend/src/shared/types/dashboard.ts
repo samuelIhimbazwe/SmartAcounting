@@ -44,6 +44,8 @@ export interface RecommendedAction {
   title: string
   description: string
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+  targetRoute?: string | null
+  targetApi?: string | null
 }
 
 export interface AlertEvent {
@@ -53,4 +55,7 @@ export interface AlertEvent {
   message: string
   role: string
   timestamp: string
+  targetRoute?: string | null
+  targetApi?: string | null
+  source?: 'dashboard' | 'stream'
 }

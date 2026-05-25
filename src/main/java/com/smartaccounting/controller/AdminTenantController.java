@@ -28,26 +28,26 @@ public class AdminTenantController {
     }
 
     @PostMapping
-    @PreAuthorize("@permissionGuard.has(authentication, 'ADMIN_TENANT_WRITE')")
+    @PreAuthorize("@permissionGuard.has(authentication, 'TENANT_CONFIG')")
     public Map<String, Object> provision(@RequestBody @Valid ProvisionTenantRequest request) {
         return service.provision(request.name());
     }
 
     @PatchMapping("/{tenantId}/plan")
-    @PreAuthorize("@permissionGuard.has(authentication, 'ADMIN_TENANT_WRITE')")
+    @PreAuthorize("@permissionGuard.has(authentication, 'TENANT_CONFIG')")
     public Map<String, Object> updatePlan(@PathVariable UUID tenantId,
                                          @RequestBody @Valid UpdateTenantPlanRequest request) {
         return service.updatePlan(tenantId, request.plan());
     }
 
     @PostMapping("/{tenantId}/disable")
-    @PreAuthorize("@permissionGuard.has(authentication, 'ADMIN_TENANT_WRITE')")
+    @PreAuthorize("@permissionGuard.has(authentication, 'TENANT_CONFIG')")
     public Map<String, Object> disable(@PathVariable UUID tenantId) {
         return service.disable(tenantId);
     }
 
     @GetMapping
-    @PreAuthorize("@permissionGuard.has(authentication, 'ADMIN_TENANT_WRITE')")
+    @PreAuthorize("@permissionGuard.has(authentication, 'TENANT_CONFIG')")
     public List<Map<String, Object>> list(@RequestParam(defaultValue = "0") int page,
                                           @RequestParam(defaultValue = "50") int size) {
         return service.list(page, size);

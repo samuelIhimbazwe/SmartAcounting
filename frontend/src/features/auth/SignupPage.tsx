@@ -4,7 +4,14 @@ import { Link, useNavigate } from 'react-router-dom'
 import { AlertCircle, ArrowRight, Eye, EyeOff, RefreshCw, ShieldCheck } from 'lucide-react'
 import { fetchOAuth2Providers, type OAuth2Provider } from '../../shared/api/auth'
 import { isApiError, normalizeApiError } from '../../shared/api/errors'
-import { publicOAuthSignup, publicSignup, resendSignupOtp, verifySignupPhone } from '../../shared/api/publicSignup'
+import {
+  type SignupOtpDelivery,
+  publicOAuthSignup,
+  publicSignup,
+  resendSignupOtp,
+  verifySignupPhone,
+} from '../../shared/api/publicSignup'
+import { detectRwandaMobileCarrier, maskPhoneForDisplay } from '../../utils/phoneValidation'
 import { useAuthStore } from '../../shared/stores/authStore'
 import { rolePathMap } from '../../shared/types/roles'
 import { isDesktop } from '../../utils/platform'
@@ -30,6 +37,7 @@ const STEP_KEYS: Record<Step, string> = {
 }
 
 const STEP_ORDER: Step[] = ['plan', 'form', 'verify']
+const RESEND_COOLDOWN_SEC = 60
 
 export function SignupPage() {
   const { t } = useTranslation()
@@ -59,8 +67,31 @@ export function SignupPage() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [resending, setResending] = useState(false)
+  const [maskedPhone, setMaskedPhone] = useState('')
+  const [smsDelivery, setSmsDelivery] = useState<SignupOtpDelivery['smsDelivery']>()
+  const [smsCarrier, setSmsCarrier] = useState<SignupOtpDelivery['smsCarrier']>()
+  const [devOtp, setDevOtp] = useState<string | null>(null)
+  const [resendCooldown, setResendCooldown] = useState(0)
+  const [showDidntReceive, setShowDidntReceive] = useState(false)
+  const [resendSuccess, setResendSuccess] = useState(false)
 
   const useOAuth2CodeFlow = oauth2Providers !== null && oauth2Providers.length > 0
+  const displayPhone = maskedPhone || maskPhoneForDisplay(pendingPhone)
+
+  function applyOtpDelivery(delivery: SignupOtpDelivery, phoneNumber?: string) {
+    const resolvedPhone = phoneNumber ?? pendingPhone
+    if (delivery.maskedPhone) {
+      setMaskedPhone(delivery.maskedPhone)
+    } else if (resolvedPhone) {
+      setMaskedPhone(maskPhoneForDisplay(resolvedPhone))
+    }
+    setSmsDelivery(delivery.smsDelivery)
+    setSmsCarrier(delivery.smsCarrier)
+    setDevOtp(delivery.devOtp ?? null)
+    if (delivery.smsDelivery !== 'SENT') {
+      setShowDidntReceive(true)
+    }
+  }
 
   useEffect(() => {
     if (step !== 'form') {
@@ -70,6 +101,16 @@ export function SignupPage() {
       .then(setOauth2Providers)
       .catch(() => setOauth2Providers([]))
   }, [step])
+
+  useEffect(() => {
+    if (step !== 'verify' || resendCooldown <= 0) {
+      return
+    }
+    const timer = window.setInterval(() => {
+      setResendCooldown((prev) => (prev <= 1 ? 0 : prev - 1))
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [step, resendCooldown])
 
   async function onSubmitForm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -106,9 +147,14 @@ export function SignupPage() {
             plan: selectedPlan,
             billingCycle,
           })
+      const normalizedPhone = phone.trim()
       setPendingTenantId(res.tenantId)
       setPendingUserId(res.userId)
-      setPendingPhone(phone.trim())
+      setPendingPhone(normalizedPhone)
+      applyOtpDelivery(res, normalizedPhone)
+      setResendCooldown(RESEND_COOLDOWN_SEC)
+      setResendSuccess(false)
+      setShowDidntReceive(false)
       setStep('verify')
       setOtp('')
     } catch (caughtError) {
@@ -147,10 +193,18 @@ export function SignupPage() {
   }
 
   async function onResend() {
+    if (resendCooldown > 0 || resending) {
+      return
+    }
     setError(null)
+    setResendSuccess(false)
     setResending(true)
     try {
-      await resendSignupOtp(pendingPhone)
+      const delivery = await resendSignupOtp(pendingPhone)
+      applyOtpDelivery(delivery)
+      setResendCooldown(RESEND_COOLDOWN_SEC)
+      setResendSuccess(true)
+      setOtp('')
     } catch (caughtError) {
       const apiError = normalizeApiError(caughtError)
       setError(apiError.message)
@@ -312,6 +366,19 @@ export function SignupPage() {
                 placeholder="+250 7XX XXX XXX"
                 required
               />
+              {(() => {
+                const carrier = detectRwandaMobileCarrier(phone)
+                if (carrier === 'UNKNOWN') {
+                  return null
+                }
+                return (
+                  <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '6px 0 0' }}>
+                    {t('auth.signupPhoneCarrierHint', {
+                      carrier: carrier === 'MTN' ? 'MTN' : 'Airtel',
+                    })}
+                  </p>
+                )
+              })()}
             </label>
           </div>
 
@@ -403,7 +470,47 @@ export function SignupPage() {
       <form className="auth-card" onSubmit={onSubmitVerify} noValidate>
         <p className="auth-card__eyebrow">{t('auth.signupStepProgress', { current: 3, total: 3 })}</p>
         <h1 className="auth-card__title">{t('auth.verifyTitle')}</h1>
-        <p className="auth-card__subtitle">{t('auth.verifySubtitle')}</p>
+        <p className="auth-card__subtitle">
+          {smsCarrier && smsCarrier !== 'UNKNOWN'
+            ? t('auth.verifySubtitleCarrier', {
+                phone: displayPhone,
+                carrier: smsCarrier === 'MTN' ? 'MTN' : 'Airtel',
+              })
+            : t('auth.verifySubtitle', { phone: displayPhone })}
+        </p>
+
+        {devOtp && (
+          <div className="auth-verify-dev-code" role="status">
+            <p>
+              {smsCarrier && smsCarrier !== 'UNKNOWN'
+                ? t('auth.verifySmsDryRunCarrier', {
+                    carrier: smsCarrier === 'MTN' ? 'MTN' : 'Airtel',
+                  })
+                : t('auth.verifySmsDryRun')}
+            </p>
+            <strong aria-label={t('auth.verifyOtpLabel')}>{devOtp}</strong>
+          </div>
+        )}
+
+        {!devOtp && smsDelivery === 'FAILED' && (
+          <div className="auth-alert" role="status">
+            <AlertCircle size={16} strokeWidth={2} />
+            <span>{t('auth.verifySmsFailed')}</span>
+          </div>
+        )}
+
+        {!devOtp && smsDelivery === 'DISABLED' && (
+          <div className="auth-alert" role="status">
+            <AlertCircle size={16} strokeWidth={2} />
+            <span>{t('auth.verifySmsDisabled')}</span>
+          </div>
+        )}
+
+        {resendSuccess && (
+          <p className="auth-verify-success" role="status">
+            {t('auth.verifyResendSuccess')}
+          </p>
+        )}
 
         {error && (
           <div className="auth-alert" role="alert" aria-live="assertive">
@@ -433,10 +540,6 @@ export function SignupPage() {
           />
         </label>
 
-        <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '-6px 0 16px' }}>
-          {t('auth.verifyDevHint')}
-        </p>
-
         <button
           type="submit"
           className="auth-btn auth-btn--primary"
@@ -446,34 +549,52 @@ export function SignupPage() {
           {submitting ? t('auth.verifySubmitting') : t('auth.verifySubmit')}
         </button>
 
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 10,
-            marginTop: 14,
-          }}
-        >
+        <div className="auth-verify-help">
           <button
             type="button"
-            className="auth-btn auth-btn--link"
-            onClick={onResend}
-            disabled={resending}
+            className="auth-verify-help__toggle"
+            aria-expanded={showDidntReceive}
+            onClick={() => setShowDidntReceive((open) => !open)}
           >
-            <RefreshCw size={12} strokeWidth={2} style={{ marginRight: 4 }} />
-            {resending ? t('auth.verifyResending') : t('auth.verifyResend')}
+            {t('auth.verifyDidntReceive')}
           </button>
-          <button
-            type="button"
-            className="auth-btn auth-btn--link"
-            onClick={() => {
-              setStep('form')
-              setError(null)
-            }}
-          >
-            {t('auth.verifyBack')}
-          </button>
+          {showDidntReceive && (
+            <div className="auth-verify-help__panel">
+              <ul>
+                <li>{t('auth.verifyHelpWait')}</li>
+                <li>{t('auth.verifyHelpCheckNumber', { phone: displayPhone })}</li>
+                <li>{t('auth.verifyHelpTryAgain')}</li>
+              </ul>
+              <div className="auth-verify-help__actions">
+                <button
+                  type="button"
+                  className="auth-btn auth-btn--ghost"
+                  onClick={() => {
+                    void onResend()
+                  }}
+                  disabled={resending || resendCooldown > 0}
+                >
+                  <RefreshCw size={14} strokeWidth={2} />
+                  {resending
+                    ? t('auth.verifyResending')
+                    : resendCooldown > 0
+                      ? t('auth.verifyResendIn', { seconds: resendCooldown })
+                      : t('auth.verifyResend')}
+                </button>
+                <button
+                  type="button"
+                  className="auth-btn auth-btn--link"
+                  onClick={() => {
+                    setStep('form')
+                    setError(null)
+                    setResendSuccess(false)
+                  }}
+                >
+                  {t('auth.verifyBack')}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <p className="auth-card__footer">

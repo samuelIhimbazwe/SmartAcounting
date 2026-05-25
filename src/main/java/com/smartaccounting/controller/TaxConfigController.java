@@ -1,6 +1,7 @@
 package com.smartaccounting.controller;
 
 import com.smartaccounting.service.TaxConfigService;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,7 +20,7 @@ public class TaxConfigController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('OPS_MANAGER','SALES_MANAGER','ACCOUNTING_CONTROLLER','CFO','CEO')")
+    @PreAuthorize(PermissionExpressions.OPS_DASHBOARD)
     public List<Map<String, Object>> list() {
         return taxConfigService.listActive();
     }

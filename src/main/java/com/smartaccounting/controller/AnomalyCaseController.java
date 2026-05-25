@@ -4,6 +4,7 @@ import com.smartaccounting.dto.CreateAnomalyCaseRequest;
 import com.smartaccounting.entity.AnomalyCase;
 import com.smartaccounting.service.AnomalyCaseService;
 import jakarta.validation.Valid;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,13 +22,13 @@ public class AnomalyCaseController {
     }
 
     @PostMapping("/cases")
-    @PreAuthorize("hasRole('CEO') or hasRole('CFO') or hasRole('OPS_MANAGER') or hasRole('ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.OPS_DASHBOARD)
     public Map<String, UUID> create(@RequestBody @Valid CreateAnomalyCaseRequest request) {
         return Map.of("anomalyCaseId", service.create(request));
     }
 
     @GetMapping("/cases/{role}")
-    @PreAuthorize("@roleScopeGuard.canAccessRole(authentication, #role)")
+    @PreAuthorize("@dashboardAccessGuard.canAccess(authentication, #role)")
     public List<AnomalyCase> list(@PathVariable String role,
                                   @RequestParam(defaultValue = "0") int page,
                                   @RequestParam(defaultValue = "20") int size) {
@@ -35,13 +36,13 @@ public class AnomalyCaseController {
     }
 
     @PostMapping("/cases/{caseId}/reviewed")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'OPS_MANAGER', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.OPS_DASHBOARD)
     public Map<String, Object> markReviewed(@PathVariable UUID caseId) {
         return service.markReviewed(caseId);
     }
 
     @PostMapping("/cases/{caseId}/escalate")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'OPS_MANAGER', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.OPS_DASHBOARD)
     public Map<String, Object> escalate(@PathVariable UUID caseId,
                                         @RequestBody(required = false) Map<String, String> body) {
         String note = body != null ? body.get("note") : null;
@@ -49,13 +50,13 @@ public class AnomalyCaseController {
     }
 
     @PostMapping("/alerts/reviewed")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'OPS_MANAGER', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.OPS_DASHBOARD)
     public Map<String, Object> reviewAlert(@RequestBody Map<String, Object> alert) {
         return service.reviewAlert(alert);
     }
 
     @PostMapping("/alerts/escalate")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'OPS_MANAGER', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.OPS_DASHBOARD)
     public Map<String, Object> escalateAlert(@RequestBody Map<String, Object> body) {
         @SuppressWarnings("unchecked")
         Map<String, Object> alert = body.get("alert") instanceof Map<?, ?> m

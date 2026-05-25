@@ -4,6 +4,7 @@ import com.smartaccounting.dto.CreateFxRateRequest;
 import com.smartaccounting.service.CurrencyService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,9 +33,7 @@ public class CurrencyController {
      * Preview FX conversion for POS totals (same logic as checkout line conversion).
      */
     @GetMapping("/convert")
-    @PreAuthorize(
-        "hasAnyRole('CEO','CFO','SALES_MANAGER','OPS_MANAGER','ACCOUNTING_CONTROLLER')"
-    )
+    @PreAuthorize(PermissionExpressions.POS_ACCESS)
     public Map<String, String> convert(
         @RequestParam @NotBlank String amount,
         @RequestParam @NotBlank String from,
@@ -45,7 +44,7 @@ public class CurrencyController {
     }
 
     @PostMapping("/rates")
-    @PreAuthorize("hasRole('CEO') or hasRole('CFO') or hasRole('ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.FINANCE_WRITE)
     public Map<String, UUID> upsert(@RequestBody @Valid CreateFxRateRequest req) {
         return Map.of("rateId", service.upsertRate(req));
     }

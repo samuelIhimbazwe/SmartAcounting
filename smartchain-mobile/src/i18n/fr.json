@@ -27,7 +27,14 @@
     "lines": "Lignes",
     "hqDashboard": "Toutes les succursales",
     "registers": "Caisses",
-    "selectRegister": "Choisir la caisse"
+    "selectRegister": "Choisir la caisse",
+    "createTransfer": "Créer un transfert",
+    "selectDestination": "Succursale de destination",
+    "submitTransfer": "Soumettre le transfert",
+    "transferCreated": "Transfert soumis",
+    "transferCreateFailed": "Échec du transfert",
+    "transferLinesRequired": "Ajoutez au moins une ligne avec quantité",
+    "phase4Note": "Création produit HQ différée — consultation seule en succursale"
   },
   "auth": {
     "appName": "SmartAccounting",
@@ -103,8 +110,14 @@
     "discount": "Discount (same currency)",
     "scanBarcode": "Scan or enter barcode",
     "barcode": "Barcode",
-    "openScanner": "Open camera scanner",
-    "cart": "Cart",
+    "openScanner": "Ouvrir le scanner caméra",
+    "searchCatalog": "Rechercher le catalogue",
+    "saleHistory": "Historique des ventes",
+    "noSaleHistory": "Aucune vente terminée",
+    "identifyByCamera": "Identifier par caméra",
+    "identifySearchFallback": "Modèle non téléchargé — recherche par nom ou SKU",
+    "identifyTop3": "Meilleures correspondances",
+    "cart": "Panier",
     "cartEmpty": "Cart is empty",
     "saleCompleted": "Sale completed",
     "savedOffline": "Saved offline — will sync when online",
@@ -305,7 +318,8 @@
     "backOnline": "En ligne",
     "syncError": "Erreur sync : {{message}}",
     "approvals": "{{count}} approval(s)",
-    "alerts": "{{count}} alert(s)"
+    "alerts": "{{count}} alerte(s)",
+    "catalogProgress": "Synchronisation catalogue {{processed}}/{{total}}"
   },
   "receipt": {
     "title": "Dernière transaction",
@@ -433,9 +447,13 @@
   },
   "payments": {
     "ussdCode": "Code transaction USSD",
+    "ussdPrompt": "Entrez le code MoMo envoyé sur votre téléphone",
+    "ussdExpired": "Session MoMo expirée. Veuillez réessayer.",
+    "ussdCountdown": "{{seconds}}s restantes",
     "verifyMomo": "Vérifier le paiement",
-    "verifying": "Vérification…",
+    "verifying": "Vérification du paiement…",
     "verified": "Paiement vérifié",
+    "paymentConfirmed": "Paiement confirmé",
     "verifyFailed": "Échec de vérification",
     "verifyTimeout": "Délai dépassé — réessayer ?"
   },

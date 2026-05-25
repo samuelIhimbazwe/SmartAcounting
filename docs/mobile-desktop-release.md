@@ -14,11 +14,14 @@ Set `PROD_API_URL` in `eas.json` per profile. Configure certificate pinning via 
 
 ```bash
 cd smartchain-desktop
-npm run build
-npm run dist
+npm ci
+npm run verify          # typecheck + desktop frontend bundle
+npm run build:win       # NSIS + portable (Windows)
 ```
 
-`electron-builder.yml` publishes installers to GitHub Releases. macOS notarisation: sign with Apple Developer ID, then `xcrun notarytool submit`.
+Tag `desktop-v*` to run `.github/workflows/desktop-release.yml` (Win/Mac/Linux artifacts).
+
+See [desktop-readiness.md](./desktop-readiness.md). macOS notarisation: sign with Apple Developer ID, then `xcrun notarytool submit`.
 
 ## Environment
 

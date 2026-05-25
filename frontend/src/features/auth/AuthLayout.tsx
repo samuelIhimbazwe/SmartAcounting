@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ShieldCheck, Sparkles, Globe2 } from 'lucide-react'
-import { ThemePreferenceControl } from '../../shared/components/ui/ThemePreferenceControl'
 
 interface AuthLayoutProps {
   children: ReactNode
@@ -73,10 +72,6 @@ export function AuthLayout({ children, wide = false }: AuthLayoutProps) {
 
       <section className={`auth-shell__panel${wide ? ' auth-shell__panel--wide' : ''}`}>
         <div className="auth-shell__panel-inner">
-          <div className="auth-shell__theme-bar">
-            <span className="auth-shell__theme-bar__label">{t('userMenu.appearance')}</span>
-            <ThemePreferenceControl />
-          </div>
           {children}
         </div>
       </section>

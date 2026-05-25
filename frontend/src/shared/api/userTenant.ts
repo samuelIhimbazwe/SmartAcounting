@@ -1,4 +1,5 @@
 import { apiClient } from './client'
+import { ApiError, isApiError } from './errors'
 import type { Role } from '../types/roles'
 
 export interface TenantSummary {
@@ -14,12 +15,15 @@ export interface TenantUser {
   name: string
   email: string
   role: Role
+  roleId?: string
+  roleName?: string
   status?: string
 }
 
 export interface InviteTenantUserRequest {
   email: string
-  role: Role
+  role?: Role
+  roleId?: string
 }
 
 export interface ListTenantUsersParams {
@@ -35,6 +39,10 @@ export interface PaginatedUsers {
 
 function toList<T>(data: T[] | { content?: T[] }) {
   return Array.isArray(data) ? data : data.content ?? []
+}
+
+function shouldFallbackToSelfService(error: unknown) {
+  return isApiError(error) ? error.status === 403 || error.status === 404 : false
 }
 
 export async function listTenants() {
@@ -59,9 +67,12 @@ export async function listTenantUsers(tenantId: string, params: ListTenantUsersP
     const rows = toList(response.data)
     const total = Array.isArray(response.data) ? rows.length : (response.data.totalElements ?? rows.length)
     return { rows, total }
-  } catch {
+  } catch (error) {
+    if (!shouldFallbackToSelfService(error)) {
+      throw error
+    }
     const response = await apiClient.get<{ content?: TenantUser[]; totalElements?: number } | TenantUser[]>(
-      `/api/v1/tenants/${tenantId}/users`,
+      '/api/v1/tenant/users',
       { params: query },
     )
     const rows = toList(response.data)
@@ -73,15 +84,34 @@ export async function listTenantUsers(tenantId: string, params: ListTenantUsersP
 export async function inviteTenantUser(tenantId: string, payload: InviteTenantUserRequest) {
   try {
     await apiClient.post(`/api/v1/admin/tenants/${tenantId}/users/invites`, payload)
-  } catch {
-    await apiClient.post(`/api/v1/tenants/${tenantId}/users/invites`, payload)
+  } catch (error) {
+    if (!shouldFallbackToSelfService(error)) {
+      throw error
+    }
+    throw new ApiError('Inviting staff from this screen requires the admin tenant management endpoint.', {
+      status: isApiError(error) ? error.status : null,
+      original: error,
+    })
   }
 }
 
-export async function updateTenantUserRole(tenantId: string, userId: string, role: Role) {
+export async function updateTenantUserRole(
+  tenantId: string,
+  userId: string,
+  payload: { role?: Role; roleId?: string },
+) {
   try {
-    await apiClient.patch(`/api/v1/admin/tenants/${tenantId}/users/${userId}`, { role })
-  } catch {
-    await apiClient.patch(`/api/v1/tenants/${tenantId}/users/${userId}`, { role })
+    await apiClient.patch(`/api/v1/admin/tenants/${tenantId}/users/${userId}`, payload)
+  } catch (error) {
+    if (!shouldFallbackToSelfService(error)) {
+      throw error
+    }
+    if (!payload.role) {
+      throw new ApiError('Custom tenant roles require the admin tenant management endpoint.', {
+        status: isApiError(error) ? error.status : null,
+        original: error,
+      })
+    }
+    await apiClient.patch(`/api/v1/tenant/users/${userId}/role`, { role: payload.role })
   }
 }

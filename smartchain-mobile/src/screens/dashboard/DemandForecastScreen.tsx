@@ -29,14 +29,28 @@ export default function DemandForecastScreen() {
       .finally(() => setLoading(false));
   }, [route.params?.horizonDays]);
 
-  const createPoForGaps = () => {
+  const createPoForGaps = async () => {
     const gaps = items.filter(i => i.willRunOutBeforeDelivery && i.gapQuantity > 0);
     if (gaps.length === 0) {
       Toast.show({type: 'info', text1: t('intelligence.noGaps')});
       return;
     }
-    Toast.show({type: 'success', text1: t('intelligence.draftPoCreated')});
-    navigation.getParent()?.navigate('Stock' as never, {screen: 'Reorder'} as never);
+    try {
+      const res = await createPosFromForecastGaps(gaps.map(g => g.productId));
+      Toast.show({
+        type: res.failedCount > 0 ? 'info' : 'success',
+        text1: t('intelligence.draftPoCreated'),
+        text2: `${res.createdCount} PO(s) created`,
+      });
+      if (res.createdCount > 0) {
+        navigation.getParent()?.navigate('Stock' as never, {screen: 'PurchaseOrders'} as never);
+      }
+    } catch (e: unknown) {
+      Toast.show({
+        type: 'error',
+        text1: e instanceof Error ? e.message : t('common.error'),
+      });
+    }
   };
 
   return (

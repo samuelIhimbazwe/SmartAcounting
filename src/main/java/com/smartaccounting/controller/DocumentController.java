@@ -25,13 +25,13 @@ public class DocumentController {
     }
 
     @PostMapping("/upload-requests")
-    @PreAuthorize("@permissionGuard.has(authentication, 'DOCUMENT_WRITE')")
+    @PreAuthorize("@permissionGuard.has(authentication, 'FINANCE_WRITE')")
     public Map<String, Object> createUpload(@RequestBody @Valid CreateDocumentRequest request) {
         return service.createUploadRequest(request);
     }
 
     @GetMapping
-    @PreAuthorize("@permissionGuard.has(authentication, 'DOCUMENT_READ')")
+    @PreAuthorize("@permissionGuard.has(authentication, 'FINANCE_READ')")
     public List<Map<String, Object>> list(@RequestParam String entityType,
                                           @RequestParam UUID entityId,
                                           @RequestParam(defaultValue = "0") int page,

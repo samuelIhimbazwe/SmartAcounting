@@ -21,14 +21,14 @@ public class FeatureFlagController {
     }
 
     @PostMapping("/{featureKey}")
-    @PreAuthorize("@permissionGuard.has(authentication, 'FEATURE_FLAG_WRITE')")
+    @PreAuthorize("@permissionGuard.has(authentication, 'TENANT_CONFIG')")
     public Map<String, Object> setFlag(@PathVariable String featureKey,
                                        @RequestParam boolean enabled) {
         return featureFlagService.setFlag(featureKey, enabled);
     }
 
     @GetMapping
-    @PreAuthorize("@permissionGuard.has(authentication, 'FEATURE_FLAG_WRITE')")
+    @PreAuthorize("@permissionGuard.has(authentication, 'TENANT_CONFIG')")
     public Map<String, Boolean> listFlags() {
         return featureFlagService.allFlags();
     }

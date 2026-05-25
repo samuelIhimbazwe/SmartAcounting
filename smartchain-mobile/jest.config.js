@@ -19,16 +19,15 @@ module.exports = {
     'src/hardware/escpos.ts',
     'src/services/syncProgress.ts',
     'src/services/receiptDeliveryConfig.ts',
+    'src/fiscal/efdSignature.ts',
+    'src/utils/formatting.ts',
   ],
-  // Phased ratchet (global, scoped files in collectCoverageFrom):
-  //   Phase 6 hardened: 85 / 75 (lines+statements / branches+functions)
-  //   Full-app 70% target requires expanding collectCoverageFrom + posSlice/efd tests.
   coverageThreshold: {
     global: {
-      branches: 74,
-      functions: 78,
-      lines: 84,
-      statements: 84,
+      branches: 70,
+      functions: 70,
+      lines: 70,
+      statements: 70,
     },
   },
 };

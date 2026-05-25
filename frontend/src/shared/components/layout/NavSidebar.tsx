@@ -1,30 +1,21 @@
-import type { ComponentType } from 'react'
-import { BarChart3, BookOpen, Briefcase, ChartSpline, DollarSign, FileText, Settings, ShoppingCart, ShieldCheck, Users } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { ChevronLeft, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { NavLink } from 'react-router-dom'
-import { canAccessRoleDashboard } from '../../security/roleAccess'
+import { accessibleDashboardRoles } from '../../security/roleAccess'
+import { useAuthStore } from '../../stores/authStore'
 import type { Role } from '../../types/roles'
-import { rolePathMap, roles } from '../../types/roles'
+import {
+  filterNavItems,
+  NAV_GROUP_ORDER,
+  ROLE_DASHBOARD_ICON,
+  ROLE_DASHBOARD_LABEL,
+  roleDashboardPath,
+  type NavGroupKey,
+  type NavItem,
+} from './navConfig'
 
-const roleLabel: Record<Role, string> = {
-  CEO: 'Strategic Overview',
-  CFO: 'Financial Command',
-  SALES: 'Revenue Engine',
-  OPERATIONS: 'Operations Control',
-  HR: 'Workforce Economics',
-  MARKETING: 'Campaign Intelligence',
-  ACCOUNTING: 'Execution Hub',
-}
-
-const roleIcon: Record<Role, ComponentType<{ className?: string }>> = {
-  CEO: ChartSpline,
-  CFO: DollarSign,
-  SALES: BarChart3,
-  OPERATIONS: Settings,
-  HR: Users,
-  MARKETING: Briefcase,
-  ACCOUNTING: BookOpen,
-}
+const COLLAPSE_KEY = 'smartchain_nav_collapsed'
 
 interface NavSidebarProps {
   role: Role
@@ -32,106 +23,175 @@ interface NavSidebarProps {
   onNavigate?: () => void
 }
 
+function matchesSearch(item: { searchLabel: string; label: string }, query: string): boolean {
+  const q = query.trim().toLowerCase()
+  if (!q) {
+    return true
+  }
+  return item.searchLabel.toLowerCase().includes(q) || item.label.toLowerCase().includes(q)
+}
+
 export function NavSidebar({ role, className, onNavigate }: NavSidebarProps) {
   const { t } = useTranslation()
+  const permissions = useAuthStore((state) => state.permissions)
+  const hasPermission = useAuthStore((state) => state.hasPermission)
+  const effectiveRoleProfile = useAuthStore((state) => state.effectiveRoleProfile)
+  const [query, setQuery] = useState('')
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return sessionStorage.getItem(COLLAPSE_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev
+      try {
+        sessionStorage.setItem(COLLAPSE_KEY, next ? '1' : '0')
+      } catch {
+        /* ignore */
+      }
+      return next
+    })
+  }
+
+  const dashboards = useMemo(
+    () =>
+      accessibleDashboardRoles(role, permissions, effectiveRoleProfile)
+        .map((r) => ({
+          id: `dashboard-${r}`,
+          to: roleDashboardPath(r),
+          label: ROLE_DASHBOARD_LABEL[r],
+          searchLabel: ROLE_DASHBOARD_LABEL[r],
+          icon: ROLE_DASHBOARD_ICON[r],
+        })),
+    [role, permissions, effectiveRoleProfile],
+  )
+
+  const navItems = useMemo(
+    () => filterNavItems(hasPermission, effectiveRoleProfile.navItemIds),
+    [hasPermission, effectiveRoleProfile.navItemIds],
+  )
+
+  const grouped = useMemo(() => {
+    const map = new Map<NavGroupKey, NavItem[]>()
+    for (const key of NAV_GROUP_ORDER) {
+      map.set(key, [])
+    }
+    for (const item of navItems) {
+      const list = map.get(item.group) ?? []
+      list.push(item)
+      map.set(item.group, list)
+    }
+    return map
+  }, [navItems])
+
+  const filteredDashboards = dashboards.filter((d) => matchesSearch(d, query))
+  const filteredGroups = NAV_GROUP_ORDER.map((groupKey) => {
+    const items = (grouped.get(groupKey) ?? [])
+      .map((item) => ({ item, label: t(item.labelKey) }))
+      .filter(({ item, label }) => matchesSearch({ searchLabel: item.searchLabel, label }, query))
+    return { groupKey, items }
+  }).filter((g) => g.groupKey !== 'nav.groupOverview' && g.items.length > 0)
+
+  const showOverview = filteredDashboards.length > 0
+  const showEmpty = !showOverview && filteredGroups.length === 0 && query.trim().length > 0
 
   return (
-    <aside className={`w-64 shrink-0 border-r border-[var(--border-subtle)] bg-white p-4 ${className ?? ''}`}>
-      <div className="mb-6 rounded-xl bg-[var(--color-brand-10)] p-3">
-        <h1 className="m-0 font-[var(--font-display)] text-lg font-bold text-[var(--color-brand-900)]">SMARTCHAIN</h1>
-        <p className="m-0 text-sm text-neutral-600">{t('nav.dashboardSuite')}</p>
-      </div>
+    <aside
+      className={`nav-sidebar ${className ?? ''}`}
+      data-collapsed={collapsed ? 'true' : 'false'}
+      aria-label={t('nav.dashboardSuite')}
+    >
+      <button
+        type="button"
+        className="nav-collapse-btn"
+        onClick={toggleCollapsed}
+        aria-label={collapsed ? t('nav.expand') : t('nav.collapse')}
+        title={collapsed ? t('nav.expand') : t('nav.collapse')}
+      >
+        <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+      </button>
 
-      <nav className="flex flex-col gap-2" aria-label={t('nav.dashboardSuite')}>
-        {roles.filter((currentRole) => canAccessRoleDashboard(role, currentRole)).map((currentRole) => {
-          const Icon = roleIcon[currentRole]
-          return (
-            <NavLink
-              key={currentRole}
-              to={`/dashboard/${rolePathMap[currentRole]}`}
-              className={({ isActive }) =>
-                `flex items-center gap-3 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                  isActive
-                    ? 'border-[var(--color-brand-200)] bg-[var(--color-brand-10)] text-[var(--color-brand-900)]'
-                    : 'border-transparent text-neutral-600 hover:border-[var(--border-subtle)] hover:bg-[var(--surface-overlay)]'
-                }`
-              }
-              onClick={onNavigate}
-            >
-              <Icon className="h-4 w-4" />
-              <span>{roleLabel[currentRole]}</span>
-            </NavLink>
-          )
-        })}
-      </nav>
-
-      <div className="mt-6 border-t border-[var(--border-subtle)] pt-4">
-        <p className="m-0 mb-2 text-xs uppercase tracking-wider text-neutral-500">{t('nav.transactions')}</p>
-        <nav className="flex flex-col gap-2" aria-label={t('nav.transactions')}>
-          <NavLink
-            to="/transactions/invoice"
-            className={({ isActive }) =>
-              `flex items-center gap-3 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                isActive
-                  ? 'border-[var(--color-brand-200)] bg-[var(--color-brand-10)] text-[var(--color-brand-900)]'
-                  : 'border-transparent text-neutral-600 hover:border-[var(--border-subtle)] hover:bg-[var(--surface-overlay)]'
-              }`
-            }
-            onClick={onNavigate}
-          >
-            <FileText className="h-4 w-4" />
-            <span>{t('nav.invoice')}</span>
-          </NavLink>
-          <NavLink
-            to="/transactions/purchase-order"
-            className={({ isActive }) =>
-              `flex items-center gap-3 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                isActive
-                  ? 'border-[var(--color-brand-200)] bg-[var(--color-brand-10)] text-[var(--color-brand-900)]'
-                  : 'border-transparent text-neutral-600 hover:border-[var(--border-subtle)] hover:bg-[var(--surface-overlay)]'
-              }`
-            }
-            onClick={onNavigate}
-          >
-            <ShoppingCart className="h-4 w-4" />
-            <span>{t('nav.purchaseOrder')}</span>
-          </NavLink>
-          <NavLink
-            to="/transactions/sales-order"
-            className={({ isActive }) =>
-              `flex items-center gap-3 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                isActive
-                  ? 'border-[var(--color-brand-200)] bg-[var(--color-brand-10)] text-[var(--color-brand-900)]'
-                  : 'border-transparent text-neutral-600 hover:border-[var(--border-subtle)] hover:bg-[var(--surface-overlay)]'
-              }`
-            }
-            onClick={onNavigate}
-          >
-            <BarChart3 className="h-4 w-4" />
-            <span>{t('nav.salesOrder')}</span>
-          </NavLink>
-        </nav>
-      </div>
-
-      {(role === 'CEO' || role === 'CFO' || role === 'HR') && (
-        <div className="mt-6 border-t border-[var(--border-subtle)] pt-4">
-          <p className="m-0 mb-2 text-xs uppercase tracking-wider text-neutral-500">{t('nav.admin')}</p>
-          <NavLink
-            to="/admin/users-tenants"
-            className={({ isActive }) =>
-              `flex items-center gap-3 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                isActive
-                  ? 'border-[var(--color-brand-200)] bg-[var(--color-brand-10)] text-[var(--color-brand-900)]'
-                  : 'border-transparent text-neutral-600 hover:border-[var(--border-subtle)] hover:bg-[var(--surface-overlay)]'
-              }`
-            }
-            onClick={onNavigate}
-          >
-            <ShieldCheck className="h-4 w-4" />
-            <span>{t('nav.userTenantManagement')}</span>
-          </NavLink>
+      <div className="nav-brand">
+        <div className="nav-brand__mark" aria-hidden>
+          SC
         </div>
-      )}
+        <div className="nav-brand__text">
+          <div className="nav-brand__name">SmartAccounting</div>
+          <div className="nav-brand__tagline">{t('nav.dashboardSuite')}</div>
+        </div>
+      </div>
+
+      <div className="nav-search">
+        <Search className="nav-search__icon h-4 w-4" aria-hidden />
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t('nav.searchPlaceholder')}
+          aria-label={t('nav.searchPlaceholder')}
+        />
+      </div>
+
+      <div className="nav-scroll">
+        {showEmpty ? <p className="nav-empty">{t('nav.searchEmpty')}</p> : null}
+
+        {showOverview ? (
+          <section className="nav-group">
+            <span className="nav-group__label">{t('nav.groupOverview')}</span>
+            <ul className="nav-list">
+              {filteredDashboards.map((d) => {
+                const Icon = d.icon
+                return (
+                  <li key={d.id}>
+                    <NavLink
+                      to={d.to}
+                      className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+                      onClick={onNavigate}
+                      title={d.label}
+                    >
+                      <span className="nav-link__icon">
+                        <Icon className="h-[18px] w-[18px]" />
+                      </span>
+                      <span className="nav-link__label">{d.label}</span>
+                    </NavLink>
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        ) : null}
+
+        {filteredGroups.map(({ groupKey, items }) => (
+          <section key={groupKey} className="nav-group">
+            <span className="nav-group__label">{t(groupKey)}</span>
+            <ul className="nav-list">
+              {items.map(({ item, label }) => {
+                const Icon = item.icon
+                return (
+                  <li key={item.id}>
+                    <NavLink
+                      to={item.to}
+                      className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
+                      onClick={onNavigate}
+                      title={label}
+                    >
+                      <span className="nav-link__icon">
+                        <Icon className="h-[18px] w-[18px]" />
+                      </span>
+                      <span className="nav-link__label">{label}</span>
+                      {item.badge ? <span className="nav-link__badge">{item.badge}</span> : null}
+                    </NavLink>
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        ))}
+      </div>
     </aside>
   )
 }

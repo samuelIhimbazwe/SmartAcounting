@@ -1,11 +1,18 @@
 import { apiClient } from './client'
 import type { Role } from '../types/roles'
+import { normalizeRoleProfile, type RoleProfile } from '../types/roleProfiles'
 
 interface LoginRequest {
   username: string
   password: string
   tenantId: string
   userId: string
+}
+
+export interface AssignedRoleSummary {
+  id: string | null
+  name: string
+  owner: boolean
 }
 
 interface LoginResponse {
@@ -16,6 +23,10 @@ interface LoginResponse {
   role?: Role
   tenantId?: string
   userId?: string
+  permissions?: string[]
+  assignedRoles?: AssignedRoleSummary[]
+  effectiveRoleProfile?: RoleProfile
+  setupComplete?: boolean
 }
 
 interface RefreshResponse {
@@ -30,8 +41,22 @@ export interface AuthSession {
   refreshToken: string | null
   expiresAt: number | null
   role: Role
+  permissions: string[]
+  assignedRoles: AssignedRoleSummary[]
+  effectiveRoleProfile: RoleProfile
+  setupComplete: boolean
   tenantId?: string
   userId?: string
+}
+
+export interface AuthSessionProfile {
+  role: Role
+  tenantId: string
+  userId: string
+  permissions: string[]
+  assignedRoles: AssignedRoleSummary[]
+  effectiveRoleProfile: RoleProfile
+  setupComplete: boolean
 }
 
 export function toExpiryTimestamp(expiresIn?: number) {
@@ -51,9 +76,23 @@ export async function login(request: LoginRequest): Promise<AuthSession> {
     accessToken,
     refreshToken: response.data.refreshToken ?? null,
     expiresAt: toExpiryTimestamp(response.data.expiresIn),
-    role: response.data.role ?? 'CEO',
+    role: (response.data.role as Role | undefined) ?? 'CEO',
+    permissions: response.data.permissions ?? [],
+    assignedRoles: response.data.assignedRoles ?? [],
+    effectiveRoleProfile: normalizeRoleProfile(response.data.effectiveRoleProfile),
+    setupComplete: response.data.setupComplete ?? false,
     tenantId: response.data.tenantId,
     userId: response.data.userId,
+  }
+}
+
+export async function fetchAuthMe(): Promise<AuthSessionProfile> {
+  const response = await apiClient.get<AuthSessionProfile>('/api/v1/auth/me')
+  return {
+    ...response.data,
+    role: response.data.role as Role,
+    effectiveRoleProfile: normalizeRoleProfile(response.data.effectiveRoleProfile),
+    setupComplete: response.data.setupComplete ?? false,
   }
 }
 

@@ -1,6 +1,7 @@
 package com.smartaccounting.controller;
 
 import com.smartaccounting.service.AnalyticsDashboardService;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,7 +20,7 @@ public class AnalyticsController {
     }
 
     @GetMapping("/dashboard")
-    @PreAuthorize("hasAnyRole('CEO','CFO','SALES_MANAGER','OPS_MANAGER','ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.OPS_DASHBOARD)
     public Map<String, Object> dashboard(
         @RequestParam(defaultValue = "location") String scope
     ) {

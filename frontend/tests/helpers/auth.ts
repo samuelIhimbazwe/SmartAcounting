@@ -31,6 +31,7 @@ export const loginAs = async (page: Page, role: keyof typeof ROLE_CREDENTIALS) =
   await page.goto('/login')
   await page.getByLabel(/username|email/i).fill(email)
   await page.getByLabel(/password/i).fill(password)
+  await page.getByText(/workspace settings/i).click()
   const tenant = page.getByLabel(/tenant/i)
   if (await tenant.isVisible()) {
     await tenant.fill(tenantId)

@@ -3,6 +3,7 @@ package com.smartaccounting.controller;
 import com.smartaccounting.dto.ExportRequest;
 import com.smartaccounting.service.ExportService;
 import jakarta.validation.Valid;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,13 +20,13 @@ public class ExportController {
     }
 
     @PostMapping("/{role}/export")
-    @PreAuthorize("@roleScopeGuard.canAccessRole(authentication, #role)")
+    @PreAuthorize("@dashboardAccessGuard.canAccess(authentication, #role)")
     public Map<String, UUID> export(@PathVariable String role, @RequestBody @Valid ExportRequest request) {
         return Map.of("exportJobId", exportService.queue(new ExportRequest(role, request.format())));
     }
 
     @GetMapping("/export/jobs/{id}")
-    @PreAuthorize("hasRole('CEO') or hasRole('CFO') or hasRole('ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.REPORTS_EXPORT)
     public Map<String, Object> exportStatus(@PathVariable UUID id) {
         return exportService.status(id);
     }

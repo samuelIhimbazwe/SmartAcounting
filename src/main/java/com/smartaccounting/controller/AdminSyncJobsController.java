@@ -25,13 +25,13 @@ public class AdminSyncJobsController {
     }
 
     @PostMapping("/sync-flush/run")
-    @PreAuthorize("@permissionGuard.has(authentication, 'PROJECTION_REBUILD')")
+    @PreAuthorize("@permissionGuard.has(authentication, 'TENANT_CONFIG')")
     public Map<String, Integer> runSyncFlush() {
         return Map.of("processed", syncService.flushPending());
     }
 
     @PostMapping("/sms-reminder/run")
-    @PreAuthorize("@permissionGuard.has(authentication, 'PROJECTION_REBUILD')")
+    @PreAuthorize("@permissionGuard.has(authentication, 'TENANT_CONFIG')")
     public Map<String, Object> runSmsReminder(
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate simulateDate
     ) {

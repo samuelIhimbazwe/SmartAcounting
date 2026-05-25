@@ -66,7 +66,21 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<Map<String, String>> handleConflict(ConflictException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "Conflict"));
+        String message = ex.getMessage();
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+            "error",
+            message != null && !message.isBlank() ? message : "Conflict"
+        ));
+    }
+
+    @ExceptionHandler(RoleConflictException.class)
+    public ResponseEntity<Map<String, String>> handleRoleConflict(RoleConflictException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(RoleModificationException.class)
+    public ResponseEntity<Map<String, String>> handleRoleModification(RoleModificationException ex) {
+        return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)

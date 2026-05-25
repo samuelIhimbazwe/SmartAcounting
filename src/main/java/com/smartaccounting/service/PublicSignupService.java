@@ -1,11 +1,14 @@
 package com.smartaccounting.service;
 
 import com.smartaccounting.config.PublicSignupProperties;
+import com.smartaccounting.config.SmsProperties;
 import com.smartaccounting.dto.AuthResponse;
+import com.smartaccounting.dto.AuthSessionProfile;
 import com.smartaccounting.dto.signup.ForgotPasswordRequest;
 import com.smartaccounting.dto.signup.PublicOAuthSignupRequest;
 import com.smartaccounting.dto.signup.PublicSignupRequest;
 import com.smartaccounting.dto.signup.ResetPasswordRequest;
+import com.smartaccounting.dto.signup.ResendOtpResponse;
 import com.smartaccounting.dto.signup.SignupResponse;
 import com.smartaccounting.dto.signup.VerifyPhoneRequest;
 import com.smartaccounting.exception.ConflictException;
@@ -13,7 +16,10 @@ import com.smartaccounting.security.JwtService;
 import com.smartaccounting.security.RefreshTokenService;
 import com.smartaccounting.signup.OidcIdentityTokenService;
 import com.smartaccounting.signup.OidcVerifiedIdentity;
+import com.smartaccounting.signup.PhoneMask;
 import com.smartaccounting.signup.PhoneNormalizer;
+import com.smartaccounting.sms.RwandaMobileNetwork;
+import com.smartaccounting.sms.RwandaMobileNetworkDetector;
 import com.smartaccounting.signup.PublicOtpService;
 import com.smartaccounting.signup.PublicRateLimitService;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -24,6 +30,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -58,40 +65,50 @@ public class PublicSignupService {
     private final PublicOtpService otpService;
     private final PublicRateLimitService rateLimitService;
     private final SmsDispatchService smsDispatchService;
+    private final SmsProperties smsProperties;
     private final PublicSignupProperties signupProperties;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
     private final UserDetailsService userDetailsService;
     private final org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
     private final OidcIdentityTokenService oidcIdentityTokenService;
+    private final AuthSessionService authSessionService;
 
     public PublicSignupService(JdbcTemplate jdbcTemplate,
                                PasswordEncoder passwordEncoder,
                                PublicOtpService otpService,
                                PublicRateLimitService rateLimitService,
                                SmsDispatchService smsDispatchService,
+                               SmsProperties smsProperties,
                                PublicSignupProperties signupProperties,
                                JwtService jwtService,
                                RefreshTokenService refreshTokenService,
                                UserDetailsService userDetailsService,
                                org.springframework.data.redis.core.StringRedisTemplate redisTemplate,
-                               OidcIdentityTokenService oidcIdentityTokenService) {
+                               OidcIdentityTokenService oidcIdentityTokenService,
+                               AuthSessionService authSessionService) {
         this.jdbcTemplate = jdbcTemplate;
         this.passwordEncoder = passwordEncoder;
         this.otpService = otpService;
         this.rateLimitService = rateLimitService;
         this.smsDispatchService = smsDispatchService;
+        this.smsProperties = smsProperties;
         this.signupProperties = signupProperties;
         this.jwtService = jwtService;
         this.refreshTokenService = refreshTokenService;
         this.userDetailsService = userDetailsService;
         this.redisTemplate = redisTemplate;
         this.oidcIdentityTokenService = oidcIdentityTokenService;
+        this.authSessionService = authSessionService;
     }
 
     @Transactional
     public SignupResponse signup(PublicSignupRequest req, String clientIp) {
-        if (!rateLimitService.allow("ratelimit:public:signup:ip:" + clientIp, 5, Duration.ofHours(1))) {
+        if (signupProperties.isRateLimitEnabled()
+            && !rateLimitService.allow(
+                "ratelimit:public:signup:ip:" + clientIp,
+                signupProperties.getServiceMaxPerHour(),
+                Duration.ofHours(1))) {
             throw new com.smartaccounting.exception.RateLimitExceededException("Too many signup attempts.");
         }
         String email = normalizeEmail(req.email());
@@ -115,7 +132,7 @@ public class PublicSignupService {
 
         UUID tenantId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
-        Instant trialEnd = Instant.now().plus(30, ChronoUnit.DAYS);
+        Timestamp trialEnd = Timestamp.from(Instant.now().plus(30, ChronoUnit.DAYS));
         String hash = passwordEncoder.encode(req.password());
 
         try {
@@ -145,6 +162,8 @@ public class PublicSignupService {
             throw new ConflictException();
         }
 
+        // RBAC roles are created during onboarding Q&A (POST /tenant/roles/setup), not at signup.
+        // Staff invited to an existing tenant receive role assignments via AdminTenantUserService.invite().
         String otpCode = otpService.generateAndStore(OTP_SIGNUP, phone);
         String sessionToken = UUID.randomUUID().toString();
         redisTemplate.opsForValue().set(
@@ -157,8 +176,7 @@ public class PublicSignupService {
             + ". Login at " + signupProperties.getLoginUrlText()
             + " with " + email + ". Your 30-day free trial has started.";
         smsDispatchService.send(tenantId, UUID.randomUUID(), "SIGNUP_WELCOME", java.util.List.of(phone), welcome);
-        String otpMsg = "Your SmartAccounting verification code is " + otpCode + ". Valid 10 minutes.";
-        smsDispatchService.send(tenantId, UUID.randomUUID(), "SIGNUP_OTP", java.util.List.of(phone), otpMsg);
+        int otpSmsDelivered = dispatchSignupOtpSms(tenantId, phone, otpCode);
 
         String adminPhone = signupProperties.getPlatformAdminPhone();
         if (!adminPhone.isBlank()) {
@@ -169,12 +187,16 @@ public class PublicSignupService {
                 java.util.List.of(PhoneNormalizer.normalize(adminPhone)), alert);
         }
 
-        return new SignupResponse(tenantId, userId, sessionToken);
+        return buildSignupResponse(tenantId, userId, sessionToken, phone, otpCode, otpSmsDelivered);
     }
 
     @Transactional
     public SignupResponse signupOAuth(PublicOAuthSignupRequest req, String clientIp) {
-        if (!rateLimitService.allow("ratelimit:public:signup:ip:" + clientIp, 5, Duration.ofHours(1))) {
+        if (signupProperties.isRateLimitEnabled()
+            && !rateLimitService.allow(
+                "ratelimit:public:signup:ip:" + clientIp,
+                signupProperties.getServiceMaxPerHour(),
+                Duration.ofHours(1))) {
             throw new com.smartaccounting.exception.RateLimitExceededException("Too many signup attempts.");
         }
         OidcVerifiedIdentity identity = oidcIdentityTokenService.verify(req.provider(), req.idToken());
@@ -199,7 +221,7 @@ public class PublicSignupService {
 
         UUID tenantId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
-        Instant trialEnd = Instant.now().plus(30, ChronoUnit.DAYS);
+        Timestamp trialEnd = Timestamp.from(Instant.now().plus(30, ChronoUnit.DAYS));
         String ownerLabel = req.ownerName().trim().isBlank() ? identity.displayName() : req.ownerName().trim();
 
         try {
@@ -230,6 +252,8 @@ public class PublicSignupService {
             throw new ConflictException();
         }
 
+        // RBAC roles are created during onboarding Q&A (POST /tenant/roles/setup), not at signup.
+        // Staff invited to an existing tenant receive role assignments via AdminTenantUserService.invite().
         String otpCode = otpService.generateAndStore(OTP_SIGNUP, phone);
         String sessionToken = UUID.randomUUID().toString();
         redisTemplate.opsForValue().set(
@@ -242,8 +266,7 @@ public class PublicSignupService {
             + ". Login at " + signupProperties.getLoginUrlText()
             + " with " + email + ". Your 30-day free trial has started.";
         smsDispatchService.send(tenantId, UUID.randomUUID(), "SIGNUP_WELCOME", java.util.List.of(phone), welcome);
-        String otpMsg = "Your SmartAccounting verification code is " + otpCode + ". Valid 10 minutes.";
-        smsDispatchService.send(tenantId, UUID.randomUUID(), "SIGNUP_OTP", java.util.List.of(phone), otpMsg);
+        int otpSmsDelivered = dispatchSignupOtpSms(tenantId, phone, otpCode);
 
         String adminPhone = signupProperties.getPlatformAdminPhone();
         if (!adminPhone.isBlank()) {
@@ -254,7 +277,7 @@ public class PublicSignupService {
                 java.util.List.of(PhoneNormalizer.normalize(adminPhone)), alert);
         }
 
-        return new SignupResponse(tenantId, userId, sessionToken);
+        return buildSignupResponse(tenantId, userId, sessionToken, phone, otpCode, otpSmsDelivered);
     }
 
     @Transactional
@@ -288,16 +311,23 @@ public class PublicSignupService {
         String username = row.get("username").toString();
 
         UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+        AuthSessionProfile session = authSessionService.buildSession(tenantId, userId);
         String tid = tenantId.toString();
         String uid = userId.toString();
-        String access = jwtService.generateToken(userDetails, tid, uid);
+        String access = jwtService.generateToken(
+            userDetails,
+            tid,
+            uid,
+            authSessionService.loadEffectivePermissions(tenantId, userId, session.role())
+        );
         String refresh = refreshTokenService.issue(tid, uid, userDetails);
-        return new AuthResponse(access, "Bearer", jwtService.expirationSeconds(), refresh);
+        return AuthResponse.fromSession(access, "Bearer", jwtService.expirationSeconds(), refresh, session);
     }
 
-    public void resendOtp(String phoneRaw) {
+    public ResendOtpResponse resendOtp(String phoneRaw) {
         String phone = PhoneNormalizer.normalize(phoneRaw);
-        if (!rateLimitService.allow("ratelimit:public:resend:" + phone, 3, Duration.ofHours(1))) {
+        if (signupProperties.isRateLimitEnabled()
+            && !rateLimitService.allow("ratelimit:public:resend:" + phone, 3, Duration.ofHours(1))) {
             throw new com.smartaccounting.exception.RateLimitExceededException("Too many resend attempts.");
         }
         Boolean pending = jdbcTemplate.query(
@@ -316,17 +346,70 @@ public class PublicSignupService {
             throw new IllegalArgumentException("Cannot resend code");
         }
         String otpCode = otpService.generateAndStore(OTP_SIGNUP, phone);
-        smsDispatchService.send(
-            jdbcTemplate.query(
-                "select tenant_id from users where phone = ? limit 1",
-                rs -> rs.next() ? UUID.fromString(rs.getString("tenant_id")) : UUID.randomUUID(),
-                phone
-            ),
-            UUID.randomUUID(),
-            "SIGNUP_OTP_RESEND",
-            java.util.List.of(phone),
-            "Your SmartAccounting verification code is " + otpCode + ". Valid 10 minutes."
+        UUID tenantId = jdbcTemplate.query(
+            "select tenant_id from users where phone = ? limit 1",
+            rs -> rs.next() ? UUID.fromString(rs.getString("tenant_id")) : UUID.randomUUID(),
+            phone
         );
+        int delivered = dispatchSignupOtpSms(tenantId, phone, otpCode);
+        return buildOtpDeliveryMeta(phone, otpCode, delivered);
+    }
+
+    private int dispatchSignupOtpSms(UUID tenantId, String phone, String otpCode) {
+        String otpMsg = "Your SmartAccounting verification code is " + otpCode + ". Valid 10 minutes.";
+        return smsDispatchService.send(tenantId, UUID.randomUUID(), "SIGNUP_OTP", java.util.List.of(phone), otpMsg);
+    }
+
+    private SignupResponse buildSignupResponse(
+        UUID tenantId,
+        UUID userId,
+        String sessionToken,
+        String phone,
+        String otpCode,
+        int smsDelivered
+    ) {
+        ResendOtpResponse meta = buildOtpDeliveryMeta(phone, otpCode, smsDelivered);
+        return new SignupResponse(
+            tenantId,
+            userId,
+            sessionToken,
+            meta.maskedPhone(),
+            meta.smsDelivery(),
+            meta.smsCarrier(),
+            meta.devOtp()
+        );
+    }
+
+    private ResendOtpResponse buildOtpDeliveryMeta(String phone, String otpCode, int smsDelivered) {
+        String delivery = resolveSmsDelivery(smsDelivered);
+        String devOtp = null;
+        if (signupProperties.isExposeOtpInResponse() && !"SENT".equals(delivery)) {
+            devOtp = otpCode;
+        }
+        String carrier = carrierLabel(detectCarrier(phone));
+        return new ResendOtpResponse(PhoneMask.mask(phone), delivery, carrier, devOtp);
+    }
+
+    private RwandaMobileNetwork detectCarrier(String phone) {
+        return RwandaMobileNetworkDetector.detect(
+            phone,
+            smsProperties.resolvedMtnPrefixes(),
+            smsProperties.resolvedAirtelPrefixes()
+        );
+    }
+
+    private static String carrierLabel(RwandaMobileNetwork network) {
+        return RwandaMobileNetworkDetector.networkLabel(network);
+    }
+
+    private String resolveSmsDelivery(int smsDelivered) {
+        if (!smsProperties.isEnabled()) {
+            return "DISABLED";
+        }
+        if (smsProperties.isDryRun() || !smsProperties.isLiveDispatchConfigured()) {
+            return "DRY_RUN";
+        }
+        return smsDelivered > 0 ? "SENT" : "FAILED";
     }
 
     public void forgotPassword(ForgotPasswordRequest req, String clientIp) {

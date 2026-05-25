@@ -39,7 +39,59 @@ public class WhatsAppBroadcastService {
             log.info("WhatsApp dry-run tenant={} eventType={} to={} message={}", tenantId, eventType, to, message);
             return true;
         }
+        if (properties.isUseTemplate()) {
+            return sendLiveTemplate(to, message);
+        }
         return sendLive(to, message);
+    }
+
+    private boolean sendLiveTemplate(String phone, String message) {
+        try {
+            String base = properties.getApiUrl().replaceAll("/+$", "");
+            String url = base + "/" + properties.getPhoneNumberId() + "/messages";
+            HttpURLConnection conn = (HttpURLConnection) URI.create(url).toURL().openConnection();
+            conn.setRequestMethod("POST");
+            conn.setConnectTimeout(properties.getConnectTimeoutMs());
+            conn.setReadTimeout(properties.getReadTimeoutMs());
+            conn.setDoOutput(true);
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("Authorization", "Bearer " + properties.getBearerToken());
+
+            String bodyText = message.length() > 900 ? message.substring(0, 900) : message;
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("messaging_product", "whatsapp");
+            body.put("to", sanitizeE164(phone));
+            body.put("type", "template");
+            body.put("template", Map.of(
+                "name", properties.getTemplateName(),
+                "language", Map.of("code", "en"),
+                "components", java.util.List.of(
+                    Map.of(
+                        "type", "body",
+                        "parameters", java.util.List.of(
+                            Map.of("type", "text", "text", bodyText))))));
+
+            byte[] payload = objectMapper.writeValueAsBytes(body);
+            try (OutputStream out = conn.getOutputStream()) {
+                out.write(payload);
+            }
+            int status = conn.getResponseCode();
+            return status >= 200 && status < 300;
+        } catch (Exception ex) {
+            log.warn("WhatsApp template send failed: {}", ex.getMessage());
+            return false;
+        }
+    }
+
+    private static String sanitizeE164(String phone) {
+        String digits = phone.replaceAll("[^0-9]", "");
+        if (digits.startsWith("250")) {
+            return "+" + digits;
+        }
+        if (digits.startsWith("07") || digits.startsWith("08")) {
+            return "+250" + digits.substring(1);
+        }
+        return "+" + digits;
     }
 
     private boolean sendLive(String phone, String message) {
@@ -56,7 +108,7 @@ public class WhatsAppBroadcastService {
 
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("messaging_product", "whatsapp");
-            body.put("to", phone.replaceAll("\\s+", ""));
+            body.put("to", sanitizeE164(phone));
             body.put("type", "text");
             body.put("text", Map.of("body", message));
 

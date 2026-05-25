@@ -1,11 +1,13 @@
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { getDashboardAnomalies } from '../../../shared/api/dashboards'
 import { rolesWithAnomalies } from '../../../shared/api/dashboardRoleConfig'
 import type { Role } from '../../../shared/types/roles'
 
 export function DashboardAnomaliesPanel({ role }: { role: Role }) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const show = rolesWithAnomalies.includes(role)
 
   const { data, isLoading } = useQuery({
@@ -32,19 +34,22 @@ export function DashboardAnomaliesPanel({ role }: { role: Role }) {
       )}
       <ul className="mt-3 space-y-2">
         {items.map((item) => (
-          <li
-            key={item.id}
-            className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-3"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <p className="m-0 text-sm font-semibold text-neutral-900">{item.title}</p>
-              <span className="rounded-full bg-[var(--surface-overlay)] px-2 py-0.5 text-[10px] font-semibold uppercase text-neutral-600">
-                {item.severity}
-              </span>
-            </div>
-            {item.details && (
-              <p className="m-0 mt-1 text-xs leading-5 text-neutral-600">{item.details}</p>
-            )}
+          <li key={item.id}>
+            <button
+              type="button"
+              className="block w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-3 text-left transition-colors hover:bg-white"
+              onClick={() => navigate(`/anomalies/${item.id}`, { state: { anomaly: item } })}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="m-0 text-sm font-semibold text-neutral-900">{item.title}</p>
+                <span className="rounded-full bg-[var(--surface-overlay)] px-2 py-0.5 text-[10px] font-semibold uppercase text-neutral-600">
+                  {item.severity}
+                </span>
+              </div>
+              {item.details && (
+                <p className="m-0 mt-1 text-xs leading-5 text-neutral-600">{item.details}</p>
+              )}
+            </button>
           </li>
         ))}
       </ul>

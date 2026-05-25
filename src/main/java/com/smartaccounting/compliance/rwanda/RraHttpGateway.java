@@ -26,6 +26,18 @@ public class RraHttpGateway {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * RRA TIN validation — path from {@link RwandaComplianceProperties#getTinValidatePath()}.
+     */
+    public Map<String, Object> validateTin(RwandaComplianceProperties props, String tin) {
+        try {
+            String jsonBody = objectMapper.writeValueAsString(Map.of("tin", tin));
+            return postJson(props, props.getTinValidatePath(), jsonBody);
+        } catch (Exception ex) {
+            return Map.of("ok", false, "error", ex.getMessage());
+        }
+    }
+
     public Map<String, Object> postJson(RwandaComplianceProperties props, String relativePath, String jsonBody) {
         if (!props.isEnabled()) {
             return Map.of(

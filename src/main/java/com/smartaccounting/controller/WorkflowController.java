@@ -1,6 +1,8 @@
 package com.smartaccounting.controller;
 
 import com.smartaccounting.dto.CreateWorkflowRuleRequest;
+import com.smartaccounting.entity.WorkflowRule;
+import com.smartaccounting.security.PermissionExpressions;
 import com.smartaccounting.service.WorkflowService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -11,8 +13,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import com.smartaccounting.entity.WorkflowRule;
 
 import java.util.HashMap;
 import java.util.List;
@@ -29,19 +29,19 @@ public class WorkflowController {
     }
 
     @GetMapping("/rules")
-    @PreAuthorize("hasRole('CEO') or hasRole('CFO')")
+    @PreAuthorize(PermissionExpressions.FINANCE_READ)
     public List<WorkflowRule> listRules() {
         return workflowService.listRules();
     }
 
     @PostMapping("/rules")
-    @PreAuthorize("hasRole('CEO') or hasRole('CFO')")
+    @PreAuthorize(PermissionExpressions.FINANCE_WRITE)
     public Map<String, UUID> createRule(@RequestBody @Valid CreateWorkflowRuleRequest request) {
         return Map.of("ruleId", workflowService.createRule(request));
     }
 
     @GetMapping("/rules/{id}/evaluate")
-    @PreAuthorize("hasRole('CEO') or hasRole('CFO')")
+    @PreAuthorize(PermissionExpressions.FINANCE_READ)
     public Map<String, Object> evaluate(@PathVariable UUID id,
                                         @RequestParam(defaultValue = "true") boolean dryRun,
                                         @RequestParam(required = false) String sampleAmount) {

@@ -5,6 +5,7 @@ import com.smartaccounting.dto.signup.TenantUpgradeRequest;
 import com.smartaccounting.dto.signup.TenantUpdateStaffRoleRequest;
 import com.smartaccounting.service.TenantSelfServiceService;
 import jakarta.validation.Valid;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,7 +31,7 @@ public class TenantSelfServiceController {
     }
 
     @GetMapping("/users")
-    @PreAuthorize("hasAnyRole('CEO','CFO')")
+    @PreAuthorize(PermissionExpressions.TENANT_CONFIG)
     public Map<String, Object> listUsers(@RequestParam(defaultValue = "0") int page,
                                          @RequestParam(defaultValue = "50") int size,
                                          @RequestParam(defaultValue = "") String q) {
@@ -38,32 +39,32 @@ public class TenantSelfServiceController {
     }
 
     @PostMapping("/users")
-    @PreAuthorize("hasAnyRole('CEO','CFO')")
+    @PreAuthorize(PermissionExpressions.TENANT_CONFIG)
     public Map<String, Object> createUser(@RequestBody @Valid TenantCreateStaffRequest request) {
         return tenantSelfServiceService.createStaff(request);
     }
 
     @DeleteMapping("/users/{id}")
-    @PreAuthorize("hasAnyRole('CEO','CFO')")
+    @PreAuthorize(PermissionExpressions.TENANT_CONFIG)
     public void deleteUser(@PathVariable UUID id) {
         tenantSelfServiceService.deleteStaff(id);
     }
 
     @PatchMapping("/users/{id}/role")
-    @PreAuthorize("hasAnyRole('CEO','CFO')")
+    @PreAuthorize(PermissionExpressions.TENANT_CONFIG)
     public Map<String, Object> updateRole(@PathVariable UUID id,
                                           @RequestBody @Valid TenantUpdateStaffRoleRequest request) {
         return tenantSelfServiceService.updateStaffRole(id, request);
     }
 
     @GetMapping("/billing")
-    @PreAuthorize("hasAnyRole('CEO','CFO')")
+    @PreAuthorize(PermissionExpressions.TENANT_CONFIG)
     public Map<String, Object> billing() {
         return tenantSelfServiceService.billing();
     }
 
     @PostMapping("/upgrade-request")
-    @PreAuthorize("hasAnyRole('CEO','CFO')")
+    @PreAuthorize(PermissionExpressions.TENANT_CONFIG)
     public void upgradeRequest(@RequestBody @Valid TenantUpgradeRequest request) {
         tenantSelfServiceService.requestUpgrade(request);
     }

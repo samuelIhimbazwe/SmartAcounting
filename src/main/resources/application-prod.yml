@@ -54,6 +54,24 @@ smartaccounting:
     mtn-webhook-secret: ${MOBILE_MONEY_MTN_WEBHOOK_SECRET}
     airtel-webhook-secret: ${MOBILE_MONEY_AIRTEL_WEBHOOK_SECRET}
     mtn-allowed-ips: ${MOMO_ALLOWED_IPS:}
+    verify-enabled: ${MOMO_VERIFY_ENABLED:false}
+    mtn-verify-url: ${MOMO_MTN_VERIFY_URL:}
+    verify-bearer-token: ${MOMO_VERIFY_BEARER_TOKEN:}
+    stk-enabled: ${MOMO_STK_ENABLED:false}
+    stk-base-url: ${MOMO_STK_BASE_URL:https://proxy.momoapi.mtn.com}
+    stk-subscription-key: ${MOMO_SUBSCRIPTION_KEY:}
+    stk-api-user: ${MOMO_API_USER:}
+    stk-api-key: ${MOMO_API_KEY:}
+    stk-target-environment: ${MOMO_ENVIRONMENT:production}
+    stk-callback-url: ${MOMO_CALLBACK_URL:}
+  whatsapp:
+    enabled: ${WHATSAPP_ENABLED:false}
+    dry-run: ${WHATSAPP_DRY_RUN:true}
+    api-url: ${WHATSAPP_API_URL:https://graph.facebook.com/v18.0}
+    bearer-token: ${WHATSAPP_API_TOKEN:}
+    phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}
+    template-name: ${WHATSAPP_TEMPLATE_NAME:smartaccounting_receipt}
+    use-template: ${WHATSAPP_USE_TEMPLATE:false}
   sms:
     enabled: true
     dry-run: false

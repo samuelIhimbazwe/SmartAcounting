@@ -10,9 +10,12 @@ export interface EbmConfig {
 export interface EbmReceipt {
   id: string
   salesOrderId?: string
+  posTransactionId?: string
   status: string
   ebmReceiptNumber?: string
   submittedAt?: string
+  transactionDate?: string
+  grossAmount?: number
   errorMessage?: string
 }
 

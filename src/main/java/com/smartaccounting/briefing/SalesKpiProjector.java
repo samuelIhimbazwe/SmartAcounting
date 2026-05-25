@@ -91,8 +91,30 @@ public class SalesKpiProjector {
     }
 
     public double getRevenueVsTarget(UUID tenantId) {
-        log.warn("getRevenueVsTarget stub called for tenant {} — wire targets from planning / OKR read model", tenantId);
-        return 0d;
+        if (tenantId == null) {
+            return 0d;
+        }
+        double today = getRevenueToday(tenantId);
+        try {
+            Number avg = jdbcTemplate.queryForObject(
+                """
+                select coalesce(sum(psl.line_total), 0) / 30.0
+                from pos_sale_lines psl
+                join sales_orders so on so.id = psl.sales_order_id and so.tenant_id = psl.tenant_id
+                where psl.tenant_id = ?
+                  and so.created_at >= current_timestamp - interval '30 day'
+                """,
+                Number.class,
+                tenantId
+            );
+            double target = avg == null ? 0d : avg.doubleValue();
+            if (target <= 0) {
+                return today > 0 ? 1d : 0d;
+            }
+            return today / target;
+        } catch (Exception ex) {
+            return 0d;
+        }
     }
 
     public String getTopProduct(UUID tenantId) {
@@ -122,8 +144,22 @@ public class SalesKpiProjector {
     }
 
     public long getNewCustomersToday(UUID tenantId) {
-        log.warn("getNewCustomersToday stub called for tenant {} — implement new-customer definition (CRM / first invoice); returning 0", tenantId);
-        return 0L;
+        if (tenantId == null) {
+            return 0L;
+        }
+        try {
+            Long n = jdbcTemplate.queryForObject(
+                """
+                select count(*)::bigint from finance_customers
+                where tenant_id = ? and (created_at at time zone 'UTC')::date = current_date
+                """,
+                Long.class,
+                tenantId
+            );
+            return n == null ? 0L : n;
+        } catch (Exception ex) {
+            return 0L;
+        }
     }
 
     public double getGrossRevenueFromSnapshot(UUID tenantId) {

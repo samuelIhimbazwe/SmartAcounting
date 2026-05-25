@@ -12,7 +12,22 @@
 
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 
-type SyncResult = { synced: number; failed: number }
+type SyncResult = { synced: number; failed: number; errors?: string[] }
+
+type QueueSaleResult = { localId: string; status: 'queued' }
+
+type QueueStatusItem = {
+  localId: string
+  createdAt: number
+  retryCount: number
+  lastError: string | null
+}
+
+type QueueStatus = {
+  pendingCount: number
+  failedCount: number
+  items: QueueStatusItem[]
+}
 
 const api = {
   isDesktop: true,
@@ -43,6 +58,15 @@ const api = {
     sync: (apiUrl: string, token: string, tenantId: string): Promise<SyncResult> =>
       ipcRenderer.invoke('offline:sync', apiUrl, token, tenantId),
   },
+  queueSale: (payload: object): Promise<QueueSaleResult> =>
+    ipcRenderer.invoke('pos:queue-sale', payload),
+  getQueueStatus: (): Promise<QueueStatus> => ipcRenderer.invoke('pos:get-queue-status'),
+  syncQueue: (apiUrl: string, token: string, tenantId: string): Promise<SyncResult> =>
+    ipcRenderer.invoke('pos:sync-queue', apiUrl, token, tenantId),
+  clearFailed: (): Promise<{ deleted: number }> => ipcRenderer.invoke('pos:clear-failed'),
+  resetFailedRetries: (): Promise<{ reset: number }> =>
+    ipcRenderer.invoke('pos:reset-failed-retries'),
+  getEfdSecret: (): Promise<string | undefined> => ipcRenderer.invoke('pos:get-efd-secret'),
   fs: {
     saveExport: (
       filename: string,
@@ -85,5 +109,11 @@ const api = {
   },
 } as const
 
+const electronAPI = {
+  getEfdSecret: (): Promise<string | undefined> =>
+    ipcRenderer.invoke('pos:get-efd-secret'),
+} as const
+
 contextBridge.exposeInMainWorld('smartAccountingDesktop', api)
 contextBridge.exposeInMainWorld('smartchainDesktop', api)
+contextBridge.exposeInMainWorld('electronAPI', electronAPI)

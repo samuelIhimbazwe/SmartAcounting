@@ -5,6 +5,7 @@ import com.smartaccounting.dto.signup.ForgotPasswordRequest;
 import com.smartaccounting.dto.signup.PublicOAuthSignupRequest;
 import com.smartaccounting.dto.signup.PublicSignupRequest;
 import com.smartaccounting.dto.signup.ResendOtpRequest;
+import com.smartaccounting.dto.signup.ResendOtpResponse;
 import com.smartaccounting.dto.signup.ResetPasswordRequest;
 import com.smartaccounting.dto.signup.SignupResponse;
 import com.smartaccounting.dto.signup.VerifyPhoneRequest;
@@ -42,8 +43,8 @@ public class PublicSignupController {
     }
 
     @PostMapping("/resend-otp")
-    public void resendOtp(@RequestBody @Valid ResendOtpRequest request) {
-        publicSignupService.resendOtp(request.phone());
+    public ResendOtpResponse resendOtp(@RequestBody @Valid ResendOtpRequest request) {
+        return publicSignupService.resendOtp(request.phone());
     }
 
     @PostMapping("/forgot-password")

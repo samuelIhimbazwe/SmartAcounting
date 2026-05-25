@@ -1,8 +1,8 @@
 # SmartAccounting Desktop
 
+Electron **v0.2** shell around the shared React frontend (`../frontend`), with native printer, HID barcode scanner, SQLite offline queue, and auto-update.
 
-
-Electron shell around the shared React frontend (`../frontend`), with native printer, barcode scanner, offline queue, and auto-update.
+**Release checklist:** [docs/desktop-readiness.md](../docs/desktop-readiness.md) · **Manual QA:** [docs/desktop-manual-test.md](../docs/desktop-manual-test.md)
 
 
 

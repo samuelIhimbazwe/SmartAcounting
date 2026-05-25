@@ -2,7 +2,9 @@ import { RouterProvider } from 'react-router-dom'
 import { AppProviders } from './providers'
 import { GlobalErrorBoundary } from './GlobalErrorBoundary'
 import { SessionTimeoutManager } from '../features/auth/SessionTimeoutManager'
-import { router } from './router'
+import { createAppRouter } from './router'
+
+const router = createAppRouter()
 import { ThemeManager } from './ThemeManager'
 
 export function App() {

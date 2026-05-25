@@ -48,6 +48,7 @@ import {
 } from '../../services/printing';
 import {poleDisplayService} from '../../services/printer/PoleDisplayService';
 import {useWakeLock} from '../../hooks/useWakeLock';
+import {usePermission} from '../../hooks/usePermission';
 import {postCheckout} from '../../api/pos';
 import {queueOfflineCheckout} from '../../services/offlineQueue';
 import {
@@ -97,6 +98,8 @@ export default function CheckoutScreen() {
   const tenderLines = useSelector((s: RootState) => s.pos.tenderLines);
   const online = useSelector((s: RootState) => s.network.online);
   const roles = useSelector((s: RootState) => s.auth.roles) as AppRole[];
+  const canDiscount = usePermission('POS_DISCOUNT');
+  const canReturns = usePermission('POS_RETURNS');
   const userId = useSelector((s: RootState) => s.auth.userId);
   const locationId = useSelector((s: RootState) => s.location.selectedLocationId);
   const scannerMode = loadHardwareConfig().scannerModeEnabled;
@@ -108,9 +111,31 @@ export default function CheckoutScreen() {
   const [momoVerify, setMomoVerify] = useState<Record<number, MomoVerifyState>>(
     {},
   );
+  const [ussdSecondsLeft, setUssdSecondsLeft] = useState(90);
 
   const isMomoTender = (tt: TenderType) =>
     tt === 'MOMO' || tt === 'AIRTEL_MONEY';
+
+  const hasOpenMomoTender = useMemo(
+    () =>
+      tenderLines.some(
+        l => isMomoTender(l.tenderType) && (l.amount ?? 0) > 0,
+      ),
+    [tenderLines],
+  );
+
+  useEffect(() => {
+    if (!hasOpenMomoTender) {
+      setUssdSecondsLeft(90);
+      return;
+    }
+    if (ussdSecondsLeft <= 0) {
+      Toast.show({type: 'error', text1: t('payments.ussdExpired')});
+      return;
+    }
+    const timer = setInterval(() => setUssdSecondsLeft(s => s - 1), 1000);
+    return () => clearInterval(timer);
+  }, [hasOpenMomoTender, ussdSecondsLeft, t]);
 
   const verifyMomoLine = async (index: number) => {
     const line = tenderLines[index];
@@ -132,7 +157,7 @@ export default function CheckoutScreen() {
           amount: line.amount || total,
         }),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('timeout')), 30_000),
+          setTimeout(() => reject(new Error('timeout')), 90_000),
         ),
       ]);
       if (res.status === 'CONFIRMED') {
@@ -423,14 +448,16 @@ export default function CheckoutScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.wrap}>
-      <Button
-        mode="outlined"
-        onPress={() => navigation.navigate('Returns')}
-        style={styles.field}
-        textColor="#DC2626"
-        contentStyle={styles.btnInner}>
-        {t('pos.processReturn')}
-      </Button>
+      {canReturns ? (
+        <Button
+          mode="outlined"
+          onPress={() => navigation.navigate('Returns')}
+          style={styles.field}
+          textColor="#DC2626"
+          contentStyle={styles.btnInner}>
+          {t('pos.processReturn')}
+        </Button>
+      ) : null}
       <Text style={[styles.section, styles.sectionTitle]}>
         {t('pos.registerTender')}
       </Text>
@@ -494,6 +521,12 @@ export default function CheckoutScreen() {
           />
           {isMomoTender(line.tenderType) && line.amount > 0 ? (
             <>
+              <Text style={styles.momoHint}>
+                {t('payments.ussdPrompt')}{' '}
+                {ussdSecondsLeft > 0
+                  ? t('payments.ussdCountdown', {seconds: ussdSecondsLeft})
+                  : t('payments.ussdExpired')}
+              </Text>
               <TextInput
                 label={t('payments.ussdCode')}
                 value={line.reference ?? ''}
@@ -584,13 +617,15 @@ export default function CheckoutScreen() {
           style={styles.field}
         />
       ) : null}
-      <TextInput
-        label={t('pos.discount')}
-        keyboardType="decimal-pad"
-        value={discount ? String(discount) : ''}
-        onChangeText={v => dispatch(setDiscount(parseFloat(v) || 0))}
-        style={styles.field}
-      />
+      {canDiscount ? (
+        <TextInput
+          label={t('pos.discount')}
+          keyboardType="decimal-pad"
+          value={discount ? String(discount) : ''}
+          onChangeText={v => dispatch(setDiscount(parseFloat(v) || 0))}
+          style={styles.field}
+        />
+      ) : null}
       <Text style={[styles.section, styles.sectionTitle]}>
         {t('pos.scanBarcode')}
       </Text>
@@ -764,9 +799,11 @@ export default function CheckoutScreen() {
             ? t('fiscal.vatExempt', 'VAT: exempt')
             : `${t('fiscal.vat', 'VAT')} ${formatMoney(vatSummary.totalVat, sessionCurrency)}`}
         </Text>
-        <Text style={styles.bodyMedium}>
-          {t('pos.discount')} {discount}
-        </Text>
+        {canDiscount && discount > 0 ? (
+          <Text style={styles.bodyMedium}>
+            {t('pos.discount')} {discount}
+          </Text>
+        ) : null}
         <Text style={styles.total}>
           {t('pos.total')} {formatMoney(total, sessionCurrency)}
         </Text>
@@ -819,6 +856,7 @@ const styles = StyleSheet.create({
   promo: {fontSize: 13, color: '#059669'},
   bodyMedium: {fontSize: 15},
   total: {fontSize: 22, fontWeight: '700'},
+  momoHint: {fontSize: 13, color: '#475569', marginBottom: 6},
   momoOk: {color: '#16A34A', marginBottom: 8},
   momoFail: {color: '#DC2626', marginBottom: 8},
 });

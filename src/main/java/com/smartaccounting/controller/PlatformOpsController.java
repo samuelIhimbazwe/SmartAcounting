@@ -6,6 +6,7 @@ import com.smartaccounting.entity.CustomFieldValue;
 import com.smartaccounting.entity.ScenarioTemplate;
 import com.smartaccounting.service.PlatformOpsService;
 import jakarta.validation.Valid;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,25 +24,25 @@ public class PlatformOpsController {
     }
 
     @PostMapping("/custom-fields/values")
-    @PreAuthorize("hasRole('CEO') or hasRole('CFO') or hasRole('OPS_MANAGER') or hasRole('HR_MANAGER') or hasRole('MARKETING_MANAGER') or hasRole('ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.OPS_DASHBOARD)
     public Map<String, UUID> setCustomField(@RequestBody @Valid CustomFieldValueRequest req) {
         return Map.of("customFieldValueId", service.upsertCustomField(req));
     }
 
     @GetMapping("/custom-fields/values/{entityType}/{entityId}")
-    @PreAuthorize("hasRole('CEO') or hasRole('CFO') or hasRole('OPS_MANAGER') or hasRole('HR_MANAGER') or hasRole('MARKETING_MANAGER') or hasRole('ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.OPS_DASHBOARD)
     public List<CustomFieldValue> getCustomFieldValues(@PathVariable String entityType, @PathVariable UUID entityId) {
         return service.values(entityType, entityId);
     }
 
     @PostMapping("/scenarios")
-    @PreAuthorize("hasRole('CEO') or hasRole('CFO')")
+    @PreAuthorize(PermissionExpressions.TENANT_ADMIN)
     public Map<String, UUID> createScenario(@RequestBody @Valid ScenarioTemplateRequest req) {
         return Map.of("scenarioId", service.createScenario(req));
     }
 
     @GetMapping("/scenarios/{role}")
-    @PreAuthorize("@roleScopeGuard.canAccessRole(authentication, #role)")
+    @PreAuthorize("@dashboardAccessGuard.canAccess(authentication, #role)")
     public List<ScenarioTemplate> scenarios(@PathVariable String role) {
         return service.scenarios(role);
     }

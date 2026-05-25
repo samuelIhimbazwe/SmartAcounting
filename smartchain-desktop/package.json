@@ -1,6 +1,6 @@
 {
   "name": "smartchain-desktop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "SmartAccounting Electron desktop shell — wraps the web frontend with native printer, scanner, offline-queue and updater capabilities.",
   "private": true,
   "main": "dist/main/index.js",
@@ -11,6 +11,9 @@
     "dev:electron-only": "cross-env NODE_ENV=development electron .",
     "build:frontend": "cd ../frontend && cross-env VITE_DESKTOP_BUNDLE=true npm run build",
     "build": "npm run build:frontend && tsc && electron-builder --config electron-builder.config.cjs",
+    "build:electron": "npm run build",
+    "typecheck": "tsc --noEmit",
+    "verify": "npm run typecheck && npm run build:frontend",
     "build:win": "npm run build:frontend && tsc && electron-builder --win --config electron-builder.config.cjs",
     "build:mac": "npm run build:frontend && tsc && electron-builder --mac --config electron-builder.config.cjs",
     "build:linux": "npm run build:frontend && tsc && electron-builder --linux --config electron-builder.config.cjs",

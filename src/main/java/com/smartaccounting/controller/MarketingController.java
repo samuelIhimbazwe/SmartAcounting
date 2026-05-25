@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,13 +34,13 @@ public class MarketingController {
     }
 
     @GetMapping("/segments")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'SALES_MANAGER', 'MARKETING_MANAGER')")
+    @PreAuthorize(PermissionExpressions.MARKETING_ACCESS)
     public ResponseEntity<List<CustomerSegmentSummary>> getSegments() {
         return ResponseEntity.ok(marketingCampaignService.listSegmentSummaries());
     }
 
     @GetMapping("/segments/{segment}/customers")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'SALES_MANAGER', 'MARKETING_MANAGER')")
+    @PreAuthorize(PermissionExpressions.MARKETING_ACCESS)
     public ResponseEntity<Page<CustomerSegment>> getCustomersBySegment(
         @PathVariable String segment,
         @RequestParam(defaultValue = "0") int page,
@@ -49,21 +50,21 @@ public class MarketingController {
     }
 
     @PostMapping("/campaigns")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'SALES_MANAGER', 'MARKETING_MANAGER')")
+    @PreAuthorize(PermissionExpressions.MARKETING_ACCESS)
     public ResponseEntity<MarketingCampaign> createCampaign(@RequestBody @Valid CreateCampaignRequest request) {
         UUID createdBy = TenantContext.userId() != null ? TenantContext.userId() : UUID.randomUUID();
         return ResponseEntity.ok(marketingCampaignService.createCampaign(request, createdBy));
     }
 
     @PostMapping("/campaigns/{campaignId}/send")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'SALES_MANAGER', 'MARKETING_MANAGER')")
+    @PreAuthorize(PermissionExpressions.MARKETING_ACCESS)
     public ResponseEntity<Void> sendCampaign(@PathVariable UUID campaignId) {
         marketingCampaignService.sendCampaign(TenantContext.tenantId(), campaignId);
         return ResponseEntity.accepted().build();
     }
 
     @GetMapping("/campaigns")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'SALES_MANAGER', 'MARKETING_MANAGER')")
+    @PreAuthorize(PermissionExpressions.MARKETING_ACCESS)
     public ResponseEntity<Page<MarketingCampaign>> listCampaigns(
         @RequestParam(required = false) String status,
         @RequestParam(defaultValue = "0") int page,
@@ -72,13 +73,13 @@ public class MarketingController {
     }
 
     @GetMapping("/campaigns/{campaignId}/performance")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'SALES_MANAGER', 'MARKETING_MANAGER')")
+    @PreAuthorize(PermissionExpressions.MARKETING_ACCESS)
     public ResponseEntity<CampaignPerformance> getCampaignPerformance(@PathVariable UUID campaignId) {
         return ResponseEntity.ok(marketingCampaignService.getCampaignPerformance(campaignId));
     }
 
     @PostMapping("/campaigns/{campaignId}/calculate-attribution")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'MARKETING_MANAGER')")
+    @PreAuthorize(PermissionExpressions.MARKETING_ACCESS)
     public ResponseEntity<Void> calculateAttribution(@PathVariable UUID campaignId) {
         marketingCampaignService.calculateAttributedRevenue(campaignId);
         return ResponseEntity.ok().build();

@@ -18,6 +18,15 @@ public class MobileMoneyProperties {
     private int verifyConnectTimeoutMs = 10000;
     private int verifyReadTimeoutMs = 30000;
 
+    /** MTN MoMo Collections STK (request-to-pay). */
+    private boolean stkEnabled = false;
+    private String stkBaseUrl = "";
+    private String stkSubscriptionKey = "";
+    private String stkApiUser = "";
+    private String stkApiKey = "";
+    private String stkTargetEnvironment = "sandbox";
+    private String stkCallbackUrl = "";
+
     public boolean isVerifyLiveEnabled() {
         return verifyEnabled
             && verifyBearerToken != null
@@ -70,4 +79,27 @@ public class MobileMoneyProperties {
     public void setVerifyConnectTimeoutMs(int verifyConnectTimeoutMs) { this.verifyConnectTimeoutMs = verifyConnectTimeoutMs; }
     public int getVerifyReadTimeoutMs() { return verifyReadTimeoutMs; }
     public void setVerifyReadTimeoutMs(int verifyReadTimeoutMs) { this.verifyReadTimeoutMs = verifyReadTimeoutMs; }
+
+    public boolean isStkLiveEnabled() {
+        return stkEnabled
+            && stkBaseUrl != null && !stkBaseUrl.isBlank()
+            && stkSubscriptionKey != null && !stkSubscriptionKey.isBlank()
+            && stkApiUser != null && !stkApiUser.isBlank()
+            && stkApiKey != null && !stkApiKey.isBlank();
+    }
+
+    public boolean isStkEnabled() { return stkEnabled; }
+    public void setStkEnabled(boolean stkEnabled) { this.stkEnabled = stkEnabled; }
+    public String getStkBaseUrl() { return stkBaseUrl; }
+    public void setStkBaseUrl(String stkBaseUrl) { this.stkBaseUrl = stkBaseUrl; }
+    public String getStkSubscriptionKey() { return stkSubscriptionKey; }
+    public void setStkSubscriptionKey(String stkSubscriptionKey) { this.stkSubscriptionKey = stkSubscriptionKey; }
+    public String getStkApiUser() { return stkApiUser; }
+    public void setStkApiUser(String stkApiUser) { this.stkApiUser = stkApiUser; }
+    public String getStkApiKey() { return stkApiKey; }
+    public void setStkApiKey(String stkApiKey) { this.stkApiKey = stkApiKey; }
+    public String getStkTargetEnvironment() { return stkTargetEnvironment; }
+    public void setStkTargetEnvironment(String stkTargetEnvironment) { this.stkTargetEnvironment = stkTargetEnvironment; }
+    public String getStkCallbackUrl() { return stkCallbackUrl; }
+    public void setStkCallbackUrl(String stkCallbackUrl) { this.stkCallbackUrl = stkCallbackUrl; }
 }

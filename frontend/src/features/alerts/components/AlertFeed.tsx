@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { useModalFocusTrap } from '../../../shared/hooks/useModalFocusTrap'
 import { useAlertStore } from '../../../shared/stores/alertStore'
 
@@ -10,6 +11,7 @@ interface AlertFeedProps {
 
 export function AlertFeed({ open, onClose }: AlertFeedProps) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const alerts = useAlertStore((state) => state.alerts)
   const panelRef = useModalFocusTrap({
     active: open,
@@ -52,7 +54,15 @@ export function AlertFeed({ open, onClose }: AlertFeedProps) {
       <div className="space-y-2 overflow-auto pr-1">
         {alerts.length === 0 && <p className="text-sm text-neutral-500">{t('alerts.empty')}</p>}
         {alerts.map((alert) => (
-          <article key={alert.id} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-3">
+          <button
+            key={alert.id}
+            type="button"
+            className="block w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-3 text-left transition-colors hover:bg-white"
+            onClick={() => {
+              onClose()
+              navigate(`/alerts/${alert.id}`, { state: { alert } })
+            }}
+          >
             <div className="mb-1 flex items-center justify-between gap-2">
               <p className="m-0 text-sm font-semibold text-neutral-900">{alert.title}</p>
               <span
@@ -65,7 +75,7 @@ export function AlertFeed({ open, onClose }: AlertFeedProps) {
             </div>
             <p className="m-0 text-xs leading-5 text-neutral-600">{alert.message}</p>
             <p className="m-0 mt-2 text-[11px] text-neutral-400">{alert.timestamp}</p>
-          </article>
+          </button>
         ))}
       </div>
     </aside>

@@ -5,5 +5,5 @@
     "emitDecoratorMetadata": false,
     "useDefineForClassFields": false
   },
-  "exclude": ["__tests__", "src/api/__contracts__", "node_modules"]
+  "exclude": ["__tests__", "src/__tests__", "src/fiscal/__tests__", "src/api/__contracts__", "node_modules"]
 }

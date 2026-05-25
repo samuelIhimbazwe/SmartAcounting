@@ -10,6 +10,7 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Locale;
@@ -139,7 +140,7 @@ public class SmartChainOAuth2UserService implements OAuth2UserService<OAuth2User
     ) {
         UUID tenantId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
-        Instant trialEnd = Instant.now().plus(30, ChronoUnit.DAYS);
+        Timestamp trialEnd = Timestamp.from(Instant.now().plus(30, ChronoUnit.DAYS));
         String businessName = (userInfo.getName() == null || userInfo.getName().isBlank())
             ? email
             : userInfo.getName().trim() + "'s Business";

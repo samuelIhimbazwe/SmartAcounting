@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartaccounting.repository.MarketingKpiSnapshotJdbcRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -17,13 +18,16 @@ public class MarketingBriefingService {
 
     private final MarketingKpiSnapshotJdbcRepository marketingKpiSnapshotJdbcRepository;
     private final ObjectMapper objectMapper;
+    private final JdbcTemplate jdbcTemplate;
 
     public MarketingBriefingService(
         MarketingKpiSnapshotJdbcRepository marketingKpiSnapshotJdbcRepository,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        JdbcTemplate jdbcTemplate
     ) {
         this.marketingKpiSnapshotJdbcRepository = marketingKpiSnapshotJdbcRepository;
         this.objectMapper = objectMapper;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     public BigDecimal getSpendThisMonth(UUID tenantId) {
@@ -51,13 +55,45 @@ public class MarketingBriefingService {
     }
 
     public String getTopChannel(UUID tenantId) {
-        log.warn("getTopChannel stub called for tenant {} — implement channel rollup from attribution tables", tenantId);
-        return "";
+        if (tenantId == null) {
+            return "";
+        }
+        try {
+            String channel = jdbcTemplate.query(
+                """
+                select channel from marketing_campaigns
+                where tenant_id = ?
+                  and started_at >= date_trunc('month', current_timestamp)
+                group by channel
+                order by coalesce(sum(attributed_revenue), 0) desc
+                limit 1
+                """,
+                rs -> rs.next() ? rs.getString(1) : null,
+                tenantId
+            );
+            return channel == null || channel.isBlank() ? "" : channel;
+        } catch (Exception ex) {
+            return "";
+        }
     }
 
     public long getNewCustomers(UUID tenantId) {
-        log.warn("getNewCustomers stub called for tenant {} — implement campaign-sourced new customer counts", tenantId);
-        return 0L;
+        if (tenantId == null) {
+            return 0L;
+        }
+        try {
+            Long n = jdbcTemplate.queryForObject(
+                """
+                select count(*)::bigint from customer_segments
+                where tenant_id = ? and (created_at at time zone 'UTC')::date = current_date
+                """,
+                Long.class,
+                tenantId
+            );
+            return n == null ? 0L : n;
+        } catch (Exception ex) {
+            return 0L;
+        }
     }
 
     private BigDecimal readBigDecimal(UUID tenantId, String field) {

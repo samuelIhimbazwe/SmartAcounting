@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -33,14 +34,14 @@ public class PromotionController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'SALES_MANAGER', 'MARKETING_MANAGER')")
+    @PreAuthorize(PermissionExpressions.MARKETING_ACCESS)
     public ResponseEntity<Promotion> createPromotion(@RequestBody @Valid CreatePromotionRequest request) {
         UUID createdBy = TenantContext.userId() != null ? TenantContext.userId() : UUID.randomUUID();
         return ResponseEntity.ok(promotionService.createPromotion(request, createdBy));
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'SALES_MANAGER', 'MARKETING_MANAGER', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.MARKETING_ACCESS)
     public ResponseEntity<Page<Promotion>> listPromotions(
         @RequestParam(required = false) String status,
         @RequestParam(defaultValue = "0") int page,
@@ -49,7 +50,7 @@ public class PromotionController {
     }
 
     @PatchMapping("/{promotionId}/status")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'SALES_MANAGER', 'MARKETING_MANAGER')")
+    @PreAuthorize(PermissionExpressions.MARKETING_ACCESS)
     public ResponseEntity<Promotion> updateStatus(
         @PathVariable UUID promotionId,
         @RequestBody Map<String, String> body) {
@@ -57,14 +58,14 @@ public class PromotionController {
     }
 
     @GetMapping("/{promotionId}/performance")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'SALES_MANAGER', 'MARKETING_MANAGER')")
+    @PreAuthorize(PermissionExpressions.MARKETING_ACCESS)
     public ResponseEntity<PromotionPerformanceReport> getPerformance(@PathVariable UUID promotionId) {
         return ResponseEntity.ok(promotionService.getPerformanceReport(
             TenantContext.tenantId().toString(), promotionId));
     }
 
     @GetMapping("/active")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'SALES_MANAGER', 'MARKETING_MANAGER', 'OPS_MANAGER')")
+    @PreAuthorize(PermissionExpressions.MARKETING_ACCESS)
     public ResponseEntity<List<Promotion>> getActivePromotions() {
         return ResponseEntity.ok(promotionService.getActivePromotions());
     }

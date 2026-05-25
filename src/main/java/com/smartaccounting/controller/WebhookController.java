@@ -2,6 +2,7 @@ package com.smartaccounting.controller;
 import com.smartaccounting.dto.CreateWebhookSubscriptionRequest;
 import com.smartaccounting.service.WebhookService;
 import jakarta.validation.Valid;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import java.util.Map;
@@ -13,7 +14,7 @@ public class WebhookController {
     private final WebhookService service;
     public WebhookController(WebhookService service) { this.service = service; }
     @PostMapping("/subscriptions")
-    @PreAuthorize("hasRole('CEO') or hasRole('CFO') or hasRole('ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.TENANT_CONFIG)
     public Map<String, UUID> subscribe(@RequestBody @Valid CreateWebhookSubscriptionRequest req) {
         return Map.of("subscriptionId", service.subscribe(req));
     }

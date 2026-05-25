@@ -5,6 +5,7 @@ import com.smartaccounting.service.TenantService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -31,7 +32,7 @@ public class AiAdminController {
     }
 
     @PostMapping("/reindex")
-    @PreAuthorize("hasRole('CEO') or hasRole('CFO')")
+    @PreAuthorize(PermissionExpressions.TENANT_ADMIN)
     public Map<String, Object> reindex(@RequestParam UUID tenantId) {
         return Map.of("indexedChunks", ragIngestionService.reindexTenant(tenantId));
     }
@@ -40,7 +41,7 @@ public class AiAdminController {
      * Reindexes every active tenant synchronously (flush + rebuild embeddings per tenant).
      */
     @PostMapping("/reindex-all")
-    @PreAuthorize("hasRole('CEO') or hasRole('CFO')")
+    @PreAuthorize(PermissionExpressions.TENANT_ADMIN)
     public ResponseEntity<Map<String, Object>> reindexAll() {
         List<String> tenantIds = tenantService.findAllActiveTenantIds();
         Map<String, String> results = new LinkedHashMap<>();

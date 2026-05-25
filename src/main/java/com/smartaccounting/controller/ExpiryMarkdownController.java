@@ -4,6 +4,7 @@ import com.smartaccounting.entity.Promotion;
 import com.smartaccounting.service.ExpiryMarkdownService;
 import com.smartaccounting.tenant.TenantContext;
 import org.springframework.http.ResponseEntity;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,7 +25,7 @@ public class ExpiryMarkdownController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'OPS_MANAGER', 'SALES_MANAGER', 'MARKETING_MANAGER')")
+    @PreAuthorize(PermissionExpressions.MARKETING_ACCESS)
     public ResponseEntity<List<Promotion>> createMarkdownPromotions(
         @RequestParam(defaultValue = "7") int daysAhead,
         @RequestParam(defaultValue = "0.15") BigDecimal discountPercent) {

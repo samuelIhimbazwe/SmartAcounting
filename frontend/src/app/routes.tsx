@@ -1,43 +1,97 @@
+import { lazy, Suspense, type ComponentType, type LazyExoticComponent, type ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
 import type { RouteObject } from 'react-router-dom'
 import { AppRoot } from './AppRoot'
+import { ProtectedRoute } from './ProtectedRoute'
+import { RouteErrorPage } from './RouteErrorPage'
 import { LoginPage } from '../features/auth/LoginPage'
 import { OAuth2CallbackPage } from '../features/auth/OAuth2CallbackPage'
 import { SignupPage } from '../features/auth/SignupPage'
 import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage'
 import { ResetPasswordPage } from '../features/auth/ResetPasswordPage'
-import { DashboardRoute } from '../features/dashboards/DashboardRoute'
 import { UnauthorizedPage } from '../features/common/UnauthorizedPage'
 import { DashboardIndexRedirect } from '../features/common/DashboardIndexRedirect'
-import { TransactionFormsRoute } from '../features/forms/TransactionFormsRoute'
-import { UserTenantManagementRoute } from '../features/userTenant/UserTenantManagementRoute'
-import { PosRoute } from '../features/pos/PosRoute'
-import { RetailOpsRoute } from '../features/retail/RetailOpsRoute'
-import { FxRatesRoute } from '../features/finance/FxRatesRoute'
-import { CreditLedgerRoute } from '../features/finance/CreditLedgerRoute'
-import { SmsDeliveryLogRoute } from '../features/finance/SmsDeliveryLogRoute'
-import { SupplierBillsRoute } from '../features/finance/SupplierBillsRoute'
-import { CustomerRecordRoute } from '../features/finance/CustomerRecordRoute'
-import { SupplierRecordRoute } from '../features/finance/SupplierRecordRoute'
-import { SettingsRoute } from '../features/settings/SettingsRoute'
-import { BankReconciliationRoute } from '../features/finance/BankReconciliationRoute'
-import { PurchaseOrdersRoute } from '../features/procurement/PurchaseOrdersRoute'
-import { HrPayrollRoute } from '../features/hr/HrPayrollRoute'
-import { EbmComplianceRoute } from '../features/compliance/EbmComplianceRoute'
-import {
-  AttendanceRoute,
-  MarketingCampaignsRoute,
-  PromotionsRoute,
-  DocumentsRoute,
-  FixedAssetsRoute,
-  MonthEndCloseRoute,
-  PaymentRunsRoute,
-  WorkflowRulesRoute,
-} from '../features/production/ProductionRoutes'
+
+function guard(permission: string | undefined, element: ReactNode) {
+  return <ProtectedRoute permission={permission}>{element}</ProtectedRoute>
+}
+
+type RouteComponent = ComponentType<object>
+
+function lazyNamedRoute(
+  loader: () => Promise<Record<string, unknown>>,
+  exportName: string,
+): LazyExoticComponent<RouteComponent> {
+  return lazy(async () => {
+    const module = await loader()
+    return { default: module[exportName] as RouteComponent }
+  })
+}
+
+function lazyElement(Component: LazyExoticComponent<RouteComponent>) {
+  return (
+    <Suspense fallback={<p className="text-sm text-neutral-500">Loading module…</p>}>
+      <Component />
+    </Suspense>
+  )
+}
+
+const OnboardingRoute = lazyNamedRoute(() => import('../features/onboarding/OnboardingRoute'), 'OnboardingRoute')
+const AlertDetailsRoute = lazyNamedRoute(() => import('../features/alerts/AlertDetailsRoute'), 'AlertDetailsRoute')
+const AnomalyDetailsRoute = lazyNamedRoute(() => import('../features/anomalies/AnomalyDetailsRoute'), 'AnomalyDetailsRoute')
+const DashboardRoute = lazyNamedRoute(() => import('../features/dashboards/DashboardRoute'), 'DashboardRoute')
+const TransactionFormsRoute = lazyNamedRoute(
+  () => import('../features/forms/TransactionFormsRoute'),
+  'TransactionFormsRoute',
+)
+const UserTenantManagementRoute = lazyNamedRoute(
+  () => import('../features/userTenant/UserTenantManagementRoute'),
+  'UserTenantManagementRoute',
+)
+const RoleManagementRoute = lazyNamedRoute(() => import('../features/rbac/RoleManagementRoute'), 'RoleManagementRoute')
+const PosRoute = lazyNamedRoute(() => import('../features/pos/PosRoute'), 'PosRoute')
+const PosSaleHistoryRoute = lazyNamedRoute(() => import('../features/pos/PosSaleHistoryRoute'), 'PosSaleHistoryRoute')
+const ReturnsRoute = lazyNamedRoute(() => import('../features/pos/ReturnsRoute'), 'ReturnsRoute')
+const PosReceiptPrintRoute = lazyNamedRoute(
+  () => import('../features/pos/PosReceiptPrintRoute'),
+  'PosReceiptPrintRoute',
+)
+const TillRoute = lazyNamedRoute(() => import('../features/till/TillRoute'), 'TillRoute')
+const RetailOpsRoute = lazyNamedRoute(() => import('../features/retail/RetailOpsRoute'), 'RetailOpsRoute')
+const FxRatesRoute = lazyNamedRoute(() => import('../features/finance/FxRatesRoute'), 'FxRatesRoute')
+const CreditLedgerRoute = lazyNamedRoute(() => import('../features/finance/CreditLedgerRoute'), 'CreditLedgerRoute')
+const SupplierBillsRoute = lazyNamedRoute(() => import('../features/finance/SupplierBillsRoute'), 'SupplierBillsRoute')
+const CustomerRecordRoute = lazyNamedRoute(() => import('../features/finance/CustomerRecordRoute'), 'CustomerRecordRoute')
+const SupplierRecordRoute = lazyNamedRoute(() => import('../features/finance/SupplierRecordRoute'), 'SupplierRecordRoute')
+const SmsDeliveryLogRoute = lazyNamedRoute(() => import('../features/finance/SmsDeliveryLogRoute'), 'SmsDeliveryLogRoute')
+const BankReconciliationRoute = lazyNamedRoute(
+  () => import('../features/finance/BankReconciliationRoute'),
+  'BankReconciliationRoute',
+)
+const PurchaseOrdersRoute = lazyNamedRoute(
+  () => import('../features/procurement/PurchaseOrdersRoute'),
+  'PurchaseOrdersRoute',
+)
+const HrPayrollRoute = lazyNamedRoute(() => import('../features/hr/HrPayrollRoute'), 'HrPayrollRoute')
+const EbmComplianceRoute = lazyNamedRoute(() => import('../features/compliance/EbmComplianceRoute'), 'EbmComplianceRoute')
+const SettingsRoute = lazyNamedRoute(() => import('../features/settings/SettingsRoute'), 'SettingsRoute')
+const MyTeamRoute = lazyNamedRoute(() => import('../features/settings/MyTeamRoute'), 'MyTeamRoute')
+const PaymentRunsRoute = lazyNamedRoute(() => import('../features/production/ProductionRoutes'), 'PaymentRunsRoute')
+const FixedAssetsRoute = lazyNamedRoute(() => import('../features/production/ProductionRoutes'), 'FixedAssetsRoute')
+const MonthEndCloseRoute = lazyNamedRoute(() => import('../features/production/ProductionRoutes'), 'MonthEndCloseRoute')
+const WorkflowRulesRoute = lazyNamedRoute(() => import('../features/production/ProductionRoutes'), 'WorkflowRulesRoute')
+const DocumentsRoute = lazyNamedRoute(() => import('../features/production/ProductionRoutes'), 'DocumentsRoute')
+const AttendanceRoute = lazyNamedRoute(() => import('../features/production/ProductionRoutes'), 'AttendanceRoute')
+const MarketingCampaignsRoute = lazyNamedRoute(
+  () => import('../features/production/ProductionRoutes'),
+  'MarketingCampaignsRoute',
+)
+const PromotionsRoute = lazyNamedRoute(() => import('../features/production/ProductionRoutes'), 'PromotionsRoute')
 
 export const appRoutes: RouteObject[] = [
   {
     element: <AppRoot />,
+    errorElement: <RouteErrorPage />,
     children: [
       { path: '/', element: <Navigate to="/login" replace /> },
       { path: '/login', element: <LoginPage /> },
@@ -45,31 +99,40 @@ export const appRoutes: RouteObject[] = [
       { path: '/signup', element: <SignupPage /> },
       { path: '/forgot-password', element: <ForgotPasswordPage /> },
       { path: '/reset-password', element: <ResetPasswordPage /> },
-      { path: '/dashboard', element: <DashboardIndexRedirect /> },
-      { path: '/dashboard/:role', element: <DashboardRoute /> },
-      { path: '/transactions/:type', element: <TransactionFormsRoute /> },
-      { path: '/admin/users-tenants', element: <UserTenantManagementRoute /> },
-      { path: '/pos', element: <PosRoute /> },
-      { path: '/retail', element: <RetailOpsRoute /> },
-      { path: '/finance/fx-rates', element: <FxRatesRoute /> },
-      { path: '/finance/credit-ledger', element: <CreditLedgerRoute /> },
-      { path: '/finance/supplier-bills', element: <SupplierBillsRoute /> },
-      { path: '/finance/customers/:customerId', element: <CustomerRecordRoute /> },
-      { path: '/finance/suppliers/:supplierId', element: <SupplierRecordRoute /> },
-      { path: '/finance/sms-deliveries', element: <SmsDeliveryLogRoute /> },
-      { path: '/finance/bank-accounts', element: <BankReconciliationRoute /> },
-      { path: '/procurement/purchase-orders', element: <PurchaseOrdersRoute /> },
-      { path: '/hr/payroll', element: <HrPayrollRoute /> },
-      { path: '/hr/attendance', element: <AttendanceRoute /> },
-      { path: '/finance/payment-runs', element: <PaymentRunsRoute /> },
-      { path: '/finance/assets', element: <FixedAssetsRoute /> },
-      { path: '/finance/close', element: <MonthEndCloseRoute /> },
-      { path: '/admin/workflow-rules', element: <WorkflowRulesRoute /> },
-      { path: '/documents', element: <DocumentsRoute /> },
-      { path: '/marketing/campaigns', element: <MarketingCampaignsRoute /> },
-      { path: '/marketing/promotions', element: <PromotionsRoute /> },
-      { path: '/compliance/ebm', element: <EbmComplianceRoute /> },
-      { path: '/settings', element: <SettingsRoute /> },
+      { path: '/onboarding', element: lazyElement(OnboardingRoute) },
+      { path: '/alerts/:alertId', element: guard(undefined, lazyElement(AlertDetailsRoute)) },
+      { path: '/anomalies/:anomalyId', element: guard(undefined, lazyElement(AnomalyDetailsRoute)) },
+      { path: '/dashboard', element: guard(undefined, <DashboardIndexRedirect />) },
+      { path: '/dashboard/:role', element: guard(undefined, lazyElement(DashboardRoute)) },
+      { path: '/transactions/:type', element: guard(undefined, lazyElement(TransactionFormsRoute)) },
+      { path: '/admin/users-tenants', element: guard('USER_MANAGE', lazyElement(UserTenantManagementRoute)) },
+      { path: '/admin/roles', element: guard('ROLE_MANAGE', lazyElement(RoleManagementRoute)) },
+      { path: '/pos', element: guard('POS_ACCESS', lazyElement(PosRoute)) },
+      { path: '/pos/history', element: guard('ANALYTICS_OWN', lazyElement(PosSaleHistoryRoute)) },
+      { path: '/returns', element: guard('POS_RETURNS', lazyElement(ReturnsRoute)) },
+      { path: '/pos/receipts/:receiptId/print', element: guard('POS_ACCESS', lazyElement(PosReceiptPrintRoute)) },
+      { path: '/till', element: guard('POS_ACCESS', lazyElement(TillRoute)) },
+      { path: '/retail', element: guard('INVENTORY_READ', lazyElement(RetailOpsRoute)) },
+      { path: '/finance/fx-rates', element: guard('FINANCE_READ', lazyElement(FxRatesRoute)) },
+      { path: '/finance/credit-ledger', element: guard('FINANCE_READ', lazyElement(CreditLedgerRoute)) },
+      { path: '/finance/supplier-bills', element: guard('FINANCE_READ', lazyElement(SupplierBillsRoute)) },
+      { path: '/finance/customers/:customerId', element: guard('FINANCE_READ', lazyElement(CustomerRecordRoute)) },
+      { path: '/finance/suppliers/:supplierId', element: guard('FINANCE_READ', lazyElement(SupplierRecordRoute)) },
+      { path: '/finance/sms-deliveries', element: guard('FINANCE_READ', lazyElement(SmsDeliveryLogRoute)) },
+      { path: '/finance/bank-accounts', element: guard('FINANCE_READ', lazyElement(BankReconciliationRoute)) },
+      { path: '/procurement/purchase-orders', element: guard('PROCUREMENT_READ', lazyElement(PurchaseOrdersRoute)) },
+      { path: '/hr/payroll', element: guard('HR_READ', lazyElement(HrPayrollRoute)) },
+      { path: '/hr/attendance', element: guard('HR_READ', lazyElement(AttendanceRoute)) },
+      { path: '/finance/payment-runs', element: guard('FINANCE_READ', lazyElement(PaymentRunsRoute)) },
+      { path: '/finance/assets', element: guard('FINANCE_READ', lazyElement(FixedAssetsRoute)) },
+      { path: '/finance/close', element: guard('FINANCE_READ', lazyElement(MonthEndCloseRoute)) },
+      { path: '/admin/workflow-rules', element: guard('ROLE_MANAGE', lazyElement(WorkflowRulesRoute)) },
+      { path: '/documents', element: guard('FINANCE_READ', lazyElement(DocumentsRoute)) },
+      { path: '/marketing/campaigns', element: guard('ANALYTICS_ALL', lazyElement(MarketingCampaignsRoute)) },
+      { path: '/marketing/promotions', element: guard('ANALYTICS_ALL', lazyElement(PromotionsRoute)) },
+      { path: '/compliance/ebm', element: guard('EBM_AUDIT', lazyElement(EbmComplianceRoute)) },
+      { path: '/settings', element: guard(undefined, lazyElement(SettingsRoute)) },
+      { path: '/settings/roles', element: guard('ROLE_MANAGE', lazyElement(MyTeamRoute)) },
       { path: '/unauthorized', element: <UnauthorizedPage /> },
       { path: '*', element: <Navigate to="/login" replace /> },
     ],

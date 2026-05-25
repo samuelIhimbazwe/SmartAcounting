@@ -142,6 +142,17 @@ See [mobile-phase-gates.md](./mobile-phase-gates.md).
 - [ ] Stock transfer between branches
 - [ ] Low stock → draft PO
 
+### Desktop (Electron v0.2 — office / counter PC)
+
+See [desktop-readiness.md](./desktop-readiness.md) and [desktop-manual-test.md](./desktop-manual-test.md).
+
+- [ ] `npm run verify` in `smartchain-desktop` green in CI
+- [ ] Packaged build: hash routes (`#/pos`, `#/dashboard/ceo`) work from `file://`
+- [ ] OAuth `smartchain://` callback + password login
+- [ ] Tray → POS; USB scanner + thermal print on Windows
+- [ ] Offline sale queues in SQLite and syncs when back online
+- [ ] Signed Windows installer or internal IT distribution plan
+
 ---
 
 ## Reference: explicit TODO markers in repo

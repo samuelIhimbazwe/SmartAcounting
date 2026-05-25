@@ -28,7 +28,14 @@
     "lines": "Imirongo",
     "hqDashboard": "Amashami yose",
     "registers": "Cash registers",
-    "selectRegister": "Hitamo cash register"
+    "selectRegister": "Hitamo cash register",
+    "createTransfer": "Kora transfer",
+    "selectDestination": "Ishami ry'aho bijya",
+    "submitTransfer": "Ohereza transfer",
+    "transferCreated": "Transfer yoherejwe",
+    "transferCreateFailed": "Transfer yanze",
+    "transferLinesRequired": "Ongeraho umurongo n'umubare",
+    "phase4Note": "Gukora ibicuruzwa kuri HQ birategereje — reba gusa ku ishami"
   },
   "auth": {
     "appName": "SmartAccounting",
@@ -104,8 +111,14 @@
     "discount": "Discount (same currency)",
     "scanBarcode": "Scan or enter barcode",
     "barcode": "Barcode",
-    "openScanner": "Open camera scanner",
-    "cart": "Cart",
+    "openScanner": "Fungura scanner ya kamera",
+    "searchCatalog": "Shakisha mu catalogue",
+    "saleHistory": "Amateka y'ubucuruzi",
+    "noSaleHistory": "Nta gucururwa byarangiye",
+    "identifyByCamera": "Menya ukoresheje kamera",
+    "identifySearchFallback": "Model ntiyamanutse — shakisha izina cyangwa SKU",
+    "identifyTop3": "Ibihuye cyane",
+    "cart": "Agafuka",
     "cartEmpty": "Cart is empty",
     "saleCompleted": "Sale completed",
     "savedOffline": "Saved offline — will sync when online",
@@ -306,7 +319,8 @@
     "backOnline": "Back online",
     "syncError": "Sync error: {{message}}",
     "approvals": "{{count}} approval(s)",
-    "alerts": "{{count}} alert(s)"
+    "alerts": "{{count}} itangazo",
+    "catalogProgress": "Catalogue irimo guhuza {{processed}}/{{total}}"
   },
   "receipt": {
     "title": "Ubucuruzi buheruka",
@@ -434,9 +448,13 @@
   },
   "payments": {
     "ussdCode": "Kode ya USSD",
+    "ussdPrompt": "Injiza kode ya MoMo yoherejwe kuri telefone yawe",
+    "ussdExpired": "Igihe cya MoMo cyararangiye. Gerageza nanone.",
+    "ussdCountdown": "Hasigaye {{seconds}}s",
     "verifyMomo": "Emeza kwishyura",
-    "verifying": "Birimo kwemezwa…",
+    "verifying": "Kugenzura kwishyura…",
     "verified": "Byemejwe",
+    "paymentConfirmed": "Kwishyura byemejwe",
     "verifyFailed": "Byanze",
     "verifyTimeout": "Byarenze igihe — ongera?"
   },

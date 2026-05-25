@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { executeRecommendedAction, getRecommendedActions } from '../../shared/api/actions'
+import type { RecommendedAction } from '../../shared/types/dashboard'
 import type { Role } from '../../shared/types/roles'
 
 export function useRecommendedActions(role: Role) {
@@ -13,7 +14,7 @@ export function useRecommendedActions(role: Role) {
 export function useExecuteRecommendedAction(role: Role) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (type: string) => executeRecommendedAction(type),
+    mutationFn: (action: Pick<RecommendedAction, 'type' | 'id'>) => executeRecommendedAction(action),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['recommended-actions', role] })
     },

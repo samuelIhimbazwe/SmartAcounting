@@ -48,7 +48,8 @@ public class RedisConfig {
         Map<String, RedisCacheConfiguration> perCache = Map.of(
             "dashboardKpis", defaultConfig.entryTtl(Duration.ofSeconds(60)),
             "dashboardCharts", defaultConfig.entryTtl(Duration.ofSeconds(300)),
-            "briefings", defaultConfig.entryTtl(Duration.ofMinutes(30))
+            "briefings", defaultConfig.entryTtl(Duration.ofMinutes(30)),
+            "permissionCatalog", defaultConfig.entryTtl(Duration.ofHours(24))
         );
         return RedisCacheManager.builder(factory)
             .cacheDefaults(defaultConfig)

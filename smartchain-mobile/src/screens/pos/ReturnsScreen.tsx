@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import type {RootState} from '../../store';
 import type {PosStackParamList} from '../../navigation/PosNavigator';
 import {queueOfflineReturn} from '../../services/offlineQueue';
 import {useTranslation} from 'react-i18next';
+import {usePermission} from '../../hooks/usePermission';
 
 const RETURN_REASONS = [
   'DAMAGED',
@@ -45,6 +46,7 @@ interface ReturnLineForm {
 export default function ReturnsScreen() {
   const {t} = useTranslation();
   const navigation = useNavigation<Nav>();
+  const canReturns = usePermission('POS_RETURNS');
   const posRegisterCode = useSelector((s: RootState) => s.pos.posRegisterCode);
   const online = useSelector((s: RootState) => s.network.online);
   const [originalRef, setOriginalRef] = useState('');
@@ -159,6 +161,16 @@ export default function ReturnsScreen() {
       ],
     );
   };
+
+  useEffect(() => {
+    if (!canReturns) {
+      navigation.goBack();
+    }
+  }, [canReturns, navigation]);
+
+  if (!canReturns) {
+    return null;
+  }
 
   return (
     <ScrollView style={styles.container}>

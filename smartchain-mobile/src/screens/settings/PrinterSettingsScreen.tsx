@@ -10,11 +10,13 @@ import {
   Platform,
 } from 'react-native';
 import {Button, Menu, TextInput} from 'react-native-paper';
-import type {BluetoothDevice} from 'react-native-bluetooth-classic';
 import {useTranslation} from 'react-i18next';
 import {useSelector} from 'react-redux';
 import type {RootState} from '../../store';
-import {printerService} from '../../services/printer/BluetoothPrinterService';
+import {
+  printerService,
+  type BluetoothDevice,
+} from '../../services/printer/BluetoothPrinterService';
 import {networkPrinterService} from '../../services/printer/NetworkPrinterService';
 import {
   loadHardwareConfig,

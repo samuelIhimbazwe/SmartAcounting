@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,19 +37,19 @@ public class BankReconciliationController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('CFO', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.FINANCE_WRITE)
     public ResponseEntity<BankAccount> createBankAccount(@RequestBody @Valid BankAccountRequest request) {
         return ResponseEntity.ok(bankReconciliationService.createBankAccount(request));
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.FINANCE_READ)
     public ResponseEntity<List<BankAccount>> listBankAccounts() {
         return ResponseEntity.ok(bankReconciliationService.listBankAccounts());
     }
 
     @PostMapping("/{accountId}/import")
-    @PreAuthorize("hasAnyRole('CFO', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.FINANCE_WRITE)
     public ResponseEntity<BankStatementImport> importStatement(
         @PathVariable UUID accountId,
         @RequestParam("file") MultipartFile file) throws IOException {
@@ -57,7 +58,7 @@ public class BankReconciliationController {
     }
 
     @GetMapping("/{accountId}/unmatched")
-    @PreAuthorize("hasAnyRole('CFO', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.FINANCE_WRITE)
     public ResponseEntity<Page<BankStatementLine>> getUnmatched(
         @PathVariable UUID accountId,
         @RequestParam(defaultValue = "0") int page,
@@ -66,7 +67,7 @@ public class BankReconciliationController {
     }
 
     @PostMapping("/{accountId}/lines/{lineId}/match")
-    @PreAuthorize("hasAnyRole('CFO', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.FINANCE_WRITE)
     public ResponseEntity<Void> confirmMatch(
         @PathVariable UUID accountId,
         @PathVariable UUID lineId,
@@ -76,7 +77,7 @@ public class BankReconciliationController {
     }
 
     @PostMapping("/{accountId}/lines/{lineId}/bank-charge")
-    @PreAuthorize("hasAnyRole('CFO', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.FINANCE_WRITE)
     public ResponseEntity<Void> postBankCharge(
         @PathVariable UUID accountId,
         @PathVariable UUID lineId,
@@ -87,13 +88,13 @@ public class BankReconciliationController {
     }
 
     @GetMapping("/{accountId}/summary")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.FINANCE_READ)
     public ResponseEntity<BankReconciliationSummary> getSummary(@PathVariable UUID accountId) {
         return ResponseEntity.ok(bankReconciliationService.getSummary(accountId));
     }
 
     @GetMapping("/{accountId}/imports")
-    @PreAuthorize("hasAnyRole('CFO', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.FINANCE_WRITE)
     public ResponseEntity<List<BankStatementImport>> getImportHistory(@PathVariable UUID accountId) {
         return ResponseEntity.ok(bankReconciliationService.getImportHistory(accountId));
     }

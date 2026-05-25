@@ -1,28 +1,47 @@
-import { Bot, Check, ChevronLeft, ChevronRight, Send, Square, X } from 'lucide-react'
-import { useEffect, useState, type FormEvent } from 'react'
+import { AlertTriangle, Bot, Check, RotateCcw, Send, ShieldCheck, Sparkles, Square, Trash2, X } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useCopilot } from './useCopilot'
+import { useCopilotContext } from './useCopilotContext'
+import { CopilotEmptyState } from './CopilotEmptyState'
+import { useModalFocusTrap } from '../../shared/hooks/useModalFocusTrap'
 
 export function CopilotSidebar() {
   const [question, setQuestion] = useState('')
+  const [previewOnly, setPreviewOnly] = useState(false)
+  const context = useCopilotContext()
   const {
     open,
-    toggleOpen,
+    setOpen,
     messages,
     steps,
     approvals,
+    recentActions,
     streaming,
     runStatus,
     sendMessage,
     cancel,
     refreshApprovals,
+    refreshRecentActions,
     approve,
     reject,
+    undo,
+    clearConversation,
     expirePendingApprovals,
   } = useCopilot()
+  const panelRef = useModalFocusTrap({ active: open, onEscape: () => setOpen(false) })
 
   useEffect(() => {
     void refreshApprovals()
-  }, [refreshApprovals])
+    void refreshRecentActions()
+  }, [refreshApprovals, refreshRecentActions])
+
+  useEffect(() => {
+    if (open) {
+      void refreshApprovals()
+      void refreshRecentActions()
+    }
+  }, [open, refreshApprovals, refreshRecentActions])
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -31,7 +50,11 @@ export function CopilotSidebar() {
     }
     const input = question
     setQuestion('')
-    await sendMessage(input)
+    await sendMessage(input, {
+      dryRun: previewOnly,
+      approveActions: true,
+      uiContext: context,
+    })
   }
 
   const statusChipClass =
@@ -43,143 +66,219 @@ export function CopilotSidebar() {
           ? 'bg-[var(--status-warning-bg)] text-[var(--status-warning-text)]'
           : 'bg-[var(--status-neutral-bg)] text-[var(--status-neutral-text)]'
 
-  return (
-    <aside
-      className={`border-l border-[var(--border-subtle)] bg-white transition-all duration-200 ${open ? 'w-[380px]' : 'w-14'} shrink-0`}
-    >
-      <div className="flex h-14 items-center justify-between border-b border-[var(--border-subtle)] px-3">
-        <div className={`flex items-center gap-2 ${open ? 'opacity-100' : 'opacity-0'} transition-opacity`}>
-          <Bot className="h-4 w-4 text-[var(--color-brand-700)]" />
-          <p className="m-0 font-[var(--font-display)] text-sm font-semibold text-neutral-900">AI Copilot</p>
-        </div>
-        <button
-          type="button"
-          onClick={toggleOpen}
-          className="rounded-md border border-[var(--border-default)] p-1.5 transition-colors hover:bg-[var(--surface-overlay)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
-          aria-label={open ? 'Collapse AI Copilot panel' : 'Expand AI Copilot panel'}
-          aria-expanded={open}
-          aria-controls="copilot-panel"
-        >
-          {open ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-        </button>
-      </div>
+  const placeholder = useMemo(() => `Ask AI Copilot about ${context.sectionLabel.toLowerCase()}...`, [context.sectionLabel])
 
-      {open && (
-        <div id="copilot-panel" className="flex h-[calc(100vh-56px)] flex-col">
-          <div className="space-y-2 border-b border-[var(--border-subtle)] p-3">
-            <p className="m-0 text-xs uppercase tracking-wider text-neutral-500">Run status</p>
-            <div className="flex items-center justify-between">
+  if (typeof document === 'undefined') {
+    return null
+  }
+
+  return createPortal(
+    <>
+      <button
+        type="button"
+        className="copilot-fab"
+        onClick={() => setOpen(!open)}
+        aria-label={open ? 'Close AI Copilot' : 'Open AI Copilot'}
+        aria-expanded={open}
+        aria-controls="copilot-panel"
+      >
+        <span className="copilot-fab__icon" aria-hidden>
+          <Bot className="h-5 w-5" />
+        </span>
+        <span className="copilot-fab__label">AI Copilot</span>
+        {approvals.filter((item) => item.status === 'PENDING').length > 0 ? (
+          <span className="copilot-fab__badge">{approvals.filter((item) => item.status === 'PENDING').length}</span>
+        ) : null}
+      </button>
+
+      {open ? (
+        <div
+          className="copilot-overlay"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setOpen(false)
+            }
+          }}
+        >
+          <aside ref={panelRef} id="copilot-panel" className="copilot-panel" role="dialog" aria-modal="true" aria-label="AI Copilot">
+            <div className="copilot-panel__header">
+              <div>
+                <div className="copilot-panel__eyebrow">
+                  <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                  {context.sectionLabel}
+                </div>
+                <h2 className="copilot-panel__title">AI Copilot</h2>
+                <p className="copilot-panel__subtitle">{context.sectionSummary}</p>
+              </div>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={() => setOpen(false)} aria-label="Close AI Copilot">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="copilot-panel__status">
               <span className={`rounded-full px-2 py-1 text-xs font-medium ${statusChipClass}`} role="status" aria-live="polite">
                 {runStatus ?? 'IDLE'}
               </span>
-              {streaming && (
-                <button
-                  type="button"
-                  onClick={() => void cancel()}
-                  className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-xs text-[var(--status-danger-text)] transition-colors hover:bg-[var(--status-danger-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
-                >
-                  <Square className="h-3 w-3" />
-                  Stop
-                </button>
-              )}
+              <div className="copilot-panel__status-note">
+                <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
+                All writes require approval. Undo is available where supported; otherwise you will see a warning first.
+              </div>
             </div>
-          </div>
 
-          <div className="flex-1 space-y-3 overflow-auto p-3">
-            <section>
-              <p className="m-0 mb-2 text-[11px] uppercase tracking-wider text-neutral-500">Conversation</p>
-              <div className="space-y-2">
-                {messages.length === 0 && <p className="m-0 text-xs text-neutral-500">Start by asking a finance question.</p>}
-                {messages.slice(-8).map((message) => (
-                  <article
-                    key={message.id}
-                    className={`rounded-lg px-3 py-2 text-sm ${
-                      message.role === 'user'
-                        ? 'ml-6 bg-[var(--color-brand-10)] text-[var(--color-brand-900)]'
-                        : 'mr-6 bg-[var(--surface-overlay)] text-neutral-800'
-                    }`}
-                  >
-                    {message.content || (streaming ? '...' : '')}
-                  </article>
-                ))}
-              </div>
-            </section>
+            <div className="copilot-panel__body">
+              <section className="copilot-panel__section">
+                <div className="copilot-panel__section-title">Conversation</div>
+                <div className="copilot-thread">
+                  {messages.length === 0 ? (
+                    <CopilotEmptyState role={context.role ?? null} context={context} onPickSuggestion={setQuestion} />
+                  ) : (
+                    messages.slice(-10).map((message) => (
+                      <article
+                        key={message.id}
+                        className={`copilot-message ${message.role === 'user' ? 'copilot-message--user' : 'copilot-message--assistant'}`}
+                      >
+                        {message.content || (streaming ? '...' : '')}
+                      </article>
+                    ))
+                  )}
+                </div>
+              </section>
 
-            <section>
-              <p className="m-0 mb-2 text-[11px] uppercase tracking-wider text-neutral-500">Run timeline</p>
-              <div className="space-y-1">
-                {steps.slice(-8).map((step) => (
-                  <div key={`${step.step}-${step.type}`} className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] px-2 py-1.5">
-                    <p className="m-0 text-xs font-semibold text-neutral-800">
-                      #{step.step} {step.type}
-                    </p>
-                    <p className="m-0 text-xs text-neutral-500">{step.status}</p>
-                  </div>
-                ))}
-              </div>
-            </section>
+              <section className="copilot-panel__section">
+                <div className="copilot-panel__section-title">Suggested prompts</div>
+                <div className="copilot-chip-list">
+                  {(context.suggestedPrompts ?? []).slice(0, 4).map((prompt) => (
+                    <button key={prompt} type="button" className="copilot-chip" onClick={() => setQuestion(prompt)}>
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+              </section>
 
-            <section>
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <p className="m-0 text-[11px] uppercase tracking-wider text-neutral-500">Pending approvals</p>
-                <button
-                  type="button"
-                  className="rounded px-1 py-0.5 text-[11px] text-neutral-600 underline-offset-2 transition-colors hover:bg-[var(--surface-overlay)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
-                  onClick={() => void expirePendingApprovals()}
-                >
-                  Expire stale
-                </button>
-              </div>
-              <div className="space-y-2">
-                {approvals.length === 0 && <p className="m-0 text-xs text-neutral-500">No pending requests.</p>}
-                {approvals.map((approval) => (
-                  <div key={approval.id} className="rounded-md border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-2">
-                    <p className="m-0 text-xs font-semibold text-neutral-800">{approval.requestedAction}</p>
-                    <p className="m-0 text-xs text-neutral-500">{approval.status}</p>
-                    {approval.status === 'PENDING' && (
-                      <div className="mt-2 flex gap-2">
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-1 rounded bg-[var(--color-brand-700)] px-2 py-1 text-xs text-white transition-colors hover:bg-[var(--color-brand-900)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
-                          onClick={() => void approve(approval.id)}
-                        >
-                          <Check className="h-3 w-3" />
-                          Approve
-                        </button>
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-1 rounded bg-[var(--color-danger)] px-2 py-1 text-xs text-white transition-colors hover:brightness-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
-                          onClick={() => void reject(approval.id)}
-                        >
-                          <X className="h-3 w-3" />
-                          Reject
-                        </button>
+              <section className="copilot-panel__section">
+                <div className="copilot-panel__section-row">
+                  <div className="copilot-panel__section-title">Pending approvals</div>
+                  <button type="button" className="btn btn--ghost btn--sm" onClick={() => void expirePendingApprovals()}>
+                    Expire stale
+                  </button>
+                </div>
+                <div className="copilot-card-list">
+                  {approvals.length === 0 ? <p className="copilot-muted">No pending approval requests.</p> : null}
+                  {approvals.map((approval) => (
+                    <div key={approval.id} className="copilot-card">
+                      <div className="copilot-card__title">{approval.requestedAction}</div>
+                      {approval.summary ? <p className="copilot-card__summary">{approval.summary}</p> : null}
+                      <p className="copilot-card__meta">
+                        {approval.status}
+                        {approval.permissionCode ? ` · ${approval.permissionCode}` : ''}
+                      </p>
+                      {approval.warningMessage ? (
+                        <p className="copilot-card__warning">
+                          <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
+                          {approval.warningMessage}
+                        </p>
+                      ) : null}
+                      {approval.status === 'PENDING' ? (
+                        <div className="copilot-card__actions">
+                          <button type="button" className="btn btn--primary btn--sm" onClick={() => void approve(approval.id)}>
+                            <Check className="h-3.5 w-3.5" />
+                            Approve
+                          </button>
+                          <button type="button" className="btn btn--danger btn--sm" onClick={() => void reject(approval.id)}>
+                            <X className="h-3.5 w-3.5" />
+                            Reject
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="copilot-panel__section">
+                <div className="copilot-panel__section-title">Recent AI actions</div>
+                <div className="copilot-card-list">
+                  {recentActions.length === 0 ? <p className="copilot-muted">No recent AI actions yet.</p> : null}
+                  {recentActions.map((action) => (
+                    <div key={action.id} className="copilot-card">
+                      <div className="copilot-card__title">{action.title}</div>
+                      {action.summary ? <p className="copilot-card__summary">{action.summary}</p> : null}
+                      <p className="copilot-card__meta">
+                        {action.status}
+                        {action.permissionCode ? ` · ${action.permissionCode}` : ''}
+                        {action.entityId ? ` · ${action.entityId}` : ''}
+                      </p>
+                      {action.warningMessage ? (
+                        <p className="copilot-card__warning">
+                          <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
+                          {action.warningMessage}
+                        </p>
+                      ) : null}
+                      {action.undoAvailable ? (
+                        <div className="copilot-card__actions">
+                          <button type="button" className="btn btn--ghost btn--sm" onClick={() => void undo(action.id)}>
+                            <RotateCcw className="h-3.5 w-3.5" />
+                            Undo
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="copilot-panel__section">
+                <div className="copilot-panel__section-title">Run timeline</div>
+                <div className="copilot-card-list">
+                  {steps.length === 0 ? <p className="copilot-muted">No run steps yet.</p> : null}
+                  {steps.slice(-8).map((step) => (
+                    <div key={`${step.step}-${step.type}`} className="copilot-card">
+                      <div className="copilot-card__title">
+                        #{step.step} {step.type}
                       </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </section>
-          </div>
+                      <p className="copilot-card__meta">{step.status}</p>
+                      {step.message ? <p className="copilot-card__summary">{step.message}</p> : null}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </div>
 
-          <form onSubmit={submit} className="border-t border-[var(--border-subtle)] p-3">
-            <textarea
-              className="h-20 w-full resize-none rounded-md border border-[var(--border-default)] px-2 py-1.5 text-sm transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
-              value={question}
-              onChange={(event) => setQuestion(event.target.value)}
-              placeholder="Ask finance Copilot..."
-              aria-label="Copilot question"
-            />
-            <button
-              type="submit"
-              className="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-md bg-[var(--color-brand-700)] px-3 py-2 text-sm text-white transition-colors hover:bg-[var(--color-brand-900)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
-            >
-              <Send className="h-4 w-4" />
-              Send
-            </button>
-          </form>
+            <form onSubmit={submit} className="copilot-panel__composer">
+              <label className="copilot-toggle">
+                <input type="checkbox" checked={previewOnly} onChange={(event) => setPreviewOnly(event.target.checked)} />
+                <span>Preview only</span>
+              </label>
+              <textarea
+                className="ui-input copilot-panel__textarea"
+                value={question}
+                onChange={(event) => setQuestion(event.target.value)}
+                placeholder={placeholder}
+                aria-label="Copilot question"
+              />
+              <div className="copilot-panel__composer-actions">
+                <button type="button" className="btn btn--ghost btn--sm" onClick={clearConversation}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Clear
+                </button>
+                {streaming ? (
+                  <button type="button" className="btn btn--danger" onClick={() => void cancel()}>
+                    <Square className="h-4 w-4" />
+                    Stop
+                  </button>
+                ) : (
+                  <button type="submit" className="btn btn--primary" disabled={!question.trim()}>
+                    <Send className="h-4 w-4" />
+                    Send
+                  </button>
+                )}
+              </div>
+            </form>
+          </aside>
         </div>
-      )}
-    </aside>
+      ) : null}
+    </>,
+    document.body,
   )
 }

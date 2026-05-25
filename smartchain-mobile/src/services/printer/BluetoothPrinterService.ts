@@ -1,9 +1,5 @@
-import RNBluetoothClassic, {
-  BluetoothDevice,
-} from 'react-native-bluetooth-classic';
 import {Platform, PermissionsAndroid} from 'react-native';
-import {captureError} from '../crashReporting';
-import {getItem, setItem} from '../../utils/storage';
+import {getItem} from '../../utils/storage';
 import {printReceiptEscPos} from '../../api/pos';
 import {appendReceiptLineExtras} from '../../utils/receiptExtras';
 import type {CartItem} from '../../store/slices/posSlice';
@@ -11,8 +7,17 @@ import {CASH_DRAWER_KICK, escPosInit} from '../../hardware/escpos';
 
 export const PREFERRED_PRINTER_KEY = 'preferred_printer';
 
+/** Paired-device shape kept for settings UI; native BT stack removed until BLE is added. */
+export type BluetoothDevice = {
+  address: string;
+  name?: string | null;
+};
+
+const BT_UNAVAILABLE_MSG =
+  'Bluetooth printing is not available in this build. Use a network or system printer in Settings → Printer.';
+
 class BluetoothPrinterService {
-  private connectedDevice: BluetoothDevice | null = null;
+  private connectedAddress: string | null = null;
 
   async requestPermissions(): Promise<boolean> {
     if (Platform.OS !== 'android') {
@@ -33,46 +38,12 @@ class BluetoothPrinterService {
   }
 
   async scanForPrinters(): Promise<BluetoothDevice[]> {
-    const hasPermission = await this.requestPermissions();
-    if (!hasPermission) {
-      throw new Error('Bluetooth permission denied');
-    }
-
-    const isEnabled = await RNBluetoothClassic.isBluetoothEnabled();
-    if (!isEnabled) {
-      await RNBluetoothClassic.requestBluetoothEnabled();
-    }
-
-    const paired = await RNBluetoothClassic.getBondedDevices();
-    return paired.filter(d => {
-      const name = d.name?.toLowerCase() ?? '';
-      return (
-        name.includes('print') ||
-        name.includes('pos') ||
-        name.includes('thermal') ||
-        name.includes('rp') ||
-        name.includes('xp') ||
-        name.includes('mp') ||
-        name.includes('epson')
-      );
-    });
+    await this.requestPermissions();
+    throw new Error(BT_UNAVAILABLE_MSG);
   }
 
-  async connect(deviceAddress: string): Promise<void> {
-    try {
-      if (this.connectedDevice) {
-        await this.disconnect();
-      }
-
-      const device = await RNBluetoothClassic.connectToDevice(deviceAddress);
-      this.connectedDevice = device;
-      setItem(PREFERRED_PRINTER_KEY, deviceAddress);
-    } catch (error) {
-      captureError(error as Error, {deviceAddress});
-      throw new Error(
-        'Could not connect to printer. Make sure it is on and paired in Bluetooth settings.',
-      );
-    }
+  async connect(_deviceAddress: string): Promise<void> {
+    throw new Error(BT_UNAVAILABLE_MSG);
   }
 
   async autoConnect(): Promise<boolean> {
@@ -89,18 +60,15 @@ class BluetoothPrinterService {
   }
 
   async disconnect(): Promise<void> {
-    if (this.connectedDevice) {
-      await this.connectedDevice.disconnect();
-      this.connectedDevice = null;
-    }
+    this.connectedAddress = null;
   }
 
   isConnected(): boolean {
-    return this.connectedDevice !== null;
+    return this.connectedAddress !== null;
   }
 
-  async printEscPos(escposData: string): Promise<void> {
-    if (!this.connectedDevice) {
+  async printEscPos(_escposData: string): Promise<void> {
+    if (!this.isConnected()) {
       const connected = await this.autoConnect();
       if (!connected) {
         throw new Error(
@@ -108,14 +76,7 @@ class BluetoothPrinterService {
         );
       }
     }
-
-    try {
-      await this.connectedDevice!.write(escposData);
-    } catch (error) {
-      this.connectedDevice = null;
-      captureError(error as Error);
-      throw new Error('Print failed. Check printer is on and in range.');
-    }
+    throw new Error(BT_UNAVAILABLE_MSG);
   }
 
   async printReceipt(

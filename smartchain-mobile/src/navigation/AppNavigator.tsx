@@ -5,8 +5,7 @@ import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {useSelector} from 'react-redux';
 import type {RootState} from '../store';
-import type {AppRole} from '../utils/roles';
-import {hasAnyRole, isCashierShell} from '../utils/roles';
+import {usePermission} from '../hooks/usePermission';
 import {SyncStatusBar} from '../components/SyncStatusBar';
 import PosNavigator from './PosNavigator';
 import StockNavigator from './StockNavigator';
@@ -23,77 +22,44 @@ function tabIcon(name: string, color: string, size: number) {
 }
 
 function resolveInitialRoute(
-  role: AppRole | null,
-  flags: {
-    showTill: boolean;
-    showDashboard: boolean;
-    showPos: boolean;
-    cashierShell: boolean;
-  },
+  canTill: boolean,
+  canPos: boolean,
+  canDashboard: boolean,
+  canCopilot: boolean,
 ): string {
-  if (flags.cashierShell || role === 'CASHIER' || role === 'POS_OPERATOR') {
+  if (canTill && canPos && !canDashboard) {
     return 'Till';
   }
-  if (
-    role === 'SALES_MANAGER' ||
-    role === 'ACCOUNTING_CONTROLLER'
-  ) {
-    return flags.showTill ? 'Till' : flags.showPos ? 'POS' : 'Copilot';
-  }
-  if (flags.showDashboard) {
+  if (canDashboard) {
     return 'Dashboard';
   }
-  if (flags.showPos) {
+  if (canPos) {
     return 'POS';
   }
-  if (flags.showTill) {
+  if (canTill) {
     return 'Till';
   }
-  return 'Copilot';
+  if (canCopilot) {
+    return 'Copilot';
+  }
+  return 'Settings';
 }
 
 export default function AppNavigator() {
-  const roles = useSelector((s: RootState) => s.auth.roles) as AppRole[];
-  const role = useSelector((s: RootState) => s.auth.role);
-  const cashierShell = isCashierShell(roles);
-
-  const showPos =
-    cashierShell ||
-    hasAnyRole(roles, 'CEO', 'SALES_MANAGER', 'OPS_MANAGER', 'CASHIER', 'POS_OPERATOR');
-  const showStock =
-    !cashierShell &&
-    hasAnyRole(
-      roles,
-      'CEO',
-      'SALES_MANAGER',
-      'OPS_MANAGER',
-      'ACCOUNTING_CONTROLLER',
-    );
-  const showTill =
-    cashierShell ||
-    hasAnyRole(
-      roles,
-      'CEO',
-      'SALES_MANAGER',
-      'OPS_MANAGER',
-      'ACCOUNTING_CONTROLLER',
-      'CASHIER',
-      'POS_OPERATOR',
-    );
-  const showDashboard =
-    !cashierShell && hasAnyRole(roles, 'CEO', 'CFO');
-  const showCopilot = !cashierShell;
+  const canTill = usePermission('POS_TILL_MANAGE');
+  const canPos = usePermission('POS_ACCESS');
+  const canStock = usePermission('INVENTORY_READ');
+  const canCustomers = usePermission('POS_ACCESS');
+  const canDashboard = usePermission('ANALYTICS_OWN');
+  const canCopilot = usePermission('AI_COPILOT');
   const copilotBadge = useSelector((s: RootState) => s.copilot.badgeCount);
-  const showCustomers =
-    !cashierShell &&
-    hasAnyRole(roles, 'CEO', 'SALES_MANAGER', 'OPS_MANAGER', 'ACCOUNTING_CONTROLLER');
 
-  const initialRouteName = resolveInitialRoute(role, {
-    showTill,
-    showDashboard,
-    showPos,
-    cashierShell,
-  });
+  const initialRouteName = resolveInitialRoute(
+    canTill,
+    canPos,
+    canDashboard,
+    canCopilot,
+  );
 
   return (
     <SafeAreaView edges={['top']} style={{flex: 1}}>
@@ -106,7 +72,7 @@ export default function AppNavigator() {
             tabBarItemStyle: {minHeight: 48},
             headerShown: false,
           }}>
-          {showTill ? (
+          {canTill ? (
             <Tab.Screen
               name="Till"
               component={TillNavigator}
@@ -115,7 +81,7 @@ export default function AppNavigator() {
               }}
             />
           ) : null}
-          {showPos ? (
+          {canPos ? (
             <Tab.Screen
               name="POS"
               component={PosNavigator}
@@ -124,7 +90,7 @@ export default function AppNavigator() {
               }}
             />
           ) : null}
-          {showStock ? (
+          {canStock ? (
             <Tab.Screen
               name="Stock"
               component={StockNavigator}
@@ -133,7 +99,7 @@ export default function AppNavigator() {
               }}
             />
           ) : null}
-          {showCustomers ? (
+          {canCustomers ? (
             <Tab.Screen
               name="Customers"
               component={CustomerNavigator}
@@ -142,7 +108,7 @@ export default function AppNavigator() {
               }}
             />
           ) : null}
-          {showDashboard ? (
+          {canDashboard ? (
             <Tab.Screen
               name="Dashboard"
               component={DashboardNavigator}
@@ -152,7 +118,7 @@ export default function AppNavigator() {
               }}
             />
           ) : null}
-          {showCopilot ? (
+          {canCopilot ? (
             <Tab.Screen
               name="Copilot"
               component={CopilotScreen}

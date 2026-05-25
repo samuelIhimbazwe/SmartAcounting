@@ -1,6 +1,6 @@
 package com.smartaccounting.security;
 
-import com.smartaccounting.exception.RateLimitExceededException;
+import com.smartaccounting.config.PublicSignupProperties;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,9 +16,11 @@ import java.time.Duration;
 public class PublicApiRateLimitFilter extends OncePerRequestFilter {
 
     private final StringRedisTemplate redisTemplate;
+    private final PublicSignupProperties signupProperties;
 
-    public PublicApiRateLimitFilter(StringRedisTemplate redisTemplate) {
+    public PublicApiRateLimitFilter(StringRedisTemplate redisTemplate, PublicSignupProperties signupProperties) {
         this.redisTemplate = redisTemplate;
+        this.signupProperties = signupProperties;
     }
 
     @Override
@@ -35,8 +37,12 @@ public class PublicApiRateLimitFilter extends OncePerRequestFilter {
         long limit = 0;
         Duration window = Duration.ofHours(1);
         if ("/api/v1/public/signup".equals(uri)) {
+            if (!signupProperties.isRateLimitEnabled()) {
+                filterChain.doFilter(request, response);
+                return;
+            }
             key = "ratelimit:signup:" + clientIp(request);
-            limit = 3;
+            limit = signupProperties.getFilterMaxPerHour();
             window = Duration.ofHours(1);
         } else if ("/api/v1/ai/copilot/query".equals(uri)) {
             String tenant = request.getHeader(TenantContextFilter.TENANT_HEADER);
@@ -51,8 +57,12 @@ public class PublicApiRateLimitFilter extends OncePerRequestFilter {
         if (key != null) {
             long count = increment(key, window);
             if (count > limit) {
-                response.setHeader("Retry-After", String.valueOf(window.toSeconds()));
-                throw new RateLimitExceededException("Rate limit exceeded for " + uri);
+                RateLimitResponseWriter.writeTooManyRequests(
+                    response,
+                    "Rate limit exceeded for " + uri,
+                    window.toSeconds()
+                );
+                return;
             }
         }
         filterChain.doFilter(request, response);

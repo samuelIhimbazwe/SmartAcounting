@@ -6,6 +6,7 @@ import com.smartaccounting.entity.EbmAuditLog;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,7 +29,7 @@ public class ComplianceController {
     }
 
     @GetMapping("/ebm/audit-log")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO')")
+    @PreAuthorize(PermissionExpressions.EBM_AUDIT)
     public Map<String, Object> ebmAuditLog(Pageable pageable) {
         Page<EbmAuditLog> page = ebmAuditService.list(pageable);
         return Map.of(
@@ -40,7 +41,7 @@ public class ComplianceController {
     }
 
     @GetMapping("/vat/calendar")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.FINANCE_READ)
     public List<Map<String, Object>> vatCalendar() {
         return vatFilingCalendarService.nextPeriods(4);
     }

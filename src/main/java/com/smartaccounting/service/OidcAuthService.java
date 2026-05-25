@@ -1,5 +1,6 @@
 package com.smartaccounting.service;
 
+import com.smartaccounting.dto.AuthSessionProfile;
 import com.smartaccounting.dto.OAuthAuthResponse;
 import com.smartaccounting.security.JwtService;
 import com.smartaccounting.security.RefreshTokenService;
@@ -26,17 +27,20 @@ public class OidcAuthService {
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
     private final UserDetailsService userDetailsService;
+    private final AuthSessionService authSessionService;
 
     public OidcAuthService(OidcIdentityTokenService oidcIdentityTokenService,
                            JdbcTemplate jdbcTemplate,
                            JwtService jwtService,
                            RefreshTokenService refreshTokenService,
-                           UserDetailsService userDetailsService) {
+                           UserDetailsService userDetailsService,
+                           AuthSessionService authSessionService) {
         this.oidcIdentityTokenService = oidcIdentityTokenService;
         this.jdbcTemplate = jdbcTemplate;
         this.jwtService = jwtService;
         this.refreshTokenService = refreshTokenService;
         this.userDetailsService = userDetailsService;
+        this.authSessionService = authSessionService;
     }
 
     @Transactional(readOnly = true)
@@ -79,18 +83,25 @@ public class OidcAuthService {
         TenantContext.set(tenantId, userId);
         try {
             UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+            AuthSessionProfile session = authSessionService.buildSession(tenantId, userId);
             String tid = tenantId.toString();
             String uid = userId.toString();
-            String access = jwtService.generateToken(userDetails, tid, uid);
+            String access = jwtService.generateToken(
+                userDetails,
+                tid,
+                uid,
+                authSessionService.loadEffectivePermissions(tenantId, userId, role)
+            );
             String refresh = refreshTokenService.issue(tid, uid, userDetails);
             return new OAuthAuthResponse(
                 access,
                 "Bearer",
                 jwtService.expirationSeconds(),
                 refresh,
-                role,
+                session.role(),
                 tid,
-                uid
+                uid,
+                session.setupComplete()
             );
         } finally {
             TenantContext.clear();

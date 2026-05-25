@@ -1,4 +1,4 @@
-﻿# Phase 3 Jest coverage baseline (2026-05-19)
+# Phase 3 Jest coverage baseline (2026-05-19)
 # Command: cd smartchain-mobile && npx jest --coverage
 # Thresholds: jest.config.js global 43% lines/statements, 32% branches/functions
 # Tag: phase3-complete @ 946bae0

@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,7 +34,7 @@ public class ReportController {
     }
 
     @GetMapping("/board/{period}")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO')")
+    @PreAuthorize(PermissionExpressions.REPORTS_EXPORT)
     public ResponseEntity<byte[]> getBoardReport(
         @PathVariable String period,
         @RequestHeader(value = HttpHeaders.ACCEPT, required = false) String accept) {
@@ -50,7 +51,7 @@ public class ReportController {
     }
 
     @GetMapping("/z-report")
-    @PreAuthorize("hasAnyRole('OPS_MANAGER','ACCOUNTING_CONTROLLER','CFO','CEO')")
+    @PreAuthorize(PermissionExpressions.POS_TILL_MANAGE)
     public Map<String, Object> previewZReport(
         @RequestParam UUID tillSessionId,
         @RequestParam(defaultValue = "X") String reportType,
@@ -61,7 +62,7 @@ public class ReportController {
     }
 
     @PostMapping("/z-report")
-    @PreAuthorize("hasAnyRole('OPS_MANAGER','ACCOUNTING_CONTROLLER','CFO','CEO')")
+    @PreAuthorize(PermissionExpressions.POS_TILL_MANAGE)
     public Map<String, Object> postZReport(@RequestBody @Valid ZReportRequest request) {
         return zReportService.saveZReport(
             request.tillSessionId(),

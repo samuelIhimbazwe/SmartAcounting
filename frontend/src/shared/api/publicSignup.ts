@@ -1,6 +1,7 @@
 import { apiClient } from './client'
 import type { AuthSession } from './auth'
 import type { Role } from '../types/roles'
+import { emptyRoleProfile } from '../types/roleProfiles'
 import type { BillingCycle, PlanId } from '../../features/auth/subscriptionPlans'
 
 export type SignupPlan = PlanId | 'TRIAL'
@@ -15,11 +16,24 @@ export interface PublicSignupPayload {
   billingCycle?: BillingCycle
 }
 
-export interface SignupApiResponse {
+export type SmsDeliveryMode = 'SENT' | 'DRY_RUN' | 'DISABLED' | 'FAILED'
+
+export type SmsCarrier = 'MTN' | 'AIRTEL' | 'UNKNOWN'
+
+export interface SignupOtpDelivery {
+  maskedPhone?: string
+  smsDelivery?: SmsDeliveryMode
+  smsCarrier?: SmsCarrier
+  devOtp?: string | null
+}
+
+export interface SignupApiResponse extends SignupOtpDelivery {
   tenantId: string
   userId: string
   token: string
 }
+
+export interface ResendOtpApiResponse extends SignupOtpDelivery {}
 
 interface VerifyPhoneApiResponse {
   token?: string
@@ -75,11 +89,16 @@ export async function verifySignupPhone(
     refreshToken: data.refreshToken ?? null,
     expiresAt: toExpirySeconds(data),
     role,
+    permissions: [],
+    assignedRoles: [],
+    effectiveRoleProfile: emptyRoleProfile(),
+    setupComplete: false,
   }
 }
 
-export async function resendSignupOtp(phone: string): Promise<void> {
-  await apiClient.post('/api/v1/public/resend-otp', { phone })
+export async function resendSignupOtp(phone: string): Promise<ResendOtpApiResponse> {
+  const { data } = await apiClient.post<ResendOtpApiResponse>('/api/v1/public/resend-otp', { phone })
+  return data
 }
 
 export interface ForgotPasswordPayload {

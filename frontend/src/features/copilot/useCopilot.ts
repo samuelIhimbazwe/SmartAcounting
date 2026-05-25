@@ -4,13 +4,15 @@ import {
   cancelCopilotRun,
   expireApprovals,
   getCopilotRun,
+  listRecentActions,
   listApprovals,
   rejectAction,
   streamCopilotRun,
+  undoRecentAction,
 } from '../../shared/api/copilot'
 import { useCopilotStore } from '../../shared/stores/copilotStore'
 import { useAuthStore } from '../../shared/stores/authStore'
-import type { RunStatus } from '../../shared/types/copilot'
+import type { RunStatus, StartCopilotRunRequest } from '../../shared/types/copilot'
 
 export function useCopilot() {
   const role = useAuthStore((state) => state.role)
@@ -21,14 +23,18 @@ export function useCopilot() {
   const messages = useCopilotStore((state) => state.messages)
   const steps = useCopilotStore((state) => state.steps)
   const approvals = useCopilotStore((state) => state.approvals)
+  const recentActions = useCopilotStore((state) => state.recentActions)
 
   const toggleOpen = useCopilotStore((state) => state.toggleOpen)
+  const setOpen = useCopilotStore((state) => state.setOpen)
   const setRunState = useCopilotStore((state) => state.setRunState)
   const setStreaming = useCopilotStore((state) => state.setStreaming)
   const addMessage = useCopilotStore((state) => state.addMessage)
+  const clearConversation = useCopilotStore((state) => state.clearConversation)
   const appendAssistantText = useCopilotStore((state) => state.appendAssistantText)
   const upsertStep = useCopilotStore((state) => state.upsertStep)
   const setApprovals = useCopilotStore((state) => state.setApprovals)
+  const setRecentActions = useCopilotStore((state) => state.setRecentActions)
   const abortRef = useRef<AbortController | null>(null)
 
   const refreshApprovals = useCallback(async () => {
@@ -36,14 +42,20 @@ export function useCopilot() {
     setApprovals(approvals)
   }, [setApprovals])
 
+  const refreshRecentActions = useCallback(async () => {
+    const actions = await listRecentActions()
+    setRecentActions(actions)
+  }, [setRecentActions])
+
   const sendMessage = useCallback(
-    async (question: string) => {
+    async (question: string, overrides?: Partial<StartCopilotRunRequest>) => {
       if (!role || !question.trim()) {
         return
       }
 
       abortRef.current?.abort()
       abortRef.current = new AbortController()
+      setOpen(true)
 
       addMessage({
         id: crypto.randomUUID(),
@@ -64,7 +76,13 @@ export function useCopilot() {
 
       try {
         await streamCopilotRun(
-          { role, question, dryRun: true, approveActions: false },
+          {
+            role,
+            question,
+            dryRun: overrides?.dryRun ?? false,
+            approveActions: overrides?.approveActions ?? true,
+            uiContext: overrides?.uiContext,
+          },
           (event) => {
             if (event.runId) {
               activeRunId = event.runId
@@ -148,9 +166,21 @@ export function useCopilot() {
         }
         setStreaming(false)
         void refreshApprovals()
+        void refreshRecentActions()
       }
     },
-    [addMessage, appendAssistantText, refreshApprovals, role, runId, setRunState, setStreaming, upsertStep],
+    [
+      addMessage,
+      appendAssistantText,
+      refreshApprovals,
+      refreshRecentActions,
+      role,
+      runId,
+      setOpen,
+      setRunState,
+      setStreaming,
+      upsertStep,
+    ],
   )
 
   const cancel = useCallback(async () => {
@@ -171,22 +201,32 @@ export function useCopilot() {
     async (id: string) => {
       await approveAction(id)
       await refreshApprovals()
+      await refreshRecentActions()
     },
-    [refreshApprovals],
+    [refreshApprovals, refreshRecentActions],
   )
 
   const reject = useCallback(
     async (id: string) => {
       await rejectAction(id, 'Rejected in frontend review')
       await refreshApprovals()
+      await refreshRecentActions()
     },
-    [refreshApprovals],
+    [refreshApprovals, refreshRecentActions],
   )
 
   const expirePendingApprovals = useCallback(async () => {
     await expireApprovals()
     await refreshApprovals()
   }, [refreshApprovals])
+
+  const undo = useCallback(
+    async (id: string) => {
+      await undoRecentAction(id)
+      await refreshRecentActions()
+    },
+    [refreshRecentActions],
+  )
 
   return {
     open,
@@ -196,12 +236,17 @@ export function useCopilot() {
     messages,
     steps,
     approvals,
+    recentActions,
     toggleOpen,
+    setOpen,
+    clearConversation,
     sendMessage,
     cancel,
     refreshApprovals,
+    refreshRecentActions,
     approve,
     reject,
+    undo,
     expirePendingApprovals,
   }
 }

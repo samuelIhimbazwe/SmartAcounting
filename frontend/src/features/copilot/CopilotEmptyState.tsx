@@ -1,4 +1,5 @@
 import { Sparkles } from 'lucide-react'
+import type { CopilotUiContext } from '../../shared/types/copilot'
 import type { Role } from '../../shared/types/roles'
 
 const DEFAULT_CHIPS = [
@@ -47,11 +48,12 @@ const SUGGESTIONS: Partial<Record<Role, string[]>> = {
 
 interface CopilotEmptyStateProps {
   role: Role | null
+  context: CopilotUiContext
   onPickSuggestion: (text: string) => void
 }
 
-export function CopilotEmptyState({ role, onPickSuggestion }: CopilotEmptyStateProps) {
-  const chips = (role && SUGGESTIONS[role]) ?? SUGGESTIONS.CEO ?? DEFAULT_CHIPS
+export function CopilotEmptyState({ role, context, onPickSuggestion }: CopilotEmptyStateProps) {
+  const chips = (context.suggestedPrompts?.length ? context.suggestedPrompts : role && SUGGESTIONS[role]) ?? SUGGESTIONS.CEO ?? DEFAULT_CHIPS
 
   return (
     <div className="rounded-2xl border border-[var(--border-subtle)] bg-gradient-to-b from-[var(--color-primary-light)] to-[var(--color-surface)] p-4 shadow-[var(--shadow-sm)]">
@@ -62,9 +64,19 @@ export function CopilotEmptyState({ role, onPickSuggestion }: CopilotEmptyStateP
       </div>
       <h3 className="m-0 text-center font-[var(--font-display)] text-base font-semibold text-neutral-900">AI Copilot</h3>
       <p className="mt-2 text-center text-xs leading-relaxed text-neutral-600">
-        Ask about <strong className="font-medium text-neutral-800">your business data</strong>—sales, inventory, financials,
-        and more. Answers are grounded in your tenant context (RAG), not generic web knowledge.
+        You are in <strong className="font-medium text-neutral-800">{context.sectionLabel}</strong>. Ask questions,
+        request drafts, or stage approval-safe actions for this workflow.
       </p>
+      <p className="mt-2 text-center text-xs leading-relaxed text-neutral-600">
+        {context.sectionSummary}
+      </p>
+      <div className="mt-4 rounded-xl border border-[var(--border-default)] bg-[var(--color-surface)] px-3 py-2 text-xs text-neutral-700 shadow-[var(--shadow-sm)]">
+        <p className="m-0 font-medium text-neutral-900">How it works</p>
+        <p className="mt-1 mb-0 leading-relaxed">
+          AI Copilot stays inside your role permissions, previews write actions before execution, and shows undo when a
+          safe reversal path exists.
+        </p>
+      </div>
       <div className="mt-4">
         <p className="m-0 mb-2 text-[11px] font-medium uppercase tracking-[0.12em] text-neutral-500">Try asking</p>
         <div className="flex flex-col gap-2">

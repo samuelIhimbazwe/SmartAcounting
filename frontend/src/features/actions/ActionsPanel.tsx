@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useExecuteRecommendedAction, useRecommendedActions } from './useRecommendedActions'
 import { ActionCard } from './ActionCard'
+import type { RecommendedAction } from '../../shared/types/dashboard'
 import type { Role } from '../../shared/types/roles'
 
 export function ActionsPanel({ role }: { role: Role }) {
@@ -8,13 +9,13 @@ export function ActionsPanel({ role }: { role: Role }) {
   const execute = useExecuteRecommendedAction(role)
   const [lastMessage, setLastMessage] = useState<string | null>(null)
 
-  const onExecute = async (type: string) => {
+  const onExecute = async (action: RecommendedAction) => {
     setLastMessage(null)
     try {
-      await execute.mutateAsync(type)
-      setLastMessage(`Action ${type} executed and queued successfully.`)
+      await execute.mutateAsync({ id: action.id, type: action.type })
+      setLastMessage(`Action ${action.title} executed and queued successfully.`)
     } catch {
-      setLastMessage(`Action ${type} failed to execute. Retry from panel.`)
+      setLastMessage(`Action ${action.title} failed to execute. Retry from panel.`)
     }
   }
 
@@ -35,7 +36,7 @@ export function ActionsPanel({ role }: { role: Role }) {
           <ActionCard
             key={action.id}
             action={action}
-            executing={execute.isPending && execute.variables === action.type}
+            executing={execute.isPending && execute.variables?.type === action.type && execute.variables?.id === action.id}
             onExecute={onExecute}
           />
         ))}

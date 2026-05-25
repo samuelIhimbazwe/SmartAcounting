@@ -26,20 +26,20 @@ public class TenantDataSharingController {
     }
 
     @PostMapping("/grants")
-    @PreAuthorize("@permissionGuard.has(authentication, 'ADMIN_TENANT_WRITE')")
+    @PreAuthorize("@permissionGuard.has(authentication, 'TENANT_CONFIG')")
     public Map<String, UUID> grant(@RequestBody @Valid CreateDataSharingGrantRequest request) {
         return Map.of("grantId", service.grant(request));
     }
 
     @GetMapping("/grants")
-    @PreAuthorize("@permissionGuard.has(authentication, 'ADMIN_TENANT_WRITE')")
+    @PreAuthorize("@permissionGuard.has(authentication, 'TENANT_CONFIG')")
     public List<Map<String, Object>> grants(@RequestParam(defaultValue = "0") int page,
                                             @RequestParam(defaultValue = "50") int size) {
         return service.listOutgoing(page, size);
     }
 
     @PostMapping("/grants/{id}/revoke")
-    @PreAuthorize("@permissionGuard.has(authentication, 'ADMIN_TENANT_WRITE')")
+    @PreAuthorize("@permissionGuard.has(authentication, 'TENANT_CONFIG')")
     public Map<String, Object> revoke(@PathVariable UUID id) {
         return service.revoke(id);
     }

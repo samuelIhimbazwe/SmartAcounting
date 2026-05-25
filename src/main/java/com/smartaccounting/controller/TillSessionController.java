@@ -7,6 +7,7 @@ import com.smartaccounting.service.TillSessionService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -28,25 +29,25 @@ public class TillSessionController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('CEO','SALES_MANAGER','OPS_MANAGER','ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.POS_TILL_MANAGE)
     public ResponseEntity<TillSessionDto> openSession(@Valid @RequestBody OpenTillSessionRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED).body(tillSessionService.openSession(req));
     }
 
     @GetMapping("/current")
-    @PreAuthorize("hasAnyRole('CEO','SALES_MANAGER','OPS_MANAGER','ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.POS_TILL_MANAGE)
     public TillSessionDto getCurrentSession() {
         return tillSessionService.getCurrentSessionForUser();
     }
 
     @GetMapping("/floor")
-    @PreAuthorize("hasAnyRole('CEO','SALES_MANAGER','OPS_MANAGER','ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.POS_TILL_MANAGE)
     public java.util.List<TillSessionDto> floorView() {
         return tillSessionService.listOpenSessionsAtLocation();
     }
 
     @PatchMapping("/{id}/close")
-    @PreAuthorize("hasAnyRole('CEO','SALES_MANAGER','OPS_MANAGER','ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.POS_TILL_MANAGE)
     public TillSessionDto closeSession(
         @PathVariable UUID id,
         @Valid @RequestBody CloseTillSessionRequest req
@@ -55,7 +56,7 @@ public class TillSessionController {
     }
 
     @PatchMapping("/{id}/suspend")
-    @PreAuthorize("hasAnyRole('CEO','CFO','ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.FINANCE_READ)
     public TillSessionDto suspendSession(@PathVariable UUID id) {
         return tillSessionService.suspendSession(id);
     }

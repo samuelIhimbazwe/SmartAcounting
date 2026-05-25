@@ -6,6 +6,7 @@ import com.smartaccounting.service.StockTransferService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -29,7 +30,7 @@ public class StockTransferController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('CEO','OPS_MANAGER','SALES_MANAGER','ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.INVENTORY_WRITE)
     public ResponseEntity<Map<String, Object>> create(
         @Valid @RequestBody CreateStockTransferRequest req
     ) {
@@ -37,13 +38,13 @@ public class StockTransferController {
     }
 
     @GetMapping("/incoming")
-    @PreAuthorize("hasAnyRole('CEO','OPS_MANAGER','SALES_MANAGER','ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.INVENTORY_WRITE)
     public List<Map<String, Object>> incoming() {
         return stockTransferService.listIncoming();
     }
 
     @PatchMapping("/{id}/receive")
-    @PreAuthorize("hasAnyRole('CEO','OPS_MANAGER','SALES_MANAGER','ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.INVENTORY_WRITE)
     public Map<String, Object> receive(
         @PathVariable UUID id,
         @Valid @RequestBody ReceiveStockTransferRequest req

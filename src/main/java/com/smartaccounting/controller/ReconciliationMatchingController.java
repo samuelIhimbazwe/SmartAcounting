@@ -2,6 +2,7 @@ package com.smartaccounting.controller;
 
 import com.smartaccounting.entity.ReconciliationMatchItem;
 import com.smartaccounting.service.ReconciliationMatchingService;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,13 +19,13 @@ public class ReconciliationMatchingController {
     }
 
     @PostMapping("/auto-match")
-    @PreAuthorize("hasRole('CEO') or hasRole('CFO') or hasRole('ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.FINANCE_WRITE)
     public Map<String, Integer> autoMatch() {
         return Map.of("matchedItems", service.autoMatch());
     }
 
     @GetMapping("/unmatched")
-    @PreAuthorize("hasRole('CEO') or hasRole('CFO') or hasRole('ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.FINANCE_WRITE)
     public List<ReconciliationMatchItem> unmatched(@RequestParam(defaultValue = "0") int page,
                                                    @RequestParam(defaultValue = "50") int size) {
         return service.unmatchedQueue(page, size);

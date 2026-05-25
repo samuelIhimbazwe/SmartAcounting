@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,13 +32,13 @@ public class FixedAssetController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('CFO', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.ASSETS_MANAGE)
     public ResponseEntity<FixedAssetRegister> createAsset(@RequestBody @Valid FixedAssetRequest request) {
         return ResponseEntity.ok(fixedAssetRegisterService.create(request));
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.ASSETS_MANAGE)
     public ResponseEntity<Page<FixedAssetRegister>> listAssets(
         @RequestParam(required = false) String status,
         @RequestParam(defaultValue = "0") int page,
@@ -46,13 +47,13 @@ public class FixedAssetController {
     }
 
     @GetMapping("/{assetId}/depreciation-schedule")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.ASSETS_MANAGE)
     public ResponseEntity<List<DepreciationScheduleLine>> getSchedule(@PathVariable UUID assetId) {
         return ResponseEntity.ok(fixedAssetRegisterService.depreciationSchedule(assetId));
     }
 
     @PostMapping("/{assetId}/dispose")
-    @PreAuthorize("hasAnyRole('CFO', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.ASSETS_MANAGE)
     public ResponseEntity<FixedAssetRegister> disposeAsset(
         @PathVariable UUID assetId,
         @RequestBody @Valid DisposeAssetRequest request) {

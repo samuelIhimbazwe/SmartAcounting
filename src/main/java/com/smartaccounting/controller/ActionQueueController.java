@@ -4,6 +4,7 @@ import com.smartaccounting.dto.EnqueueActionRequest;
 import com.smartaccounting.entity.ActionQueueItem;
 import com.smartaccounting.service.ActionQueueService;
 import jakarta.validation.Valid;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,20 +22,20 @@ public class ActionQueueController {
     }
 
     @PostMapping("/queue")
-    @PreAuthorize("hasRole('CEO') or hasRole('CFO') or hasRole('ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.FINANCE_READ)
     public Map<String, UUID> enqueue(@RequestBody @Valid EnqueueActionRequest req) {
         return Map.of("actionId", service.enqueue(req.actionType(), req.actionRef(), req.payloadJson()));
     }
 
     @GetMapping("/queue")
-    @PreAuthorize("hasRole('CEO') or hasRole('CFO') or hasRole('ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.FINANCE_READ)
     public List<ActionQueueItem> queued(@RequestParam(defaultValue = "0") int page,
                                         @RequestParam(defaultValue = "50") int size) {
         return service.queued(page, size);
     }
 
     @PostMapping("/process")
-    @PreAuthorize("hasRole('CEO') or hasRole('CFO') or hasRole('ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.FINANCE_READ)
     public Map<String, Integer> process() {
         return Map.of("processed", service.processBatch());
     }

@@ -8,6 +8,7 @@ import { useAlertStream } from '../alerts/useAlertStream'
 import { useDashboardAlerts } from '../alerts/useDashboardAlerts'
 import { DrilldownDrawer } from '../drilldown/DrilldownDrawer'
 import { canAccessRoleDashboard } from '../../shared/security/roleAccess'
+import { getDefaultRoute } from '../../shared/routing/getDefaultRoute'
 import type { DashboardPageProps } from './routes/types'
 import type { Role } from '../../shared/types/roles'
 
@@ -25,21 +26,21 @@ export function DashboardRoute() {
   const { t } = useTranslation()
   const { role: routeRole } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
-  const sessionRole = useAuthStore((state) => state.role)
-  const accessToken = useAuthStore((state) => state.accessToken)
+  const sessionRole = useAuthStore((state) => state.role)!
+  const permissions = useAuthStore((state) => state.permissions)
+  const effectiveRoleProfile = useAuthStore((state) => state.effectiveRoleProfile)
   const normalizedRole = routeRole ? pathRoleMap[routeRole] : undefined
-  const allowed = Boolean(sessionRole && normalizedRole && canAccessRoleDashboard(sessionRole, normalizedRole))
+  const allowed = Boolean(
+    normalizedRole &&
+      canAccessRoleDashboard(sessionRole, normalizedRole, permissions, effectiveRoleProfile),
+  )
   const drillMetric = searchParams.get('drill')
 
   useAlertStream(normalizedRole ?? null, allowed)
   useDashboardAlerts(normalizedRole ?? null, allowed)
 
-  if (!sessionRole || !accessToken) {
-    return <Navigate to="/login" replace />
-  }
-
   if (!normalizedRole || !allowed) {
-    return <Navigate to="/unauthorized" replace />
+    return <Navigate to={getDefaultRoute(sessionRole, permissions, effectiveRoleProfile)} replace />
   }
 
   const RoleDashboard = roleRouteComponent[normalizedRole]

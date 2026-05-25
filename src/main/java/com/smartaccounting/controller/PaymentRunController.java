@@ -7,6 +7,7 @@ import com.smartaccounting.service.PaymentRunService;
 import com.smartaccounting.tenant.TenantContext;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,33 +29,33 @@ public class PaymentRunController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('CFO', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.FINANCE_WRITE)
     public ResponseEntity<PaymentRun> createRun(@RequestBody @Valid CreatePaymentRunRequest request) {
         UUID createdBy = TenantContext.userId() != null ? TenantContext.userId() : UUID.randomUUID();
         return ResponseEntity.ok(paymentRunService.createPaymentRun(request, createdBy));
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.FINANCE_READ)
     public ResponseEntity<List<PaymentRun>> listRuns() {
         return ResponseEntity.ok(paymentRunService.listRuns());
     }
 
     @GetMapping("/{runId}")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.FINANCE_READ)
     public ResponseEntity<PaymentRunDetail> getRun(@PathVariable UUID runId) {
         return ResponseEntity.ok(paymentRunService.getRunDetail(runId));
     }
 
     @PostMapping("/{runId}/approve")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO')")
+    @PreAuthorize(PermissionExpressions.FINANCE_WRITE)
     public ResponseEntity<PaymentRun> approveRun(@PathVariable UUID runId) {
         UUID approvedBy = TenantContext.userId() != null ? TenantContext.userId() : UUID.randomUUID();
         return ResponseEntity.ok(paymentRunService.approvePaymentRun(runId, approvedBy));
     }
 
     @PostMapping("/{runId}/execute")
-    @PreAuthorize("hasAnyRole('CFO', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.FINANCE_WRITE)
     public ResponseEntity<PaymentRun> executeRun(@PathVariable UUID runId) {
         return ResponseEntity.ok(paymentRunService.executePaymentRun(runId));
     }

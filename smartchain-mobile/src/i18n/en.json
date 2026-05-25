@@ -447,9 +447,13 @@
   },
   "payments": {
     "ussdCode": "USSD transaction code",
+    "ussdPrompt": "Enter the MoMo code sent to your phone",
+    "ussdExpired": "MoMo session expired. Please try again.",
+    "ussdCountdown": "{{seconds}}s remaining",
     "verifyMomo": "Verify payment",
     "verifying": "Verifying…",
     "verified": "Payment verified",
+    "paymentConfirmed": "Payment confirmed",
     "verifyFailed": "Verification failed",
     "verifyTimeout": "Verification timed out — retry?"
   },

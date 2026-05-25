@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { AgentApproval, CopilotMessage, CopilotStep, RunStatus } from '../types/copilot'
+import type { AgentApproval, CopilotMessage, CopilotRecentAction, CopilotStep, RunStatus } from '../types/copilot'
 
 interface CopilotState {
   open: boolean
@@ -9,27 +9,34 @@ interface CopilotState {
   messages: CopilotMessage[]
   steps: CopilotStep[]
   approvals: AgentApproval[]
+  recentActions: CopilotRecentAction[]
   toggleOpen: () => void
+  setOpen: (open: boolean) => void
   setRunState: (runId: string | null, status: RunStatus | null) => void
   setStreaming: (streaming: boolean) => void
   addMessage: (message: CopilotMessage) => void
+  clearConversation: () => void
   appendAssistantText: (text: string) => void
   upsertStep: (step: CopilotStep) => void
   setApprovals: (approvals: AgentApproval[]) => void
+  setRecentActions: (recentActions: CopilotRecentAction[]) => void
 }
 
 export const useCopilotStore = create<CopilotState>((set) => ({
-  open: true,
+  open: false,
   runId: null,
   runStatus: null,
   streaming: false,
   messages: [],
   steps: [],
   approvals: [],
+  recentActions: [],
   toggleOpen: () => set((state) => ({ open: !state.open })),
+  setOpen: (open) => set({ open }),
   setRunState: (runId, runStatus) => set({ runId, runStatus }),
   setStreaming: (streaming) => set({ streaming }),
   addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
+  clearConversation: () => set({ messages: [], steps: [], runId: null, runStatus: null }),
   appendAssistantText: (text) =>
     set((state) => {
       const messages = [...state.messages]
@@ -57,4 +64,5 @@ export const useCopilotStore = create<CopilotState>((set) => ({
       return { steps: updated.sort((a, b) => a.step - b.step) }
     }),
   setApprovals: (approvals) => set({ approvals }),
+  setRecentActions: (recentActions) => set({ recentActions }),
 }))

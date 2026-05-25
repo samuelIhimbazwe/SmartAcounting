@@ -8,6 +8,7 @@ import com.smartaccounting.tenant.TenantContext;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,14 +32,14 @@ public class AttendanceController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('HR_MANAGER', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.HR_WRITE)
     public ResponseEntity<AttendanceRecord> recordAttendance(@RequestBody @Valid AttendanceRequest request) {
         UUID recordedBy = TenantContext.userId() != null ? TenantContext.userId() : UUID.randomUUID();
         return ResponseEntity.ok(attendanceService.recordAttendance(request, recordedBy));
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'HR_MANAGER')")
+    @PreAuthorize(PermissionExpressions.HR_READ)
     public ResponseEntity<List<AttendanceRecord>> getAttendance(
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
         @RequestParam(required = false) UUID employeeId) {
@@ -46,7 +47,7 @@ public class AttendanceController {
     }
 
     @GetMapping("/summary/{period}")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'HR_MANAGER')")
+    @PreAuthorize(PermissionExpressions.HR_READ)
     public ResponseEntity<AttendanceSummary> getMonthlySummary(@PathVariable String period) {
         return ResponseEntity.ok(attendanceService.getMonthlySummary(period));
     }

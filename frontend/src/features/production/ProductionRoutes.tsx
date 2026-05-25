@@ -1,7 +1,5 @@
 import type { ReactNode } from 'react'
-import { Navigate } from 'react-router-dom'
 import { useAuthStore } from '../../shared/stores/authStore'
-import type { Role } from '../../shared/types/roles'
 import { AppShell } from '../../shared/components/layout/AppShell'
 import { PaymentRunsPage } from '../finance/PaymentRunsPage'
 import { FixedAssetsPage } from '../finance/FixedAssetsPage'
@@ -12,42 +10,71 @@ import { AttendancePage } from '../hr/AttendancePage'
 import { MarketingCampaignsPage } from '../marketing/MarketingCampaignsPage'
 import { PromotionsPage } from '../marketing/PromotionsPage'
 
-function guard(allowed: Role[], children: ReactNode) {
-  const sessionRole = useAuthStore((s) => s.role)
-  const accessToken = useAuthStore((s) => s.accessToken)
-  if (!accessToken || !sessionRole) return <Navigate to="/login" replace />
-  if (!allowed.includes(sessionRole)) return <Navigate to="/unauthorized" replace />
+function ShellRoute({ children }: { children: ReactNode }) {
+  const sessionRole = useAuthStore((s) => s.role)!
   return <AppShell role={sessionRole}>{children}</AppShell>
 }
 
 export function PaymentRunsRoute() {
-  return guard(['CEO', 'CFO', 'ACCOUNTING'], <PaymentRunsPage />)
+  return (
+    <ShellRoute>
+      <PaymentRunsPage />
+    </ShellRoute>
+  )
 }
 
 export function FixedAssetsRoute() {
-  return guard(['CEO', 'CFO', 'ACCOUNTING'], <FixedAssetsPage />)
+  return (
+    <ShellRoute>
+      <FixedAssetsPage />
+    </ShellRoute>
+  )
 }
 
 export function MonthEndCloseRoute() {
-  return guard(['CEO', 'CFO', 'ACCOUNTING'], <MonthEndClosePage />)
+  return (
+    <ShellRoute>
+      <MonthEndClosePage />
+    </ShellRoute>
+  )
 }
 
 export function WorkflowRulesRoute() {
-  return guard(['CEO', 'CFO'], <WorkflowRulesPage />)
+  return (
+    <ShellRoute>
+      <WorkflowRulesPage />
+    </ShellRoute>
+  )
 }
 
 export function DocumentsRoute() {
-  return guard(['CEO', 'CFO', 'ACCOUNTING', 'OPERATIONS'], <DocumentsPage />)
+  return (
+    <ShellRoute>
+      <DocumentsPage />
+    </ShellRoute>
+  )
 }
 
 export function AttendanceRoute() {
-  return guard(['CEO', 'CFO', 'HR', 'ACCOUNTING'], <AttendancePage />)
+  return (
+    <ShellRoute>
+      <AttendancePage />
+    </ShellRoute>
+  )
 }
 
 export function MarketingCampaignsRoute() {
-  return guard(['CEO', 'CFO', 'SALES', 'MARKETING'], <MarketingCampaignsPage />)
+  return (
+    <ShellRoute>
+      <MarketingCampaignsPage />
+    </ShellRoute>
+  )
 }
 
 export function PromotionsRoute() {
-  return guard(['CEO', 'CFO', 'SALES', 'MARKETING'], <PromotionsPage />)
+  return (
+    <ShellRoute>
+      <PromotionsPage />
+    </ShellRoute>
+  )
 }

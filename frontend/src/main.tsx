@@ -13,7 +13,12 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 )
 
-if ('serviceWorker' in navigator) {
+// Service workers require http(s); skip in packaged Electron (file://).
+if (
+  'serviceWorker' in navigator &&
+  window.location.protocol !== 'file:' &&
+  import.meta.env.VITE_DESKTOP_BUNDLE !== 'true'
+) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {
       // Ignore registration errors in local/dev mode.

@@ -6,6 +6,7 @@ import com.smartaccounting.entity.HourlySales;
 import com.smartaccounting.service.SalesAnalyticsService;
 import com.smartaccounting.tenant.TenantContext;
 import org.springframework.http.ResponseEntity;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,7 +26,7 @@ public class SalesAnalyticsController {
     }
 
     @GetMapping("/cashier-performance")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'SALES_MANAGER')")
+    @PreAuthorize(PermissionExpressions.ANALYTICS_OWN)
     public ResponseEntity<List<CashierPerformanceSummary>> getCashierPerformance(
         @RequestParam String from,
         @RequestParam String to) {
@@ -36,7 +37,7 @@ public class SalesAnalyticsController {
     }
 
     @GetMapping("/hourly-heatmap")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'SALES_MANAGER', 'OPS_MANAGER')")
+    @PreAuthorize(PermissionExpressions.ANALYTICS_ANY)
     public ResponseEntity<List<HourlySales>> getHourlyHeatmap(
         @RequestParam(required = false) String date) {
         LocalDate d = date != null ? LocalDate.parse(date) : LocalDate.now();
@@ -45,7 +46,7 @@ public class SalesAnalyticsController {
     }
 
     @GetMapping("/lost-sales")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'SALES_MANAGER', 'OPS_MANAGER')")
+    @PreAuthorize(PermissionExpressions.ANALYTICS_ANY)
     public ResponseEntity<LostSalesSummary> getLostSales(
         @RequestParam String from,
         @RequestParam String to) {

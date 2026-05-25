@@ -1,6 +1,7 @@
 package com.smartaccounting.controller;
 
 import com.smartaccounting.dashboard.DashboardCacheService;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,7 +19,7 @@ public class AdminCacheController {
     }
 
     @GetMapping("/stats")
-    @PreAuthorize("hasRole('CEO') or hasRole('CFO')")
+    @PreAuthorize(PermissionExpressions.TENANT_CONFIG)
     public Map<String, Object> stats() {
         return dashboardCacheService.stats();
     }

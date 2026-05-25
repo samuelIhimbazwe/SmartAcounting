@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router-dom'
-import { ArrowLeft, Link2, Monitor, Printer } from 'lucide-react'
+import { Link2, Monitor, Printer } from 'lucide-react'
 import { fetchOAuth2Providers, requestOAuth2Link, type OAuth2Provider } from '../../shared/api/auth'
 import { fetchCopilotProviderStatus, type CopilotProviderStatus } from '../../shared/api/copilot'
 import { API_BASE_URL } from '../../shared/api/config'
+import { HistoryBackButton } from '../../shared/components/navigation/HistoryBackButton'
 import { rolePathMap } from '../../shared/types/roles'
 import { useAuthStore } from '../../shared/stores/authStore'
 import { desktop, isDesktop } from '../../utils/platform'
@@ -63,10 +63,11 @@ export function SettingsPage() {
   return (
     <div className="settings-page">
       <header className="settings-page__header">
-        <Link to={dashboardPath} className="settings-page__back">
-          <ArrowLeft size={16} />
-          {t('settings.backToDashboard')}
-        </Link>
+        <HistoryBackButton
+          label={t('settings.backToDashboard')}
+          fallbackTo={dashboardPath}
+          className="settings-page__back"
+        />
         <h1>{t('settings.title')}</h1>
         <p className="settings-page__subtitle">{t('settings.subtitle')}</p>
       </header>
@@ -159,7 +160,7 @@ export function SettingsPage() {
       <style>{`
         .settings-page { max-width: 640px; margin: 0 auto; padding: 24px 20px 48px; }
         .settings-page__header { margin-bottom: 24px; }
-        .settings-page__back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; margin-bottom: 12px; color: var(--color-primary); text-decoration: none; }
+        .settings-page__back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; margin-bottom: 12px; color: var(--color-primary); text-decoration: none; border: 0; background: transparent; padding: 0; cursor: pointer; }
         .settings-page h1 { margin: 0 0 8px; font-size: 1.5rem; }
         .settings-page__subtitle { margin: 0; color: var(--color-text-secondary); font-size: 14px; }
         .settings-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }

@@ -1,9 +1,14 @@
 import { expect, test } from '@playwright/test'
 
+async function selectLoginRole(page: import('@playwright/test').Page, role: string) {
+  await page.getByText(/workspace settings/i).click()
+  await page.getByLabel(/sign in as/i).selectOption(role)
+}
+
 test.describe('dashboard smoke', () => {
   test('login renders selected role dashboard', async ({ page }) => {
     await page.goto('/login')
-    await page.getByLabel('Role').selectOption('CFO')
+    await selectLoginRole(page, 'CFO')
     await page.getByRole('button', { name: 'Sign in' }).click()
 
     await expect(page).toHaveURL(/\/dashboard\/cfo/)
@@ -13,7 +18,7 @@ test.describe('dashboard smoke', () => {
 
   test('non-ceo role cannot open another role dashboard', async ({ page }) => {
     await page.goto('/login')
-    await page.getByLabel('Role').selectOption('HR')
+    await selectLoginRole(page, 'HR')
     await page.getByRole('button', { name: 'Sign in' }).click()
     await expect(page).toHaveURL(/\/dashboard\/hr/)
 
@@ -24,7 +29,7 @@ test.describe('dashboard smoke', () => {
 
   test('ceo can navigate cross-role dashboards', async ({ page }) => {
     await page.goto('/login')
-    await page.getByLabel('Role').selectOption('CEO')
+    await selectLoginRole(page, 'CEO')
     await page.getByRole('button', { name: 'Sign in' }).click()
     await expect(page).toHaveURL(/\/dashboard\/ceo/)
 
@@ -35,7 +40,7 @@ test.describe('dashboard smoke', () => {
 
   test('kpi click opens drilldown with URL state', async ({ page }) => {
     await page.goto('/login')
-    await page.getByLabel('Role').selectOption('CFO')
+    await selectLoginRole(page, 'CFO')
     await page.getByRole('button', { name: 'Sign in' }).click()
     await expect(page).toHaveURL(/\/dashboard\/cfo/)
 
@@ -47,7 +52,7 @@ test.describe('dashboard smoke', () => {
 
   test('copilot sidebar is available in dashboard shell', async ({ page }) => {
     await page.goto('/login')
-    await page.getByLabel('Role').selectOption('CEO')
+    await selectLoginRole(page, 'CEO')
     await page.getByRole('button', { name: 'Sign in' }).click()
     await expect(page.getByText('AI Copilot')).toBeVisible()
   })

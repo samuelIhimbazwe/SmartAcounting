@@ -15,7 +15,7 @@ interface UseModalFocusTrapOptions {
 }
 
 export function useModalFocusTrap({ active, onEscape }: UseModalFocusTrapOptions) {
-  const containerRef = useRef<HTMLElement | null>(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     if (!active) {

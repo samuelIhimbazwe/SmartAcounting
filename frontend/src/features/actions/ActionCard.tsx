@@ -4,7 +4,7 @@ import type { RecommendedAction } from '../../shared/types/dashboard'
 interface ActionCardProps {
   action: RecommendedAction
   executing: boolean
-  onExecute: (type: string) => void
+  onExecute: (action: RecommendedAction) => void
 }
 
 const priorityClass: Record<RecommendedAction['priority'], string> = {
@@ -27,7 +27,7 @@ export function ActionCard({ action, executing, onExecute }: ActionCardProps) {
       <button
         type="button"
         className="mt-2 inline-flex items-center gap-1 rounded-md border border-[var(--border-default)] px-2 py-1 text-xs text-neutral-700 transition-colors hover:bg-[var(--surface-overlay)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-200)] disabled:opacity-60"
-        onClick={() => onExecute(action.type)}
+        onClick={() => onExecute(action)}
         disabled={executing}
         aria-label={`Execute action ${action.title}`}
         aria-busy={executing}

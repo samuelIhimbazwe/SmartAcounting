@@ -1,4 +1,7 @@
 import { apiClient } from './client'
+import { API_BASE_URL } from './config'
+import { useAuthStore } from '../stores/authStore'
+import type { AgentApproval, CopilotRecentAction, StartCopilotRunRequest } from '../types/copilot'
 
 export interface CopilotProviderStatus {
   provider: string
@@ -12,8 +15,6 @@ export async function fetchCopilotProviderStatus() {
   const { data } = await apiClient.get<CopilotProviderStatus>('/api/v1/ai/copilot/provider-status')
   return data
 }
-import { useAuthStore } from '../stores/authStore'
-import type { AgentApproval, StartCopilotRunRequest } from '../types/copilot'
 
 export interface StreamEvent {
   event: string
@@ -72,7 +73,7 @@ export async function streamCopilotRun(
   signal?: AbortSignal,
 ) {
   const { accessToken, tenantId, userId } = useAuthStore.getState()
-  const response = await fetch('/api/v1/ai/copilot/agent/run/stream', {
+  const response = await fetch(`${API_BASE_URL}/api/v1/ai/copilot/agent/run/stream`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -157,4 +158,20 @@ export async function rejectAction(id: string, reason?: string) {
 
 export async function expireApprovals() {
   await apiClient.post('/api/v1/ai/copilot/agent/approvals/expire')
+}
+
+export async function listRecentActions() {
+  try {
+    const response = await apiClient.get<CopilotRecentAction[]>('/api/v1/ai/copilot/actions/recent', {
+      params: { size: 10 },
+    })
+    return response.data
+  } catch {
+    return []
+  }
+}
+
+export async function undoRecentAction(id: string) {
+  const response = await apiClient.post<CopilotRecentAction>(`/api/v1/ai/copilot/actions/${id}/undo`)
+  return response.data
 }

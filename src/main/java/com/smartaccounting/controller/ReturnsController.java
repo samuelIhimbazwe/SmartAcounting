@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,7 +30,7 @@ public class ReturnsController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'SALES_MANAGER', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.POS_RETURNS)
     public ResponseEntity<PosReturn> initiateReturn(@RequestBody @Valid InitiateReturnRequest request) {
         String cashierId = TenantContext.userId() != null
             ? TenantContext.userId().toString() : "unknown";
@@ -37,14 +38,14 @@ public class ReturnsController {
     }
 
     @PostMapping("/{returnId}/approve")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'SALES_MANAGER', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.POS_RETURNS)
     public ResponseEntity<PosReturn> approveReturn(@PathVariable UUID returnId) {
         UUID approvedBy = TenantContext.userId() != null ? TenantContext.userId() : UUID.randomUUID();
         return ResponseEntity.ok(returnsService.approveReturn(returnId, approvedBy));
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'SALES_MANAGER', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.POS_RETURNS)
     public ResponseEntity<Page<PosReturn>> listReturns(
         @RequestParam(required = false) String status,
         @RequestParam(defaultValue = "0") int page,

@@ -3,8 +3,11 @@ package com.smartaccounting.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
+import java.util.UUID;
+
 public record InviteTenantUserRequest(
     @Email @NotBlank String email,
-    @NotBlank String role
+    String role,
+    UUID roleId
 ) {
 }

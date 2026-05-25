@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,14 +31,14 @@ public class ShrinkageController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'OPS_MANAGER', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.INVENTORY_SHRINKAGE)
     public ResponseEntity<ShrinkageRecord> recordShrinkage(@RequestBody @Valid ShrinkageRequest request) {
         UUID recordedBy = TenantContext.userId() != null ? TenantContext.userId() : UUID.randomUUID();
         return ResponseEntity.ok(shrinkageService.recordShrinkage(request, recordedBy));
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'OPS_MANAGER', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.INVENTORY_SHRINKAGE)
     public ResponseEntity<Page<ShrinkageRecord>> listShrinkage(
         @RequestParam(required = false) String from,
         @RequestParam(required = false) String to,
@@ -49,7 +50,7 @@ public class ShrinkageController {
     }
 
     @GetMapping("/summary")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'OPS_MANAGER')")
+    @PreAuthorize(PermissionExpressions.INVENTORY_READ)
     public ResponseEntity<ShrinkageSummary> getSummary(
         @RequestParam String from,
         @RequestParam String to) {

@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useState } from 'react'
 import { ShieldCheck } from 'lucide-react'
+import { EfdStatusBadge } from '../../components/fiscal/EfdStatusBadge'
 import {
   getEbmConfig,
   getEbmReport,
@@ -76,12 +77,15 @@ export function EbmCompliancePage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <header className="flex items-center gap-2">
-        <ShieldCheck className="h-8 w-8 text-[var(--color-brand-700)]" aria-hidden />
-        <div>
-          <h1 className="m-0 font-[var(--font-display)] text-2xl font-bold text-neutral-900">EBM integration</h1>
-          <p className="m-0 text-sm text-neutral-600">RRA electronic billing machine receipts from POS (Sprint 1.4).</p>
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="h-8 w-8 text-[var(--color-brand-700)]" aria-hidden />
+          <div>
+            <h1 className="m-0 font-[var(--font-display)] text-2xl font-bold text-neutral-900">EBM integration</h1>
+            <p className="m-0 text-sm text-neutral-600">RRA electronic billing machine receipts from POS (Sprint 1.4).</p>
+          </div>
         </div>
+        <EfdStatusBadge />
       </header>
 
       {error && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}

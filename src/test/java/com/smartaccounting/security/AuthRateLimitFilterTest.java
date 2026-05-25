@@ -1,6 +1,5 @@
 package com.smartaccounting.security;
 
-import com.smartaccounting.exception.RateLimitExceededException;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,7 +13,6 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -61,10 +59,11 @@ class AuthRateLimitFilterTest {
             filter.doFilterInternal(request, response, filterChain);
         }
 
-        assertThatThrownBy(() -> filter.doFilterInternal(request, response, filterChain))
-            .isInstanceOf(RateLimitExceededException.class)
-            .hasMessageContaining("Too many auth attempts");
+        filter.doFilterInternal(request, response, filterChain);
+
+        assertThat(response.getStatus()).isEqualTo(429);
         assertThat(response.getHeader("Retry-After")).isEqualTo("900");
+        assertThat(response.getContentAsString()).contains("Too many auth attempts");
     }
 
     private MockHttpServletRequest request(String uri) {

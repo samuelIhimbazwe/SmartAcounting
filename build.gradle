@@ -1,8 +1,25 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'org.flywaydb:flyway-database-postgresql:10.21.0'
+    }
+}
+
 plugins {
     id 'java'
     id 'org.springframework.boot' version '3.3.5'
     id 'io.spring.dependency-management' version '1.1.6'
     id 'org.owasp.dependencycheck' version '11.1.1'
+    id 'org.flywaydb.flyway' version '10.21.0'
+}
+
+flyway {
+    url = System.getenv('DB_URL') ?: 'jdbc:postgresql://localhost:5433/smartchain'
+    user = System.getenv('DB_USERNAME') ?: 'smartchain'
+    password = System.getenv('DB_PASSWORD') ?: 'smartchain'
+    locations = ['filesystem:src/main/resources/db/migration']
 }
 
 dependencyCheck {
@@ -65,10 +82,12 @@ dependencies {
     testRuntimeOnly 'com.h2database:h2'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.junit.platform:junit-platform-suite'
     testImplementation 'org.springframework.security:spring-security-test'
     testImplementation 'io.zonky.test:embedded-postgres:2.0.7'
     testImplementation 'org.testcontainers:junit-jupiter'
     testImplementation 'org.testcontainers:kafka'
+    testImplementation 'org.testcontainers:postgresql'
 }
 
 tasks.named('test') {

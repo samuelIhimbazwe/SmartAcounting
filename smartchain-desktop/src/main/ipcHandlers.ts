@@ -19,9 +19,14 @@ import {
   disconnectScanner,
 } from './barcodeScanner'
 import {
+  clearFailed,
   getPendingCount,
+  getQueueStatus,
+  queueSale,
   queueTransaction,
+  resetFailedRetries,
   syncPending,
+  syncQueue,
 } from './offlineQueue'
 import { getMainWindow } from './windowManager'
 
@@ -87,7 +92,7 @@ export function registerIpcHandlers(): void {
     disconnectScanner()
   })
 
-  // -- Offline queue ---------------------------------------------------------
+  // -- Offline queue (legacy channels) -------------------------------------
   ipcMain.handle('offline:queue', async (_event: IpcMainInvokeEvent, payload: unknown) => {
     if (!isPlainObject(payload)) {
       throw new Error('offline:queue requires an object payload')
@@ -117,6 +122,46 @@ export function registerIpcHandlers(): void {
       return syncPending(apiUrl, token, tenantId)
     },
   )
+
+  // -- POS offline queue (Sprint 4) ------------------------------------------
+  ipcMain.handle('pos:queue-sale', async (_event: IpcMainInvokeEvent, payload: unknown) => {
+    if (!isPlainObject(payload)) {
+      throw new Error('pos:queue-sale requires an object payload')
+    }
+    return queueSale(payload)
+  })
+
+  ipcMain.handle('pos:get-queue-status', async () => getQueueStatus())
+
+  ipcMain.handle(
+    'pos:sync-queue',
+    async (
+      _event: IpcMainInvokeEvent,
+      apiUrl: unknown,
+      token: unknown,
+      tenantId: unknown,
+    ) => {
+      if (!isHttpsOrLocal(apiUrl)) {
+        throw new Error('pos:sync-queue requires a valid api URL')
+      }
+      if (!isNonEmptyString(token, 8192)) {
+        throw new Error('pos:sync-queue requires a non-empty token')
+      }
+      if (!isNonEmptyString(tenantId, 256)) {
+        throw new Error('pos:sync-queue requires a tenantId')
+      }
+      return syncQueue(apiUrl, token, tenantId)
+    },
+  )
+
+  ipcMain.handle('pos:clear-failed', async () => clearFailed())
+
+  ipcMain.handle('pos:reset-failed-retries', async () => resetFailedRetries())
+
+  ipcMain.handle('pos:get-efd-secret', async () => {
+    const secret = process.env.EFD_DEVICE_SECRET?.trim()
+    return secret && secret.length > 0 ? secret : undefined
+  })
 
   // -- Filesystem ------------------------------------------------------------
   ipcMain.handle(
@@ -159,6 +204,12 @@ export function registerIpcHandlers(): void {
   // -- App metadata ----------------------------------------------------------
   ipcMain.handle('app:version', async () => app.getVersion())
   ipcMain.handle('app:platform', async () => process.platform)
+
+  // -- Fiscal (RRA EFD secret stays in main process env, not renderer bundle) -
+  ipcMain.handle('get-efd-secret', async () => {
+    const secret = process.env.EFD_DEVICE_SECRET?.trim()
+    return secret && secret.length > 0 ? secret : undefined
+  })
 
   // -- OAuth2 (system browser + smartchain:// callback) ------------------------
   ipcMain.handle(

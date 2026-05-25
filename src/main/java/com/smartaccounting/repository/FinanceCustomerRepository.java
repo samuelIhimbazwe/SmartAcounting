@@ -15,6 +15,9 @@ public interface FinanceCustomerRepository extends JpaRepository<FinanceCustomer
     Optional<FinanceCustomer> findFirstByTenantIdAndCustomerNameIgnoreCaseAndDeletedAtIsNull(
         UUID tenantId, String customerName);
 
+    Optional<FinanceCustomer> findFirstByTenantIdAndTinNumberAndDeletedAtIsNull(
+        UUID tenantId, String tinNumber);
+
     @Query("""
         SELECT c FROM FinanceCustomer c
         WHERE c.tenantId = :tenantId AND c.deletedAt IS NULL

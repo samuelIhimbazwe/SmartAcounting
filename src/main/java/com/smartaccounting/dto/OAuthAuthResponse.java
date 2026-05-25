@@ -7,6 +7,7 @@ public record OAuthAuthResponse(
     String refreshToken,
     String role,
     String tenantId,
-    String userId
+    String userId,
+    boolean setupComplete
 ) {
 }

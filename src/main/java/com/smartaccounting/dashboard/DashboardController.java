@@ -47,7 +47,7 @@ public class DashboardController {
     }
 
     @GetMapping("/{role}/kpis")
-    @PreAuthorize("@roleScopeGuard.canAccessRole(authentication, #role)")
+    @PreAuthorize("@dashboardAccessGuard.canAccess(authentication, #role)")
     public ResponseEntity<List<KpiDto>> kpis(@PathVariable String role) {
         boolean hit = false;
         if (com.smartaccounting.tenant.TenantContext.tenantId() != null) {
@@ -58,13 +58,13 @@ public class DashboardController {
     }
 
     @GetMapping("/{role}/charts/{widget}")
-    @PreAuthorize("@roleScopeGuard.canAccessRole(authentication, #role)")
+    @PreAuthorize("@dashboardAccessGuard.canAccess(authentication, #role)")
     public List<ChartPointDto> chart(@PathVariable String role, @PathVariable String widget) {
         return dashboardService.chart(role, widget);
     }
 
     @GetMapping("/{role}/charts/{widget}/drilldown")
-    @PreAuthorize("@roleScopeGuard.canAccessRole(authentication, #role)")
+    @PreAuthorize("@dashboardAccessGuard.canAccess(authentication, #role)")
     public Map<String, Object> drilldown(@PathVariable String role,
                                          @PathVariable String widget,
                                          @RequestParam(defaultValue = "0") int page,
@@ -75,31 +75,31 @@ public class DashboardController {
     }
 
     @GetMapping("/{role}/anomalies")
-    @PreAuthorize("@roleScopeGuard.canAccessRole(authentication, #role)")
+    @PreAuthorize("@dashboardAccessGuard.canAccess(authentication, #role)")
     public List<AnomalyDto> anomalies(@PathVariable String role) {
         return dashboardService.anomalies(role);
     }
 
     @GetMapping("/{role}/alerts")
-    @PreAuthorize("@roleScopeGuard.canAccessRole(authentication, #role)")
+    @PreAuthorize("@dashboardAccessGuard.canAccess(authentication, #role)")
     public List<String> alerts(@PathVariable String role) {
         return dashboardService.alerts(role);
     }
 
     @GetMapping("/{role}/actions")
-    @PreAuthorize("@roleScopeGuard.canAccessRole(authentication, #role)")
+    @PreAuthorize("@dashboardAccessGuard.canAccess(authentication, #role)")
     public List<RecommendedActionDto> actions(@PathVariable String role) {
         return dashboardService.actions(role);
     }
 
     @GetMapping("/{role}/briefing")
-    @PreAuthorize("@roleScopeGuard.canAccessRole(authentication, #role)")
+    @PreAuthorize("@dashboardAccessGuard.canAccess(authentication, #role)")
     public Map<String, Object> dashboardBriefing(@PathVariable String role) {
         return copilotService.briefing(role);
     }
 
     @PostMapping("/{role}/whatif")
-    @PreAuthorize("@roleScopeGuard.canAccessRole(authentication, #role)")
+    @PreAuthorize("@dashboardAccessGuard.canAccess(authentication, #role)")
     public Map<String, Object> dashboardWhatIf(@PathVariable String role,
                                                @RequestBody @Valid DashboardWhatIfRequest request) {
         return copilotService.whatIf(role, request.scenario());
@@ -111,7 +111,7 @@ public class DashboardController {
     }
 
     @GetMapping(value = "/{role}/alerts/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @PreAuthorize("@roleScopeGuard.canAccessRole(authentication, #role)")
+    @PreAuthorize("@dashboardAccessGuard.canAccess(authentication, #role)")
     public SseEmitter alertsStream(@PathVariable String role) throws IOException {
         if (TenantContext.tenantId() == null || TenantContext.userId() == null) {
             throw new IllegalStateException("Tenant/user context required for SSE");

@@ -2,8 +2,9 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { KPIItem } from '../../../shared/types/dashboard'
 import type { Role } from '../../../shared/types/roles'
+import { useAuthStore } from '../../../shared/stores/authStore'
 
-type Pill = { labelKey: string; to: string; count: number; urgent: boolean }
+type Pill = { labelKey: string; to: string; count: number; urgent: boolean; requiredPermission?: string }
 
 function matchesHints(k: KPIItem | undefined, hints: string[]): boolean {
   if (!k) {
@@ -27,24 +28,28 @@ function buildPills(role: Role, kpis: KPIItem[]): Pill[] {
         to: '/finance/credit-ledger?view=kanban',
         count: countFor(pickKpi(kpis, ['invoice', 'approve', 'receivable', 'ar'], 0)),
         urgent: urgentFor(pickKpi(kpis, ['invoice', 'approve', 'receivable', 'ar'], 0)),
+        requiredPermission: 'FINANCE_READ',
       },
       {
         labelKey: 'dashboard.activityCfo.payments',
         to: '/finance/credit-ledger?view=table&status=OPEN',
         count: countFor(pickKpi(kpis, ['payment', 'match', 'reconcil', 'cash'], 1)),
         urgent: urgentFor(pickKpi(kpis, ['payment', 'match', 'reconcil', 'cash'], 1)),
+        requiredPermission: 'FINANCE_READ',
       },
       {
         labelKey: 'dashboard.activityCfo.bills',
         to: '/finance/credit-ledger?status=OVERDUE&view=table',
         count: countFor(pickKpi(kpis, ['bill', 'payable', 'ap ', 'aging', 'overdue'], 2)),
         urgent: urgentFor(pickKpi(kpis, ['bill', 'payable', 'ap ', 'aging', 'overdue'], 2)),
+        requiredPermission: 'FINANCE_READ',
       },
       {
         labelKey: 'dashboard.activityCfo.close',
         to: '/finance/fx-rates',
         count: countFor(pickKpi(kpis, ['close', 'period', 'month', 'task'], 3)),
         urgent: urgentFor(pickKpi(kpis, ['close', 'period', 'month', 'task'], 3)),
+        requiredPermission: 'FINANCE_READ',
       },
     ]
   }
@@ -55,24 +60,28 @@ function buildPills(role: Role, kpis: KPIItem[]): Pill[] {
         to: '/finance/credit-ledger?view=table',
         count: countFor(pickKpi(kpis, ['reconcil', 'unmatch', 'open item'], 0)),
         urgent: urgentFor(pickKpi(kpis, ['reconcil', 'unmatch', 'open item'], 0)),
+        requiredPermission: 'FINANCE_READ',
       },
       {
         labelKey: 'dashboard.activityAc.journals',
         to: '/transactions/invoice',
         count: countFor(pickKpi(kpis, ['journal', 'entry', 'review'], 1)),
         urgent: urgentFor(pickKpi(kpis, ['journal', 'entry', 'review'], 1)),
+        requiredPermission: 'FINANCE_WRITE',
       },
       {
         labelKey: 'dashboard.activityAc.sms',
         to: '/finance/sms-deliveries',
         count: countFor(pickKpi(kpis, ['sms', 'reminder', 'notif'], 2)),
         urgent: urgentFor(pickKpi(kpis, ['sms', 'reminder', 'notif'], 2)),
+        requiredPermission: 'FINANCE_READ',
       },
       {
         labelKey: 'dashboard.activityAc.till',
         to: '/retail',
         count: countFor(pickKpi(kpis, ['till', 'variance', 'cash count', 'register'], 3)),
         urgent: urgentFor(pickKpi(kpis, ['till', 'variance', 'cash count', 'register'], 3)),
+        requiredPermission: 'INVENTORY_READ',
       },
     ]
   }
@@ -98,7 +107,10 @@ function urgentFor(k?: KPIItem): boolean {
 export function ActivitySummaryBar({ role, kpis }: { role: Role; kpis: KPIItem[] }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const pills = buildPills(role, kpis)
+  const hasPermission = useAuthStore((state) => state.hasPermission)
+  const pills = buildPills(role, kpis).filter(
+    (pill) => !pill.requiredPermission || hasPermission(pill.requiredPermission),
+  )
   if (!pills.length) {
     return null
   }

@@ -3,6 +3,7 @@ package com.smartaccounting.controller;
 import com.smartaccounting.dto.SyncOperationRequest;
 import com.smartaccounting.service.SyncService;
 import jakarta.validation.Valid;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,13 +21,13 @@ public class SyncController {
     }
 
     @PostMapping("/queue")
-    @PreAuthorize("hasRole('CEO') or hasRole('OPS_MANAGER') or hasRole('SALES_MANAGER')")
+    @PreAuthorize(PermissionExpressions.RETAIL_OPS)
     public Map<String, Object> queue(@RequestBody @Valid List<SyncOperationRequest> requests) {
         return syncService.enqueueBatch(requests);
     }
 
     @PostMapping("/flush")
-    @PreAuthorize("hasRole('CEO') or hasRole('OPS_MANAGER')")
+    @PreAuthorize(PermissionExpressions.RETAIL_OPS)
     public Map<String, Integer> flush() {
         return Map.of("processed", syncService.flushPending());
     }

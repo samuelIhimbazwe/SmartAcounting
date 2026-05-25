@@ -1,4 +1,5 @@
 import { apiClient } from './client'
+import { parseDashboardAlertLine } from '../alerts/alertUtils'
 import type { AlertEvent, DashboardPayload, DateRange, KPIItem, TrendPoint } from '../types/dashboard'
 import { roleApiMap, type Role } from '../types/roles'
 import { roleChartWidgetMap } from './dashboardRoleConfig'
@@ -113,48 +114,11 @@ function normalizeKpisPayload(data: unknown): KPIItem[] {
   return []
 }
 
-function inferAlertSeverity(message: string): AlertEvent['severity'] {
-  const lower = message.toLowerCase()
-  if (lower.includes('critical') || lower.includes('90+')) {
-    return 'CRITICAL'
-  }
-  if (lower.includes('expir') || lower.includes('unmatched') || lower.includes('overdue') || lower.includes('below')) {
-    return 'HIGH'
-  }
-  if (lower.includes('review') || lower.includes('pending')) {
-    return 'MEDIUM'
-  }
-  return 'LOW'
-}
-
-function parseDashboardAlertLine(raw: string, index: number, role: Role): AlertEvent {
-  const pipe = raw.indexOf(' | ')
-  let message = raw.trim()
-  let route = ''
-  if (pipe >= 0) {
-    message = raw.slice(0, pipe).trim()
-    const meta = raw.slice(pipe + 3).trim()
-    if (meta.startsWith('route:')) {
-      route = meta.slice(6).trim()
-    } else if (meta.startsWith('api:')) {
-      route = meta.slice(4).trim()
-    }
-  }
-  return {
-    id: `dashboard-alert-${index}`,
-    title: message,
-    message: route ? `${message} (${route})` : message,
-    severity: inferAlertSeverity(message),
-    role,
-    timestamp: new Date().toISOString(),
-  }
-}
-
 export async function getDashboardAlerts(role: Role): Promise<AlertEvent[]> {
   const roleSegment = roleApiMap[role]
   const response = await apiClient.get<string[]>(`/api/v1/dashboards/${roleSegment}/alerts`)
   const rows = Array.isArray(response.data) ? response.data : []
-  return rows.map((line, index) => parseDashboardAlertLine(line, index, role))
+  return rows.map((line) => parseDashboardAlertLine(line, role))
 }
 
 export interface DashboardAnomaly {

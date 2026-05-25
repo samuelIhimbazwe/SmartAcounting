@@ -17,6 +17,7 @@ export interface AuthState {
   tenantId: string | null;
   userId: string | null;
   roles: AppRole[];
+  permissions: string[];
   role: AppRole | null;
   userName: string | null;
   isLoading: boolean;
@@ -42,6 +43,7 @@ export const authInitialState: AuthState = {
   tenantId: null,
   userId: null,
   roles: [],
+  permissions: [],
   role: null,
   userName: null,
   isLoading: false,
@@ -65,6 +67,7 @@ function applySession(state: AuthState, session: SessionPayload) {
   state.tenantId = session.tenantId;
   state.userId = session.userId;
   state.roles = session.roles;
+  state.permissions = session.permissions ?? [];
   state.role = resolvePrimaryRole(session.roles);
   state.userName = session.userName;
   setItem('refreshToken', session.refreshToken);
@@ -138,6 +141,7 @@ const authSlice = createSlice({
       state.tenantId = null;
       state.userId = null;
       state.roles = [];
+      state.permissions = [];
       state.role = null;
       state.userName = null;
       state.loginDraft = null;
@@ -182,6 +186,7 @@ const authSlice = createSlice({
       })
       .addCase(loginWithPassword.fulfilled, (state, action) => {
         state.isLoading = false;
+        state.permissions = action.payload.permissions ?? [];
         applySession(state, action.payload);
         state.loginDraft = null;
         state.pendingMfaChallengeId = null;
@@ -207,6 +212,7 @@ const authSlice = createSlice({
       })
       .addCase(loginWithOtp.fulfilled, (state, action) => {
         state.isLoading = false;
+        state.permissions = action.payload.permissions ?? [];
         applySession(state, action.payload);
         state.loginDraft = null;
         state.pendingMfaChallengeId = null;
@@ -222,6 +228,7 @@ const authSlice = createSlice({
       })
       .addCase(restoreSessionFromRefresh.fulfilled, (state, action) => {
         state.isLoading = false;
+        state.permissions = action.payload.permissions ?? [];
         applySession(state, action.payload);
       })
       .addCase(restoreSessionFromRefresh.rejected, (state, action) => {
@@ -233,4 +240,11 @@ const authSlice = createSlice({
 
 export const {logout, setTokens, setOtpEntry, updateLoginForm, cancelMfa} =
   authSlice.actions;
+
+/** True when JWT permission list includes {@code code}. */
+export const selectHasPermission = (
+  state: {auth: AuthState},
+  code: string,
+): boolean => state.auth.permissions?.includes(code) ?? false;
+
 export default authSlice.reducer;

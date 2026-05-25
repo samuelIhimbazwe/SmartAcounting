@@ -19,8 +19,9 @@ public interface PosPaymentTenderRepository extends JpaRepository<PosPaymentTend
         UUID tenantId, Collection<String> tenderTypes, String reference);
 
     @Query("""
-        select coalesce(sum(t.amount), 0) from PosPaymentTender t join SalesOrder o
-        where t.salesOrderId = o.id and t.tenantId = :tenantId and o.tenantId = :tenantId and o.salesChannel = 'POS'
+        select coalesce(sum(t.amount), 0) from PosPaymentTender t
+        inner join SalesOrder o on o.id = t.salesOrderId
+        where t.tenantId = :tenantId and o.tenantId = :tenantId and o.salesChannel = 'POS'
           and t.tenderType = :tenderType and o.createdAt >= :start and o.createdAt < :end
           and o.posRegisterCode = :register
         """)

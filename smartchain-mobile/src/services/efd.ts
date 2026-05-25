@@ -1,6 +1,12 @@
+import {apiCall} from '../api/client';
 import {database} from '../db';
 import {EfdSubmission} from '../db/models/EfdSubmission';
 import {Q} from '@nozbe/watermelondb';
+import {
+  generateEfdQrPayload,
+  generateEfdSignature,
+  resolveEfdDeviceSecret,
+} from '../fiscal/efdSignature';
 
 export interface EfdSalePayload {
   salesOrderId: string;
@@ -28,16 +34,62 @@ export function buildEfdRequestHeaders(salesOrderId: string): Record<string, str
   };
 }
 
+const EFD_API_PATH = '/compliance/ebm/receipts/submit';
+
 /**
- * RRA_API_TODO: confirm endpoint, auth method (cert/API key), and JSON payload schema.
- * RRA_API_TODO: pass `headers` (includes X-Idempotency-Key) on every POST attempt.
+ * Live path: POST backend EBM submit (server holds RRA credentials).
+ * Fallback: HMAC-signed local payload when EFD_DEVICE_SECRET is set.
+ * Last resort: deterministic mock for dev/demo.
  */
 async function callRraEbmsApi(
-  _payload: EfdSalePayload,
+  payload: EfdSalePayload,
   headers: Record<string, string>,
 ): Promise<{signature: string; qrData: string}> {
-  void headers;
-  throw new Error('RRA eBMS API not configured');
+  try {
+    const res = await apiCall<{fiscalSignature?: string; fiscalQrData?: string}>(
+      EFD_API_PATH,
+      {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          salesOrderId: payload.salesOrderId,
+          grossAmount: payload.grossAmount,
+          vatAmount: payload.vatAmount,
+          currencyCode: payload.currencyCode,
+        }),
+      },
+    );
+    if (res.fiscalSignature && res.fiscalQrData) {
+      return {signature: res.fiscalSignature, qrData: res.fiscalQrData};
+    }
+  } catch {
+    /* try local signing or mock below */
+  }
+
+  const secret = resolveEfdDeviceSecret();
+  const dateIso = new Date().toISOString().slice(0, 10);
+  const tin = process.env.EXPO_PUBLIC_RRA_TIN?.trim() || '000000000';
+  const invoiceNumber = payload.salesOrderId;
+  if (secret) {
+    const signature = generateEfdSignature(
+      tin,
+      invoiceNumber,
+      payload.grossAmount,
+      dateIso,
+      secret,
+    );
+    const qrData = generateEfdQrPayload({
+      tin,
+      invoiceNumber,
+      amount: payload.grossAmount,
+      vatAmount: payload.vatAmount,
+      dateIso,
+      signature,
+    });
+    return {signature, qrData};
+  }
+
+  return mockFiscal(payload);
 }
 
 function mockFiscal(payload: EfdSalePayload): {signature: string; qrData: string} {

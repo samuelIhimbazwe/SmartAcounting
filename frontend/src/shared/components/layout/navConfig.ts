@@ -9,6 +9,7 @@ import {
   FileText,
   MessageSquare,
   Package,
+  RotateCcw,
   ScanBarcode,
   ScrollText,
   Settings,
@@ -18,6 +19,7 @@ import {
   Users,
 } from 'lucide-react'
 import type { Role } from '../../types/roles'
+import type { RoleProfile } from '../../types/roleProfiles'
 import { rolePathMap } from '../../types/roles'
 
 export type NavGroupKey =
@@ -39,8 +41,8 @@ export interface NavItem {
   group: NavGroupKey
   /** Lucide icon. */
   icon: ComponentType<{ className?: string; size?: number; strokeWidth?: number }>
-  /** Optional list of roles that may see the item. */
-  roles?: Role[]
+  /** RBAC: user must have this permission code. Omit to show for any authenticated user. */
+  requiredPermission?: string
   /** Optional decoration badge (e.g. "Beta"). */
   badge?: string
 }
@@ -85,6 +87,7 @@ export const NAV_ITEMS: NavItem[] = [
     searchLabel: 'Invoice',
     group: 'nav.groupOperations',
     icon: FileText,
+    requiredPermission: 'FINANCE_WRITE',
   },
   {
     id: 'purchase-order',
@@ -93,7 +96,7 @@ export const NAV_ITEMS: NavItem[] = [
     searchLabel: 'Purchase orders',
     group: 'nav.groupOperations',
     icon: ShoppingCart,
-    roles: ['CEO', 'CFO', 'OPERATIONS', 'ACCOUNTING'],
+    requiredPermission: 'PROCUREMENT_READ',
   },
   {
     id: 'sales-order',
@@ -102,6 +105,7 @@ export const NAV_ITEMS: NavItem[] = [
     searchLabel: 'Sales Order',
     group: 'nav.groupOperations',
     icon: BarChart3,
+    requiredPermission: 'POS_ACCESS',
   },
   {
     id: 'pos',
@@ -110,7 +114,34 @@ export const NAV_ITEMS: NavItem[] = [
     searchLabel: 'Point of Sale',
     group: 'nav.groupOperations',
     icon: ScanBarcode,
-    roles: ['CEO', 'SALES', 'OPERATIONS'],
+    requiredPermission: 'POS_ACCESS',
+  },
+  {
+    id: 'pos-history',
+    to: '/pos/history',
+    labelKey: 'nav.posHistory',
+    searchLabel: 'Sale history',
+    group: 'nav.groupOperations',
+    icon: ScanBarcode,
+    requiredPermission: 'ANALYTICS_OWN',
+  },
+  {
+    id: 'pos-returns',
+    to: '/returns',
+    labelKey: 'nav.returns',
+    searchLabel: 'Returns refunds',
+    group: 'nav.groupOperations',
+    icon: RotateCcw,
+    requiredPermission: 'POS_RETURNS',
+  },
+  {
+    id: 'till',
+    to: '/till',
+    labelKey: 'nav.till',
+    searchLabel: 'Till session',
+    group: 'nav.groupOperations',
+    icon: ScanBarcode,
+    requiredPermission: 'POS_ACCESS',
   },
   {
     id: 'retail',
@@ -119,7 +150,7 @@ export const NAV_ITEMS: NavItem[] = [
     searchLabel: 'Retail stock',
     group: 'nav.groupOperations',
     icon: Package,
-    roles: ['CEO', 'SALES', 'OPERATIONS', 'ACCOUNTING'],
+    requiredPermission: 'INVENTORY_READ',
   },
   {
     id: 'fx-rates',
@@ -128,7 +159,7 @@ export const NAV_ITEMS: NavItem[] = [
     searchLabel: 'FX rates',
     group: 'nav.groupFinance',
     icon: Banknote,
-    roles: ['CEO', 'CFO', 'ACCOUNTING'],
+    requiredPermission: 'FINANCE_READ',
   },
   {
     id: 'credit-ledger',
@@ -137,7 +168,7 @@ export const NAV_ITEMS: NavItem[] = [
     searchLabel: 'Credit ledger',
     group: 'nav.groupFinance',
     icon: BookOpen,
-    roles: ['CEO', 'CFO', 'ACCOUNTING', 'SALES', 'OPERATIONS'],
+    requiredPermission: 'FINANCE_READ',
   },
   {
     id: 'supplier-bills',
@@ -146,7 +177,7 @@ export const NAV_ITEMS: NavItem[] = [
     searchLabel: 'Supplier bills',
     group: 'nav.groupFinance',
     icon: ScrollText,
-    roles: ['CFO', 'ACCOUNTING', 'OPERATIONS'],
+    requiredPermission: 'FINANCE_READ',
   },
   {
     id: 'payment-runs',
@@ -155,7 +186,7 @@ export const NAV_ITEMS: NavItem[] = [
     searchLabel: 'Payment runs',
     group: 'nav.groupFinance',
     icon: Banknote,
-    roles: ['CEO', 'CFO', 'ACCOUNTING'],
+    requiredPermission: 'FINANCE_READ',
   },
   {
     id: 'fixed-assets',
@@ -164,7 +195,7 @@ export const NAV_ITEMS: NavItem[] = [
     searchLabel: 'Fixed assets',
     group: 'nav.groupFinance',
     icon: Landmark,
-    roles: ['CEO', 'CFO', 'ACCOUNTING'],
+    requiredPermission: 'FINANCE_READ',
   },
   {
     id: 'month-end-close',
@@ -173,7 +204,7 @@ export const NAV_ITEMS: NavItem[] = [
     searchLabel: 'Month-end close',
     group: 'nav.groupFinance',
     icon: BookOpen,
-    roles: ['CEO', 'CFO', 'ACCOUNTING'],
+    requiredPermission: 'FINANCE_READ',
   },
   {
     id: 'documents',
@@ -182,7 +213,7 @@ export const NAV_ITEMS: NavItem[] = [
     searchLabel: 'Documents',
     group: 'nav.groupOperations',
     icon: FileText,
-    roles: ['CEO', 'CFO', 'ACCOUNTING', 'OPERATIONS'],
+    requiredPermission: 'FINANCE_READ',
   },
   {
     id: 'attendance',
@@ -191,7 +222,7 @@ export const NAV_ITEMS: NavItem[] = [
     searchLabel: 'Attendance',
     group: 'nav.groupAdmin',
     icon: Users,
-    roles: ['CEO', 'CFO', 'HR', 'ACCOUNTING'],
+    requiredPermission: 'HR_READ',
   },
   {
     id: 'marketing-campaigns',
@@ -200,7 +231,7 @@ export const NAV_ITEMS: NavItem[] = [
     searchLabel: 'Marketing campaigns',
     group: 'nav.groupOperations',
     icon: Briefcase,
-    roles: ['CEO', 'CFO', 'SALES', 'MARKETING'],
+    requiredPermission: 'ANALYTICS_ALL',
   },
   {
     id: 'promotions',
@@ -209,7 +240,7 @@ export const NAV_ITEMS: NavItem[] = [
     searchLabel: 'Promotions',
     group: 'nav.groupOperations',
     icon: Briefcase,
-    roles: ['CEO', 'CFO', 'SALES', 'MARKETING'],
+    requiredPermission: 'ANALYTICS_ALL',
   },
   {
     id: 'workflow-rules',
@@ -218,7 +249,7 @@ export const NAV_ITEMS: NavItem[] = [
     searchLabel: 'Workflow rules',
     group: 'nav.groupAdmin',
     icon: ShieldCheck,
-    roles: ['CEO', 'CFO'],
+    requiredPermission: 'ROLE_MANAGE',
   },
   {
     id: 'bank-reconciliation',
@@ -227,7 +258,7 @@ export const NAV_ITEMS: NavItem[] = [
     searchLabel: 'Bank reconciliation',
     group: 'nav.groupFinance',
     icon: Landmark,
-    roles: ['CEO', 'CFO', 'ACCOUNTING'],
+    requiredPermission: 'FINANCE_READ',
   },
   {
     id: 'hr-payroll',
@@ -236,7 +267,7 @@ export const NAV_ITEMS: NavItem[] = [
     searchLabel: 'Attendance and payroll',
     group: 'nav.groupAdmin',
     icon: Users,
-    roles: ['CEO', 'CFO', 'HR', 'ACCOUNTING'],
+    requiredPermission: 'HR_READ',
   },
   {
     id: 'ebm-compliance',
@@ -245,7 +276,7 @@ export const NAV_ITEMS: NavItem[] = [
     searchLabel: 'EBM compliance',
     group: 'nav.groupFinance',
     icon: ShieldCheck,
-    roles: ['CEO', 'CFO', 'ACCOUNTING'],
+    requiredPermission: 'EBM_AUDIT',
   },
   {
     id: 'sms-deliveries',
@@ -254,7 +285,16 @@ export const NAV_ITEMS: NavItem[] = [
     searchLabel: 'SMS deliveries',
     group: 'nav.groupFinance',
     icon: MessageSquare,
-    roles: ['CEO', 'CFO', 'ACCOUNTING'],
+    requiredPermission: 'FINANCE_READ',
+  },
+  {
+    id: 'admin-roles',
+    to: '/admin/roles',
+    labelKey: 'nav.rolesPermissions',
+    searchLabel: 'Roles and permissions',
+    group: 'nav.groupAdmin',
+    icon: ShieldCheck,
+    requiredPermission: 'ROLE_MANAGE',
   },
   {
     id: 'users-tenants',
@@ -263,7 +303,7 @@ export const NAV_ITEMS: NavItem[] = [
     searchLabel: 'User Tenant Management',
     group: 'nav.groupAdmin',
     icon: ShieldCheck,
-    roles: ['CEO', 'CFO', 'HR'],
+    requiredPermission: 'USER_MANAGE',
   },
 ]
 
@@ -274,6 +314,22 @@ export const NAV_GROUP_ORDER: NavGroupKey[] = [
   'nav.groupAdmin',
 ]
 
-export function filterNavForRole(role: Role): NavItem[] {
-  return NAV_ITEMS.filter((item) => !item.roles || item.roles.includes(role))
+export function filterNavItems(hasPermission: (code: string) => boolean, allowedItemIds?: string[] | null): NavItem[] {
+  const allowed = allowedItemIds && allowedItemIds.length > 0 ? new Set(allowedItemIds) : null
+  return NAV_ITEMS.filter((item) => {
+    if (allowed && !allowed.has(item.id)) {
+      return false
+    }
+    return !item.requiredPermission || hasPermission(item.requiredPermission)
+  })
+}
+
+/** @deprecated Use {@link filterNavItems} with auth store `hasPermission`. */
+export function filterNavForRole(_role: Role, permissions: string[] = []): NavItem[] {
+  const has = (code: string) => permissions.includes(code)
+  return filterNavItems(has)
+}
+
+export function findNavItemByRoute(route: string, hasPermission: (code: string) => boolean, roleProfile?: RoleProfile | null): NavItem | null {
+  return filterNavItems(hasPermission, roleProfile?.navItemIds).find((item) => item.to === route) ?? null
 }

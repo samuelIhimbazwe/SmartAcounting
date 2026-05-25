@@ -26,20 +26,20 @@ public class AssetController {
     }
 
     @PostMapping
-    @PreAuthorize("@permissionGuard.has(authentication, 'ASSET_WRITE')")
+    @PreAuthorize("@permissionGuard.has(authentication, 'ASSETS_MANAGE')")
     public Map<String, UUID> create(@RequestBody @Valid CreateAssetRequest request) {
         return Map.of("assetId", service.create(request));
     }
 
     @GetMapping
-    @PreAuthorize("@permissionGuard.has(authentication, 'ASSET_READ')")
+    @PreAuthorize("@permissionGuard.has(authentication, 'ASSETS_MANAGE')")
     public List<Map<String, Object>> list(@RequestParam(defaultValue = "0") int page,
                                           @RequestParam(defaultValue = "50") int size) {
         return service.list(page, size);
     }
 
     @GetMapping("/{assetId}/depreciation-schedule")
-    @PreAuthorize("@permissionGuard.has(authentication, 'ASSET_READ')")
+    @PreAuthorize("@permissionGuard.has(authentication, 'ASSETS_MANAGE')")
     public Map<String, Object> depreciationSchedule(@PathVariable UUID assetId) {
         return service.depreciationSchedule(assetId);
     }

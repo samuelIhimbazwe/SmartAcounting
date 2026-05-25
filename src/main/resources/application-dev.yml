@@ -31,6 +31,11 @@ smartaccounting:
     sender-id: SmartAccounting-Dev
   forecast:
     base-url: http://localhost:8090
+  public-signup:
+    # Allow repeated signup attempts while testing locally (production keeps defaults).
+    rate-limit-enabled: false
+    # Show OTP on the verify screen when SMS dry-run is on (smartaccounting.sms.dry-run).
+    expose-otp-in-response: true
 
 spring:
   datasource:

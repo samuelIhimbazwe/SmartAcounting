@@ -9,6 +9,7 @@ import com.smartaccounting.tenant.TenantContext;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -37,44 +38,44 @@ public class PayrollController {
     }
 
     @PostMapping("/runs")
-    @PreAuthorize("hasAnyRole('CFO', 'HR_MANAGER', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.PAYROLL_WRITE)
     public ResponseEntity<PayrollRun> prepareRun(@RequestBody Map<String, String> body) {
         return ResponseEntity.ok(payrollService.preparePayrollRun(
             body.get("period"), currentUserId()));
     }
 
     @GetMapping("/runs")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'HR_MANAGER', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.PAYROLL_READ)
     public ResponseEntity<List<PayrollRun>> listRuns() {
         return ResponseEntity.ok(payrollService.listRuns());
     }
 
     @GetMapping("/runs/{runId}")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'HR_MANAGER', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.PAYROLL_READ)
     public ResponseEntity<PayrollRunDetail> getRun(@PathVariable UUID runId) {
         return ResponseEntity.ok(payrollService.getRun(runId));
     }
 
     @PostMapping("/runs/{runId}/approve")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO')")
+    @PreAuthorize(PermissionExpressions.PAYROLL_WRITE)
     public ResponseEntity<PayrollRun> approveRun(@PathVariable UUID runId) {
         return ResponseEntity.ok(payrollService.approvePayrollRun(runId, currentUserId()));
     }
 
     @PostMapping("/runs/{runId}/post")
-    @PreAuthorize("hasAnyRole('CFO', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.PAYROLL_WRITE)
     public ResponseEntity<PayrollRun> postRun(@PathVariable UUID runId) {
         return ResponseEntity.ok(payrollService.postPayrollRun(runId));
     }
 
     @GetMapping("/runs/{runId}/lines")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'HR_MANAGER', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.PAYROLL_READ)
     public ResponseEntity<List<PayrollLine>> getRunLines(@PathVariable UUID runId) {
         return ResponseEntity.ok(payrollService.getRunLines(runId));
     }
 
     @GetMapping("/runs/{runId}/payslip/{employeeId}")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'HR_MANAGER', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.PAYROLL_READ)
     public ResponseEntity<byte[]> getPayslip(
         @PathVariable UUID runId,
         @PathVariable UUID employeeId) {
@@ -88,7 +89,7 @@ public class PayrollController {
     }
 
     @GetMapping("/runs/{runId}/payslips")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'HR_MANAGER', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.PAYROLL_READ)
     public ResponseEntity<byte[]> downloadAllPayslips(@PathVariable UUID runId) throws IOException {
         List<PayrollLine> lines = payrollService.getRunLines(runId);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -107,7 +108,7 @@ public class PayrollController {
     }
 
     @GetMapping("/runs/{runId}/paye-export")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'HR_MANAGER', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.PAYROLL_READ)
     public ResponseEntity<byte[]> payeExport(@PathVariable UUID runId) {
         byte[] csv = payrollFilingService.exportPayeCsv(runId);
         return ResponseEntity.ok()

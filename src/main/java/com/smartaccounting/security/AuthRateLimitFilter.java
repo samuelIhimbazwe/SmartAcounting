@@ -1,6 +1,5 @@
 package com.smartaccounting.security;
 
-import com.smartaccounting.exception.RateLimitExceededException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -47,8 +46,12 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
         };
         if (count > limit) {
             long retrySeconds = "login".equals(endpoint) ? 900L : 60L;
-            response.setHeader("Retry-After", String.valueOf(retrySeconds));
-            throw new RateLimitExceededException("Too many auth attempts. Try again later.");
+            RateLimitResponseWriter.writeTooManyRequests(
+                response,
+                "Too many auth attempts. Try again later.",
+                retrySeconds
+            );
+            return;
         }
         filterChain.doFilter(request, response);
     }

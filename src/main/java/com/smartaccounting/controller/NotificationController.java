@@ -13,6 +13,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -47,33 +48,33 @@ public class NotificationController {
     }
 
     @PostMapping("/rules")
-    @PreAuthorize("hasRole('CEO') or hasRole('CFO') or hasRole('ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.TENANT_CONFIG)
     public Map<String, UUID> createRule(@RequestBody @Valid NotificationRuleRequest req) {
         return Map.of("ruleId", service.createRule(req));
     }
 
     @GetMapping("/rules")
-    @PreAuthorize("hasRole('CEO') or hasRole('CFO') or hasRole('ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.TENANT_CONFIG)
     public List<NotificationRule> rules(@RequestParam(defaultValue = "0") int page,
                                         @RequestParam(defaultValue = "50") int size) {
         return service.activeRules(page, size);
     }
 
     @PostMapping("/events")
-    @PreAuthorize("hasRole('CEO') or hasRole('CFO') or hasRole('ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.TENANT_CONFIG)
     public Map<String, UUID> emit(@RequestBody @Valid NotificationEventRequest req) {
         return Map.of("eventId", service.emit(req));
     }
 
     @GetMapping("/events")
-    @PreAuthorize("hasRole('CEO') or hasRole('CFO') or hasRole('ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.TENANT_CONFIG)
     public List<NotificationEvent> events(@RequestParam(defaultValue = "0") int page,
                                           @RequestParam(defaultValue = "50") int size) {
         return service.recentEvents(page, size);
     }
 
     @GetMapping("/sms-deliveries")
-    @PreAuthorize("hasRole('CEO') or hasRole('CFO') or hasRole('ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.TENANT_CONFIG)
     public List<NotificationSmsDeliveryLog> smsDeliveries(@RequestParam(required = false) UUID eventId,
                                                           @RequestParam(defaultValue = "0") int page,
                                                           @RequestParam(defaultValue = "50") int size) {
@@ -81,7 +82,7 @@ public class NotificationController {
     }
 
     @GetMapping("/sms-deliveries/export")
-    @PreAuthorize("hasRole('CEO') or hasRole('CFO') or hasRole('ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.TENANT_CONFIG)
     public ResponseEntity<byte[]> exportSmsDeliveries(@RequestParam(required = false) UUID eventId,
                                                       @RequestParam(required = false) String status,
                                                       @RequestParam(required = false) String phone,

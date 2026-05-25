@@ -1,7 +1,8 @@
 import type { NavigateFunction } from 'react-router-dom'
-import { toExpiryTimestamp } from '../../shared/api/auth'
+import { toExpiryTimestamp, type AssignedRoleSummary } from '../../shared/api/auth'
+import { resolvePostLoginRoute } from '../../shared/routing/postLoginRoute'
 import type { Role } from '../../shared/types/roles'
-import { rolePathMap, roles } from '../../shared/types/roles'
+import { roles } from '../../shared/types/roles'
 
 export interface OAuth2CallbackParams {
   accessToken?: string
@@ -10,6 +11,9 @@ export interface OAuth2CallbackParams {
   userId?: string
   role?: string
   expiresInSeconds?: string
+  setupComplete?: string
+  permissions?: string
+  assignedRoles?: string
   error?: string
 }
 
@@ -18,6 +22,9 @@ export interface OAuth2SessionActions {
   setUserId: (userId: string) => void
   setSession: (session: {
     role: Role
+    permissions?: string[]
+    assignedRoles?: AssignedRoleSummary[]
+    setupComplete?: boolean
     accessToken: string
     refreshToken: string | null
     expiresAt: number | null
@@ -29,6 +36,45 @@ function parseRole(roleParam: string | undefined): Role | null {
     return null
   }
   return roles.includes(roleParam as Role) ? (roleParam as Role) : null
+}
+
+function parseSetupComplete(value: string | undefined): boolean {
+  if (!value) {
+    return false
+  }
+  return value === 'true' || value === '1'
+}
+
+function parsePermissions(value: string | undefined): string[] {
+  if (!value) {
+    return []
+  }
+  try {
+    const parsed = JSON.parse(value) as unknown
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function parseAssignedRoles(value: string | undefined): AssignedRoleSummary[] {
+  if (!value) {
+    return []
+  }
+  try {
+    const parsed = JSON.parse(value) as unknown
+    if (!Array.isArray(parsed)) {
+      return []
+    }
+    return parsed.filter(
+      (item): item is AssignedRoleSummary =>
+        typeof item === 'object' &&
+        item !== null &&
+        typeof (item as AssignedRoleSummary).name === 'string',
+    )
+  } catch {
+    return []
+  }
 }
 
 /**
@@ -53,6 +99,9 @@ export function applyOAuth2Callback(
   const role = parseRole(params.role)
   const expiresInRaw = params.expiresInSeconds
   const expiresInSeconds = expiresInRaw ? Number.parseInt(expiresInRaw, 10) : undefined
+  const setupComplete = parseSetupComplete(params.setupComplete)
+  const permissions = parsePermissions(params.permissions)
+  const assignedRoles = parseAssignedRoles(params.assignedRoles)
 
   if (!accessToken || !tenantId || !userId || !role) {
     navigate('/login?error=' + encodeURIComponent('Invalid OAuth2 response'))
@@ -66,8 +115,11 @@ export function applyOAuth2Callback(
     refreshToken,
     expiresAt: toExpiryTimestamp(expiresInSeconds),
     role,
+    permissions,
+    assignedRoles,
+    setupComplete,
   })
 
-  navigate(`/dashboard/${rolePathMap[role] ?? role.toLowerCase()}`)
+  navigate(resolvePostLoginRoute(setupComplete, role, permissions, assignedRoles))
   return true
 }

@@ -1,69 +1,54 @@
 /**
- * SQLite-backed offline transaction queue for the desktop shell.
+ * SQLite-backed POS sale queue for the desktop shell (Sprint 4).
  *
- * Wire format is identical across web, desktop and mobile: the backend's
- * `POST /api/v1/sync/queue` accepts a JSON array of `SyncOperationRequest`:
- *
- *   {
- *     deviceId:        UUID,
- *     idempotencyKey:  UUID,
- *     operationType:   "POS_SALE",
- *     entityType:      "POS_CHECKOUT",
- *     payload:         {...},
- *     lamportClock:    epoch-ms,
- *     conflictPolicy:  "LAST_WRITE_WINS"
- *   }
- *
- * The idempotency key lives in the *body*, not as an HTTP header — the
- * backend's `SyncService` reads it from the DTO. Required auth headers:
- *   - `Authorization: Bearer <token>`
- *   - `X-Tenant-Id: <tenantId>`
- *
- * After any successful pushes, `/sync/flush` is fired (advisory; role-gated
- * to CEO/OPS_MANAGER, so non-privileged users will receive 403 and we
- * swallow that case).
+ * Sales are stored locally when offline and replayed via
+ * `POST /api/v1/pos/checkout` with `X-Idempotency-Key: localId`.
  */
 
 import { app } from 'electron'
 import path from 'node:path'
-import fs from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import type Database from 'better-sqlite3'
 
-const MAX_RETRIES = 5
+const MAX_RETRIES = 3
 
-interface Row {
-  id: string
-  payload: string // JSON-stringified
-  idempotency_key: string
-  saved_at: string
-  synced: number // 0 / 1
-  retry_count: number
-  last_error: string | null
+interface PendingSaleRow {
+  localId: string
+  payload: string
+  createdAt: number
+  syncedAt: number | null
+  lastError: string | null
+  retryCount: number
 }
 
-export interface SyncResult {
+export interface QueueSaleResult {
+  localId: string
+  status: 'queued'
+}
+
+export interface QueueStatusItem {
+  localId: string
+  createdAt: number
+  retryCount: number
+  lastError: string | null
+}
+
+export interface QueueStatus {
+  pendingCount: number
+  failedCount: number
+  items: QueueStatusItem[]
+}
+
+export interface SyncQueueResult {
   synced: number
   failed: number
-}
-
-interface SyncOperationRequest {
-  deviceId: string
-  idempotencyKey: string
-  operationType: 'POS_SALE'
-  entityType: 'POS_CHECKOUT'
-  payload: unknown
-  lamportClock: number
-  conflictPolicy: 'LAST_WRITE_WINS'
+  errors: string[]
 }
 
 let db: Database.Database | null = null
-let cachedDeviceId: string | null = null
 
 function loadDriver(): typeof Database | null {
   try {
-    // Lazy-loaded so an unbuilt native binary degrades gracefully into "queue
-    // unavailable" rather than crashing the whole main process.
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     return require('better-sqlite3') as typeof Database
   } catch {
@@ -71,164 +56,222 @@ function loadDriver(): typeof Database | null {
   }
 }
 
+function migrateLegacyTable(handle: Database.Database): void {
+  const legacy = handle
+    .prepare(
+      `SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'offline_transactions'`,
+    )
+    .get() as { name: string } | undefined
+  if (!legacy) {
+    return
+  }
+  const pendingExists = handle
+    .prepare(`SELECT COUNT(*) AS count FROM pending_sales`)
+    .get() as { count: number }
+  if (pendingExists.count > 0) {
+    return
+  }
+  const rows = handle
+    .prepare(`SELECT id, payload, saved_at, retry_count, last_error FROM offline_transactions WHERE synced = 0`)
+    .all() as Array<{
+    id: string
+    payload: string
+    saved_at: string
+    retry_count: number
+    last_error: string | null
+  }>
+  const insert = handle.prepare(
+    `INSERT INTO pending_sales (localId, payload, createdAt, syncedAt, lastError, retryCount)
+     VALUES (?, ?, ?, NULL, ?, ?)`,
+  )
+  for (const row of rows) {
+    const createdAt = Date.parse(row.saved_at) || Date.now()
+    insert.run(row.id, row.payload, createdAt, row.last_error, row.retry_count)
+  }
+}
+
 function getDb(): Database.Database | null {
-  if (db) return db
+  if (db) {
+    return db
+  }
   const driver = loadDriver()
-  if (!driver) return null
+  if (!driver) {
+    return null
+  }
   const dbPath = path.join(app.getPath('userData'), 'offline-queue.db')
   db = new driver(dbPath)
   db.pragma('journal_mode = WAL')
   db.exec(`
-    CREATE TABLE IF NOT EXISTS offline_transactions (
-      id TEXT PRIMARY KEY,
+    CREATE TABLE IF NOT EXISTS pending_sales (
+      localId TEXT PRIMARY KEY,
       payload TEXT NOT NULL,
-      idempotency_key TEXT NOT NULL,
-      saved_at TEXT NOT NULL,
-      synced INTEGER NOT NULL DEFAULT 0,
-      retry_count INTEGER NOT NULL DEFAULT 0,
-      last_error TEXT
+      createdAt INTEGER NOT NULL,
+      syncedAt INTEGER,
+      lastError TEXT,
+      retryCount INTEGER NOT NULL DEFAULT 0
     );
-    CREATE INDEX IF NOT EXISTS idx_offline_synced ON offline_transactions(synced);
+    CREATE INDEX IF NOT EXISTS idx_pending_sales_sync ON pending_sales(syncedAt, retryCount);
   `)
+  migrateLegacyTable(db)
   return db
 }
 
-/**
- * Stable per-install device UUID, persisted alongside the SQLite file.
- *
- * Kept separate from `electron-store` so the value survives even when the
- * config store is wiped, and so we don't pull the ESM-only flavor of
- * electron-store into the main process for a single string.
- */
-function getDeviceId(): string {
-  if (cachedDeviceId) return cachedDeviceId
-  try {
-    const userData = app.getPath('userData')
-    const filePath = path.join(userData, 'device-id.txt')
-    if (fs.existsSync(filePath)) {
-      const value = fs.readFileSync(filePath, 'utf-8').trim()
-      if (value) {
-        cachedDeviceId = value
-        return value
-      }
-    }
-    const fresh = randomUUID()
-    fs.mkdirSync(userData, { recursive: true })
-    fs.writeFileSync(filePath, fresh, { encoding: 'utf-8' })
-    cachedDeviceId = fresh
-    return fresh
-  } catch {
-    const fresh = randomUUID()
-    cachedDeviceId = fresh
-    return fresh
-  }
-}
-
-export function queueTransaction(payload: unknown): string {
+export function queueSale(payload: unknown): QueueSaleResult {
   const handle = getDb()
   if (!handle) {
     throw new Error('Offline queue unavailable (better-sqlite3 not loaded)')
   }
-  const id = randomUUID()
-  const idempotencyKey = randomUUID()
-  const savedAt = new Date().toISOString()
-  const stmt = handle.prepare(
-    `INSERT INTO offline_transactions (id, payload, idempotency_key, saved_at, synced, retry_count)
-     VALUES (?, ?, ?, ?, 0, 0)`,
-  )
-  stmt.run(id, JSON.stringify(payload ?? null), idempotencyKey, savedAt)
-  return id
-}
-
-export function getPendingCount(): number {
-  const handle = getDb()
-  if (!handle) return 0
-  const row = handle
-    .prepare<unknown[], { count: number }>(
-      `SELECT COUNT(*) AS count FROM offline_transactions WHERE synced = 0`,
+  const localId = randomUUID()
+  const createdAt = Date.now()
+  handle
+    .prepare(
+      `INSERT INTO pending_sales (localId, payload, createdAt, syncedAt, lastError, retryCount)
+       VALUES (?, ?, ?, NULL, NULL, 0)`,
     )
-    .get() as { count: number } | undefined
-  return row?.count ?? 0
+    .run(localId, JSON.stringify(payload ?? null), createdAt)
+  return { localId, status: 'queued' }
 }
 
-function buildOperation(row: Row, deviceId: string): SyncOperationRequest {
+/** @deprecated Use {@link queueSale} — returns localId only for legacy IPC. */
+export function queueTransaction(payload: unknown): string {
+  return queueSale(payload).localId
+}
+
+export function getQueueStatus(): QueueStatus {
+  const handle = getDb()
+  if (!handle) {
+    return { pendingCount: 0, failedCount: 0, items: [] }
+  }
+  const pendingRow = handle
+    .prepare(
+      `SELECT COUNT(*) AS count FROM pending_sales
+       WHERE syncedAt IS NULL AND retryCount < ?`,
+    )
+    .get(MAX_RETRIES) as { count: number }
+  const failedRow = handle
+    .prepare(
+      `SELECT COUNT(*) AS count FROM pending_sales
+       WHERE syncedAt IS NULL AND retryCount >= ?`,
+    )
+    .get(MAX_RETRIES) as { count: number }
+  const items = handle
+    .prepare(
+      `SELECT localId, createdAt, retryCount, lastError FROM pending_sales
+       WHERE syncedAt IS NULL
+       ORDER BY createdAt ASC`,
+    )
+    .all() as QueueStatusItem[]
   return {
-    deviceId,
-    idempotencyKey: row.idempotency_key,
-    operationType: 'POS_SALE',
-    entityType: 'POS_CHECKOUT',
-    payload: JSON.parse(row.payload),
-    lamportClock: Date.now(),
-    conflictPolicy: 'LAST_WRITE_WINS',
+    pendingCount: pendingRow.count,
+    failedCount: failedRow.count,
+    items,
   }
 }
 
-export async function syncPending(
+/** @deprecated Use {@link getQueueStatus}. */
+export function getPendingCount(): number {
+  return getQueueStatus().pendingCount
+}
+
+export async function syncQueue(
   apiBaseUrl: string,
   token: string,
   tenantId: string,
-): Promise<SyncResult> {
+): Promise<SyncQueueResult> {
   const handle = getDb()
-  if (!handle) return { synced: 0, failed: 0 }
+  if (!handle) {
+    return { synced: 0, failed: 0, errors: [] }
+  }
 
   const pending = handle
-    .prepare<unknown[], Row>(
-      `SELECT * FROM offline_transactions WHERE synced = 0 AND retry_count < ?`,
+    .prepare(
+      `SELECT localId, payload, retryCount FROM pending_sales
+       WHERE syncedAt IS NULL AND retryCount < ?
+       ORDER BY createdAt ASC`,
     )
-    .all(MAX_RETRIES) as Row[]
+    .all(MAX_RETRIES) as Array<Pick<PendingSaleRow, 'localId' | 'payload' | 'retryCount'>>
 
-  const markSynced = handle.prepare(
-    `UPDATE offline_transactions SET synced = 1 WHERE id = ?`,
-  )
+  const markSynced = handle.prepare(`UPDATE pending_sales SET syncedAt = ? WHERE localId = ?`)
   const markFailed = handle.prepare(
-    `UPDATE offline_transactions SET retry_count = retry_count + 1, last_error = ? WHERE id = ?`,
+    `UPDATE pending_sales SET retryCount = retryCount + 1, lastError = ? WHERE localId = ?`,
   )
 
+  const base = apiBaseUrl.replace(/\/$/, '')
+  const url = `${base}/api/v1/pos/checkout`
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${token}`,
     'X-Tenant-Id': tenantId,
   }
-  const deviceId = getDeviceId()
 
   let synced = 0
   let failed = 0
+  const errors: string[] = []
 
-  for (const record of pending) {
+  for (const row of pending) {
     try {
-      const res = await fetch(`${apiBaseUrl}/api/v1/sync/queue`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify([buildOperation(record, deviceId)]),
-      })
-      if (res.ok) {
-        markSynced.run(record.id)
-        synced += 1
-      } else {
-        markFailed.run(`HTTP ${res.status}`, record.id)
-        failed += 1
-      }
-    } catch (err) {
-      markFailed.run(err instanceof Error ? err.message : String(err), record.id)
-      failed += 1
-    }
-  }
-
-  if (synced > 0) {
-    try {
-      await fetch(`${apiBaseUrl}/api/v1/sync/flush`, {
+      const res = await fetch(url, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${token}`,
-          'X-Tenant-Id': tenantId,
+          ...headers,
+          'X-Idempotency-Key': row.localId,
         },
+        body: row.payload,
       })
-    } catch {
-      /* flush is advisory and role-gated; ignore failures */
+      if (res.ok) {
+        markSynced.run(Date.now(), row.localId)
+        synced += 1
+      } else {
+        const body = await res.text().catch(() => '')
+        const message = `HTTP ${res.status}${body ? `: ${body.slice(0, 200)}` : ''}`
+        markFailed.run(message, row.localId)
+        failed += 1
+        errors.push(`${row.localId.slice(0, 8)}: ${message}`)
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      markFailed.run(message, row.localId)
+      failed += 1
+      errors.push(`${row.localId.slice(0, 8)}: ${message}`)
     }
   }
 
-  return { synced, failed }
+  return { synced, failed, errors }
+}
+
+/** @deprecated Use {@link syncQueue}. */
+export async function syncPending(
+  apiBaseUrl: string,
+  token: string,
+  tenantId: string,
+): Promise<{ synced: number; failed: number }> {
+  const result = await syncQueue(apiBaseUrl, token, tenantId)
+  return { synced: result.synced, failed: result.failed }
+}
+
+export function clearFailed(): { deleted: number } {
+  const handle = getDb()
+  if (!handle) {
+    return { deleted: 0 }
+  }
+  const result = handle
+    .prepare(`DELETE FROM pending_sales WHERE syncedAt IS NULL AND retryCount >= ?`)
+    .run(MAX_RETRIES)
+  return { deleted: result.changes }
+}
+
+export function resetFailedRetries(): { reset: number } {
+  const handle = getDb()
+  if (!handle) {
+    return { reset: 0 }
+  }
+  const result = handle
+    .prepare(
+      `UPDATE pending_sales SET retryCount = 0, lastError = NULL
+       WHERE syncedAt IS NULL AND retryCount >= ?`,
+    )
+    .run(MAX_RETRIES)
+  return { reset: result.changes }
 }
 
 export function closeOfflineQueue(): void {

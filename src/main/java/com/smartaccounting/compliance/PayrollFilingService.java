@@ -33,6 +33,7 @@ public class PayrollFilingService {
             throw new IllegalStateException("Payroll run must be approved or posted before PAYE export");
         }
         List<PayrollLine> lines = payrollService.getRunLines(runId);
+        // RRA e-tax may expect: EmployeeName,TIN,GrossSalary,PAYE,... — confirm in sandbox before go-live.
         StringBuilder csv = new StringBuilder("employee_tin,gross,paye,rssb_employee,rssb_employer,rama,net\n");
         for (PayrollLine line : lines) {
             csv.append(csvField(line.getEmployeeId()))

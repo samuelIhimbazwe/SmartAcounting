@@ -8,6 +8,7 @@ import com.smartaccounting.service.PosCheckoutService;
 import com.smartaccounting.service.PosReceiptService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -31,7 +32,7 @@ public class PosController {
     }
 
     @GetMapping("/catalog/scan")
-    @PreAuthorize("hasAnyRole('CEO','SALES_MANAGER','OPS_MANAGER')")
+    @PreAuthorize(PermissionExpressions.POS_ACCESS)
     public Map<String, Object> scan(@RequestParam String barcode) {
         PosCatalogItem item = posCheckoutService.scanBarcode(barcode);
         Map<String, Object> m = new LinkedHashMap<>();
@@ -51,31 +52,31 @@ public class PosController {
     }
 
     @PostMapping("/catalog/items")
-    @PreAuthorize("hasAnyRole('CEO','SALES_MANAGER','OPS_MANAGER')")
+    @PreAuthorize(PermissionExpressions.POS_ACCESS)
     public Map<String, UUID> createCatalogItem(@RequestBody @Valid CreatePosCatalogItemRequest req) {
         return Map.of("catalogItemId", posCheckoutService.upsertCatalogItem(req));
     }
 
     @PostMapping("/checkout")
-    @PreAuthorize("hasAnyRole('CEO','SALES_MANAGER','OPS_MANAGER')")
+    @PreAuthorize(PermissionExpressions.POS_ACCESS)
     public Map<String, Object> checkout(@RequestBody @Valid PosCheckoutRequest req) {
         return posCheckoutService.checkout(req);
     }
 
     @GetMapping("/receipt/{salesOrderId}")
-    @PreAuthorize("hasAnyRole('CEO','SALES_MANAGER','OPS_MANAGER')")
+    @PreAuthorize(PermissionExpressions.POS_ACCESS)
     public ResponseEntity<Map<String, Object>> receipt(@PathVariable UUID salesOrderId) {
         return ResponseEntity.ok(posCheckoutService.receipt(salesOrderId));
     }
 
     @PostMapping("/receipts/print")
-    @PreAuthorize("hasAnyRole('CEO','SALES_MANAGER','OPS_MANAGER')")
+    @PreAuthorize(PermissionExpressions.POS_ACCESS)
     public ResponseEntity<Map<String, Object>> printReceipt(@RequestBody @Valid PosReceiptPrintRequest req) {
         return ResponseEntity.ok(posReceiptService.print(req.transactionId(), false));
     }
 
     @PostMapping("/receipts/{transactionId}/reprint")
-    @PreAuthorize("hasAnyRole('CEO','SALES_MANAGER','OPS_MANAGER')")
+    @PreAuthorize(PermissionExpressions.POS_ACCESS)
     public ResponseEntity<Map<String, Object>> reprintReceipt(@PathVariable UUID transactionId) {
         return ResponseEntity.ok(posReceiptService.print(transactionId, true));
     }

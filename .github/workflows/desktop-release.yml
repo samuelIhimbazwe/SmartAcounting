@@ -6,7 +6,28 @@ on:
   workflow_dispatch:
 
 jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+      - name: Install desktop dependencies
+        run: npm ci
+        working-directory: smartchain-desktop
+      - name: Typecheck desktop main process
+        run: npm run typecheck
+        working-directory: smartchain-desktop
+      - name: Build desktop frontend bundle
+        run: npm run build:frontend
+        working-directory: smartchain-desktop
+
   build:
+    needs: verify
     strategy:
       fail-fast: false
       matrix:
@@ -16,14 +37,16 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
       - name: Install desktop dependencies
-        run: cd smartchain-desktop && npm ci
-      - name: Build frontend bundle for desktop
-        run: |
-          cd frontend && npm ci && npm run build
-      - name: Build Electron app
-        run: cd smartchain-desktop && npm run build:electron
+        run: npm ci
+        working-directory: smartchain-desktop
+      - name: Build installers
+        run: npm run build
+        working-directory: smartchain-desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/upload-artifact@v4

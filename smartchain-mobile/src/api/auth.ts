@@ -25,6 +25,7 @@ interface JwtClaims {
   tenantId?: string;
   userId?: string;
   roles?: string[];
+  permissions?: string[];
 }
 
 export interface SessionPayload {
@@ -33,18 +34,21 @@ export interface SessionPayload {
   tenantId: string;
   userId: string;
   roles: AppRole[];
+  permissions: string[];
   userName: string | null;
 }
 
 function sessionFromTokenPair(token: string, refreshToken: string): SessionPayload {
   const claims = jwtDecode<JwtClaims>(token);
   const roles = normalizeRoles(claims.roles ?? []);
+  const permissions = (claims.permissions ?? []).map(p => p.trim().toUpperCase());
   return {
     accessToken: token,
     refreshToken,
     tenantId: claims.tenantId ?? '',
     userId: claims.userId ?? '',
     roles,
+    permissions,
     userName: claims.sub ?? null,
   };
 }

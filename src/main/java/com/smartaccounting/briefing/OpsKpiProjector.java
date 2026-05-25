@@ -6,8 +6,11 @@ import com.smartaccounting.repository.OpsKpiSnapshotJdbcRepository;
 import com.smartaccounting.service.InventoryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -18,15 +21,18 @@ public class OpsKpiProjector {
     private final OpsKpiSnapshotJdbcRepository opsKpiSnapshotJdbcRepository;
     private final ObjectMapper objectMapper;
     private final InventoryService inventoryService;
+    private final JdbcTemplate jdbcTemplate;
 
     public OpsKpiProjector(
         OpsKpiSnapshotJdbcRepository opsKpiSnapshotJdbcRepository,
         ObjectMapper objectMapper,
-        InventoryService inventoryService
+        InventoryService inventoryService,
+        JdbcTemplate jdbcTemplate
     ) {
         this.opsKpiSnapshotJdbcRepository = opsKpiSnapshotJdbcRepository;
         this.objectMapper = objectMapper;
         this.inventoryService = inventoryService;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     public long getLowStockCount(UUID tenantId) {
@@ -60,7 +66,36 @@ public class OpsKpiProjector {
     }
 
     public double getInventoryTurnover(UUID tenantId) {
-        log.warn("getInventoryTurnover stub called for tenant {} — implement COGS / average inventory turnover", tenantId);
-        return 0d;
+        if (tenantId == null) {
+            return 0d;
+        }
+        try {
+            BigDecimal cogs = jdbcTemplate.queryForObject(
+                """
+                select coalesce(sum(psl.quantity * coalesce(psl.cost_price, 0)), 0)
+                from pos_sale_lines psl
+                join sales_orders so on so.id = psl.sales_order_id and so.tenant_id = psl.tenant_id
+                where psl.tenant_id = ?
+                  and so.created_at >= current_timestamp - interval '30 day'
+                """,
+                BigDecimal.class,
+                tenantId
+            );
+            BigDecimal avgQty = jdbcTemplate.queryForObject(
+                """
+                select coalesce(nullif(avg(quantity), 0), 1)
+                from inventory_balances where tenant_id = ?
+                """,
+                BigDecimal.class,
+                tenantId
+            );
+            if (cogs == null || avgQty == null || avgQty.compareTo(BigDecimal.ZERO) == 0) {
+                return 0d;
+            }
+            return cogs.divide(avgQty, 4, RoundingMode.HALF_UP).doubleValue();
+        } catch (Exception ex) {
+            log.debug("getInventoryTurnover failed for {}: {}", tenantId, ex.getMessage());
+            return 0d;
+        }
     }
 }

@@ -8,6 +8,30 @@
  * web-only fallback.
  */
 
+export interface QueueSaleResult {
+  localId: string
+  status: 'queued'
+}
+
+export interface QueueStatusItem {
+  localId: string
+  createdAt: number
+  retryCount: number
+  lastError: string | null
+}
+
+export interface QueueStatus {
+  pendingCount: number
+  failedCount: number
+  items: QueueStatusItem[]
+}
+
+export interface SyncQueueResult {
+  synced: number
+  failed: number
+  errors: string[]
+}
+
 export interface SmartAccountingDesktopApi {
   isDesktop: boolean
   printer: {
@@ -29,6 +53,13 @@ export interface SmartAccountingDesktopApi {
       tenantId: string,
     ) => Promise<{ synced: number; failed: number }>
   }
+  /** Sprint 4 — POS checkout offline queue */
+  queueSale: (payload: object) => Promise<QueueSaleResult>
+  getQueueStatus: () => Promise<QueueStatus>
+  syncQueue: (apiUrl: string, token: string, tenantId: string) => Promise<SyncQueueResult>
+  clearFailed: () => Promise<{ deleted: number }>
+  resetFailedRetries: () => Promise<{ reset: number }>
+  getEfdSecret: () => Promise<string | undefined>
   fs: {
     saveExport: (
       filename: string,
@@ -49,6 +80,8 @@ export interface SmartAccountingDesktopApi {
   navigation?: {
     onNavigate: (cb: (route: string) => void) => () => void
   }
+  /** Optional: print POS receipt by sales order id (Electron shell). */
+  printReceipt?: (receiptId: string) => Promise<void>
 }
 
 declare global {

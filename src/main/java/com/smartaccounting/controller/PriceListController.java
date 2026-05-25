@@ -1,6 +1,7 @@
 package com.smartaccounting.controller;
 
 import com.smartaccounting.service.PriceListService;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,7 +20,7 @@ public class PriceListController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('CEO','SALES_MANAGER','OPS_MANAGER')")
+    @PreAuthorize(PermissionExpressions.MARKETING_ACCESS)
     public List<Map<String, Object>> list() {
         return priceListService.listPriceLists();
     }

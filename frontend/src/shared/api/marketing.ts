@@ -19,13 +19,27 @@ export interface PromotionRow {
   discountValue?: number
 }
 
+function unwrapArrayResponse<T>(data: unknown): T[] {
+  if (Array.isArray(data)) {
+    return data
+  }
+  if (data && typeof data === 'object') {
+    const record = data as Record<string, unknown>
+    for (const candidate of [record.content, record.items, record.rows, record.segments, record.campaigns]) {
+      if (Array.isArray(candidate)) {
+        return candidate as T[]
+      }
+    }
+  }
+  return []
+}
+
 export async function listCampaigns(page = 0, size = 50): Promise<CampaignRow[]> {
   const { data } = await apiClient.get<{ content?: CampaignRow[] } | CampaignRow[]>(
     '/marketing/campaigns',
     { params: { page, size } },
   )
-  if (Array.isArray(data)) return data
-  return data.content ?? []
+  return unwrapArrayResponse<CampaignRow>(data)
 }
 
 export async function listPromotions(page = 0, size = 50): Promise<PromotionRow[]> {
@@ -33,12 +47,12 @@ export async function listPromotions(page = 0, size = 50): Promise<PromotionRow[
     '/promotions',
     { params: { page, size } },
   )
-  return Array.isArray(data) ? data : (data.content ?? [])
+  return unwrapArrayResponse<PromotionRow>(data)
 }
 
 export async function listSegments(): Promise<Array<{ segment: string; customerCount: number }>> {
-  const { data } = await apiClient.get<Array<{ segment: string; customerCount: number }>>(
+  const { data } = await apiClient.get<unknown>(
     '/marketing/segments',
   )
-  return data
+  return unwrapArrayResponse<{ segment: string; customerCount: number }>(data)
 }

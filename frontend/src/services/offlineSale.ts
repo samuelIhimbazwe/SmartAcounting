@@ -1,16 +1,16 @@
-import { desktop, isDesktop } from '../utils/platform'
+import { desktop, isDesktop, type QueueSaleResult } from '../utils/platform'
 import { queueTransaction } from './offlineQueue'
 
 /**
  * Persist a POS sale locally for later sync.
  *
- * On Electron desktop, hands the payload to the SQLite-backed native queue
- * (durable across crashes / reinstalls). On the web, falls back to the
- * IndexedDB queue managed by `offlineQueue.ts`.
+ * On Electron desktop, uses SQLite `pending_sales` via `queueSale`.
+ * On the web, falls back to IndexedDB.
  */
-export async function queueOfflineSale(payload: object): Promise<string> {
-  if (isDesktop() && desktop) {
-    return desktop.offline.queue(payload)
+export async function queueOfflineSale(payload: object): Promise<QueueSaleResult> {
+  if (isDesktop() && desktop?.queueSale) {
+    return desktop.queueSale(payload)
   }
-  return queueTransaction(payload)
+  const localId = await queueTransaction(payload)
+  return { localId, status: 'queued' }
 }

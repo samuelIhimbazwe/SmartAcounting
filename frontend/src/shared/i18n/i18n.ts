@@ -2,7 +2,7 @@ import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import { resources } from './resources'
 
-const supportedLocales = ['en', 'fr'] as const
+const supportedLocales = ['en', 'fr', 'rw'] as const
 
 function resolveDefaultLocale() {
   if (typeof window === 'undefined') {

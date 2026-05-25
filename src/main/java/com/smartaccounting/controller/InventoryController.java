@@ -4,6 +4,7 @@ import com.smartaccounting.dto.MoveStockRequest;
 import com.smartaccounting.dto.ReceiveStockRequest;
 import com.smartaccounting.service.InventoryService;
 import jakarta.validation.Valid;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,38 +27,38 @@ public class InventoryController {
     }
 
     @GetMapping("/balances")
-    @PreAuthorize("hasAnyRole('CEO','SALES_MANAGER','OPS_MANAGER','ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.INVENTORY_READ)
     public List<Map<String, Object>> balances(@RequestParam(required = false) String location) {
         return inventoryService.listBalances(location);
     }
 
     @GetMapping("/batches")
-    @PreAuthorize("hasAnyRole('CEO','SALES_MANAGER','OPS_MANAGER','ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.INVENTORY_READ)
     public List<Map<String, Object>> batches(@RequestParam(required = false) String location) {
         return inventoryService.listBatches(location);
     }
 
     @GetMapping("/low-stock")
-    @PreAuthorize("hasAnyRole('OPS_MANAGER','ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.INVENTORY_READ)
     public List<Map<String, Object>> lowStock(@RequestParam(required = false) String location) {
         return inventoryService.lowStock(location);
     }
 
     @GetMapping("/expiry-risk")
-    @PreAuthorize("hasAnyRole('OPS_MANAGER','ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.INVENTORY_READ)
     public List<Map<String, Object>> expiryRisk(@RequestParam(required = false) String location,
                                                 @RequestParam(required = false) Integer daysAhead) {
         return inventoryService.expiryRisk(location, daysAhead);
     }
 
     @PostMapping("/move")
-    @PreAuthorize("hasAnyRole('CEO','OPS_MANAGER','SALES_MANAGER','ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.INVENTORY_WRITE)
     public Map<String, UUID> moveStock(@RequestBody @Valid MoveStockRequest request) {
         return Map.of("eventId", inventoryService.moveStock(request));
     }
 
     @PostMapping("/receive")
-    @PreAuthorize("hasAnyRole('CEO','OPS_MANAGER','SALES_MANAGER','ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.INVENTORY_WRITE)
     public Map<String, UUID> receiveStock(@RequestBody @Valid ReceiveStockRequest request) {
         return Map.of("stockMovementId", inventoryService.receiveStock(request));
     }

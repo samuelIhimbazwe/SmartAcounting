@@ -25,7 +25,7 @@ public class AdminServiceAccountController {
     }
 
     @PostMapping("/keys")
-    @PreAuthorize("@permissionGuard.has(authentication, 'ADMIN_SECURITY_WRITE')")
+    @PreAuthorize("@permissionGuard.has(authentication, 'TENANT_CONFIG')")
     public Map<String, Object> create(@RequestBody @Valid CreateServiceAccountKeyRequest request) {
         ServiceAccountApiKeyService.CreatedKey created = service.create(
             request.serviceAccountName(),
@@ -43,13 +43,13 @@ public class AdminServiceAccountController {
     }
 
     @GetMapping("/keys")
-    @PreAuthorize("@permissionGuard.has(authentication, 'ADMIN_SECURITY_WRITE')")
+    @PreAuthorize("@permissionGuard.has(authentication, 'TENANT_CONFIG')")
     public List<Map<String, Object>> list() {
         return service.list();
     }
 
     @PostMapping("/keys/{id}/revoke")
-    @PreAuthorize("@permissionGuard.has(authentication, 'ADMIN_SECURITY_WRITE')")
+    @PreAuthorize("@permissionGuard.has(authentication, 'TENANT_CONFIG')")
     public Map<String, Object> revoke(@PathVariable UUID id) {
         return service.revoke(id);
     }

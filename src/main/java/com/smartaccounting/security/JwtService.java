@@ -20,6 +20,7 @@ import java.util.Base64;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -49,11 +50,34 @@ public class JwtService {
     }
 
     public String generateToken(UserDetails userDetails, String tenantId, String userId) {
+        return generateToken(userDetails, tenantId, userId, List.of());
+    }
+
+    public String generateToken(
+        UserDetails userDetails,
+        String tenantId,
+        String userId,
+        Collection<String> permissions
+    ) {
         Instant now = Instant.now();
         Instant expiresAt = now.plusSeconds(expirationMinutes * 60);
         Collection<String> roles = userDetails.getAuthorities().stream()
             .map(GrantedAuthority::getAuthority)
+            .filter(a -> a.startsWith("ROLE_"))
             .collect(Collectors.toSet());
+        List<String> permissionList = permissions == null
+            ? List.of()
+            : permissions.stream()
+                .filter(p -> p != null && !p.isBlank())
+                .map(String::trim)
+                .distinct()
+                .sorted()
+                .toList();
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("tenantId", tenantId);
+        claims.put("userId", userId);
+        claims.put("roles", roles);
+        claims.put("permissions", permissionList);
         SecretKey activeKey = Keys.hmacShaKeyFor(resolveActiveSecret().getBytes(StandardCharsets.UTF_8));
         String jti = UUID.randomUUID().toString();
         return Jwts.builder()
@@ -62,11 +86,7 @@ public class JwtService {
             .subject(userDetails.getUsername())
             .issuedAt(Date.from(now))
             .expiration(Date.from(expiresAt))
-            .claims(Map.of(
-                "tenantId", tenantId,
-                "userId", userId,
-                "roles", roles
-            ))
+            .claims(claims)
             .signWith(activeKey)
             .compact();
     }

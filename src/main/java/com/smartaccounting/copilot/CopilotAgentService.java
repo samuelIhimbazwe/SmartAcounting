@@ -34,6 +34,7 @@ public class CopilotAgentService {
     private final ActionQueueService actionQueueService;
     private final CopilotAgentAuditService copilotAgentAuditService;
     private final CopilotToolPolicyService toolPolicyService;
+    private final CopilotActionPlannerService copilotActionPlannerService;
     private final RolePersonaService rolePersonaService;
     private final HrService hrService;
     private final long maxDurationSeconds;
@@ -49,6 +50,7 @@ public class CopilotAgentService {
                                ActionQueueService actionQueueService,
                                CopilotAgentAuditService copilotAgentAuditService,
                                CopilotToolPolicyService toolPolicyService,
+                               CopilotActionPlannerService copilotActionPlannerService,
                                RolePersonaService rolePersonaService,
                                HrService hrService,
                                @Value("${smartaccounting.copilot.agent.execution.max-duration-seconds:45}") long maxDurationSeconds,
@@ -63,6 +65,7 @@ public class CopilotAgentService {
         this.actionQueueService = actionQueueService;
         this.copilotAgentAuditService = copilotAgentAuditService;
         this.toolPolicyService = toolPolicyService;
+        this.copilotActionPlannerService = copilotActionPlannerService;
         this.rolePersonaService = rolePersonaService;
         this.hrService = hrService;
         this.maxDurationSeconds = maxDurationSeconds;
@@ -72,14 +75,21 @@ public class CopilotAgentService {
 
     @Transactional
     public Map<String, Object> run(String role, String question) {
-        return runWithEvents(role, question, null, null, event -> {
+        return runWithEvents(role, question, null, null, Map.of(), event -> {
             // No-op event sink for non-streaming invocation.
         });
     }
 
     @Transactional
     public Map<String, Object> run(String role, String question, Boolean dryRun, Boolean approveActions) {
-        return runWithEvents(role, question, dryRun, approveActions, event -> {
+        return runWithEvents(role, question, dryRun, approveActions, Map.of(), event -> {
+            // No-op event sink for non-streaming invocation.
+        });
+    }
+
+    @Transactional
+    public Map<String, Object> run(String role, String question, Boolean dryRun, Boolean approveActions, Map<String, Object> uiContext) {
+        return runWithEvents(role, question, dryRun, approveActions, uiContext, event -> {
             // No-op event sink for non-streaming invocation.
         });
     }
@@ -89,6 +99,7 @@ public class CopilotAgentService {
                                              String question,
                                              Boolean requestedDryRun,
                                              Boolean approveActions,
+                                             Map<String, Object> uiContext,
                                              Consumer<Map<String, Object>> eventSink) {
         UUID tenantId = requireTenant();
         UUID userId = requireUser();
@@ -152,7 +163,10 @@ public class CopilotAgentService {
             steps.add(personaStep);
             emit(eventSink, Map.of("event", "step", "runId", runId, "payload", personaStep));
             copilotAgentAuditService.log(runId, "STEP_ROLE_PERSONA_ALIGNMENT", personaStep);
-            runTools(context, toolSignals, runId, 3, steps, eventSink);
+            if (uiContext != null && !uiContext.isEmpty()) {
+                toolSignals.put("uiContext", uiContext);
+            }
+            runTools(context, toolSignals, runId, 3, steps, eventSink, uiContext);
 
             assertRunActive(context, runId, 4);
             Map<String, Object> response = copilotService.buildAgentResponse(role, question, docs, toolSignals, steps);
@@ -306,7 +320,8 @@ public class CopilotAgentService {
                           UUID runId,
                           int stepNo,
                           List<Map<String, Object>> steps,
-                          Consumer<Map<String, Object>> eventSink) {
+                          Consumer<Map<String, Object>> eventSink,
+                          Map<String, Object> uiContext) {
         assertRunActive(context, runId, stepNo);
         String role = context.role();
         String question = context.question();
@@ -443,9 +458,9 @@ public class CopilotAgentService {
             emit(eventSink, Map.of("event", "step", "runId", runId, "payload", step));
             copilotAgentAuditService.log(runId, "TOOL_BLOCKED", step);
         }
-        if (normalized.contains("action:")) {
+        if (copilotActionPlannerService.plan(role, question, uiContext == null ? Map.of() : uiContext).isPresent()) {
             assertRunActive(context, runId, stepNo);
-            Map<String, Object> queued = queueActionFromPrompt(role, question, dryRun, approveActions);
+            Map<String, Object> queued = queueActionFromPrompt(role, question, dryRun, approveActions, uiContext);
             String status = String.valueOf(queued.getOrDefault("status", "COMPLETED"));
             toolSignals.put("actionDecision", queued);
             Map<String, Object> step = Map.of("step", stepNo, "type", "TOOL_ACTION_QUEUE_ENQUEUE", "status", status);
@@ -639,44 +654,58 @@ public class CopilotAgentService {
         );
     }
 
-    private Map<String, Object> queueActionFromPrompt(String role, String question, boolean dryRun, Boolean approveActions) {
+    private Map<String, Object> queueActionFromPrompt(
+        String role,
+        String question,
+        boolean dryRun,
+        Boolean approveActions,
+        Map<String, Object> uiContext
+    ) {
         if (!toolPolicyService.canUseTool(role, "ACTION_QUEUE")) {
             return Map.of("status", "BLOCKED", "reason", "role_policy", "type", "AGENT_RECOMMENDATION");
         }
-        if (dryRun) {
+        CopilotActionPlan plan = copilotActionPlannerService.plan(role, question, uiContext == null ? Map.of() : uiContext)
+            .orElse(null);
+        if (plan == null) {
+            return Map.of("status", "SKIPPED", "reason", "no_action_detected", "type", "AGENT_RECOMMENDATION");
+        }
+        Map<String, Object> preview = new LinkedHashMap<>();
+        preview.put("type", plan.type());
+        preview.put("title", plan.title());
+        preview.put("summary", plan.summary());
+        preview.put("permissionCode", plan.permissionCode());
+        preview.put("reversible", plan.reversible());
+        preview.put("warningMessage", plan.warningMessage());
+        preview.put("payload", plan.payload());
+        if (!plan.executable()) {
+            preview.put("missingFields", plan.missingFields());
             return Map.of(
                 "status", "PREVIEW",
-                "reason", "dry_run",
-                "approvalRequired", toolPolicyService.actionNeedsApproval(),
-                "type", "AGENT_RECOMMENDATION",
-                "previewPayload", Map.of("question", question)
-            );
-        }
-        if (toolPolicyService.actionNeedsApproval() && !Boolean.TRUE.equals(approveActions)) {
-            Instant expiresAt = Instant.now().plusSeconds(toolPolicyService.actionApprovalTtlSeconds());
-            UUID approvalId = actionQueueService.enqueuePendingApproval(
-                "AGENT_RECOMMENDATION",
-                "copilot-agent",
-                toJson(Map.of("question", question, "timestamp", Instant.now().toString())),
-                expiresAt
-            );
-            return Map.of(
-                "status", "PENDING_APPROVAL",
+                "reason", "missing_fields",
                 "approvalRequired", true,
-                "approvalId", approvalId,
-                "approvalExpiresAt", expiresAt.toString(),
-                "type", "AGENT_RECOMMENDATION"
+                "type", plan.type(),
+                "previewPayload", preview
             );
         }
-        if (!toolPolicyService.canExecuteActionWrite(role, false, approveActions)) {
-            return Map.of("status", "BLOCKED", "reason", "approval_required", "type", "AGENT_RECOMMENDATION");
+        if (dryRun || !Boolean.TRUE.equals(approveActions)) {
+            return Map.of(
+                "status", "PREVIEW",
+                "reason", dryRun ? "dry_run" : "approval_required",
+                "approvalRequired", true,
+                "type", plan.type(),
+                "previewPayload", preview
+            );
         }
-        UUID id = actionQueueService.enqueue(
-            "AGENT_RECOMMENDATION",
-            "copilot-agent",
-            toJson(Map.of("question", question, "timestamp", Instant.now().toString()))
+        Instant expiresAt = Instant.now().plusSeconds(toolPolicyService.actionApprovalTtlSeconds());
+        UUID approvalId = actionQueueService.enqueuePendingApproval(plan, "copilot-agent", expiresAt);
+        return Map.of(
+            "status", "PENDING_APPROVAL",
+            "approvalRequired", true,
+            "approvalId", approvalId,
+            "approvalExpiresAt", expiresAt.toString(),
+            "type", plan.type(),
+            "previewPayload", preview
         );
-        return Map.of("status", "COMPLETED", "queuedActionId", id, "type", "AGENT_RECOMMENDATION");
     }
 
     private String normalizeRoleForDashboard(String role) {

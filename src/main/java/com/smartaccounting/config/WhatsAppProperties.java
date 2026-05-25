@@ -11,6 +11,8 @@ public class WhatsAppProperties {
     private String bearerToken = "";
     private String phoneNumberId = "";
     private String templateName = "pos_receipt";
+    /** When true, send pre-approved Meta template instead of free-form text. */
+    private boolean useTemplate = false;
     private int connectTimeoutMs = 10000;
     private int readTimeoutMs = 30000;
 
@@ -26,6 +28,8 @@ public class WhatsAppProperties {
     public void setPhoneNumberId(String phoneNumberId) { this.phoneNumberId = phoneNumberId; }
     public String getTemplateName() { return templateName; }
     public void setTemplateName(String templateName) { this.templateName = templateName; }
+    public boolean isUseTemplate() { return useTemplate; }
+    public void setUseTemplate(boolean useTemplate) { this.useTemplate = useTemplate; }
     public int getConnectTimeoutMs() { return connectTimeoutMs; }
     public void setConnectTimeoutMs(int connectTimeoutMs) { this.connectTimeoutMs = connectTimeoutMs; }
     public int getReadTimeoutMs() { return readTimeoutMs; }

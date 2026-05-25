@@ -27,7 +27,7 @@ public class AdminTenantUserController {
     }
 
     @GetMapping
-    @PreAuthorize("@permissionGuard.has(authentication, 'ADMIN_TENANT_WRITE')")
+    @PreAuthorize("@permissionGuard.has(authentication, 'TENANT_CONFIG')")
     public Map<String, Object> list(@PathVariable UUID tenantId,
                                     @RequestParam(defaultValue = "0") int page,
                                     @RequestParam(defaultValue = "20") int size,
@@ -36,17 +36,17 @@ public class AdminTenantUserController {
     }
 
     @PostMapping("/invites")
-    @PreAuthorize("@permissionGuard.has(authentication, 'ADMIN_TENANT_WRITE')")
+    @PreAuthorize("@permissionGuard.has(authentication, 'TENANT_CONFIG')")
     public Map<String, Object> invite(@PathVariable UUID tenantId,
                                       @RequestBody @Valid InviteTenantUserRequest request) {
-        return service.invite(tenantId, request.email(), request.role());
+        return service.invite(tenantId, request.email(), request.role(), request.roleId());
     }
 
     @PatchMapping("/{userId}")
-    @PreAuthorize("@permissionGuard.has(authentication, 'ADMIN_TENANT_WRITE')")
+    @PreAuthorize("@permissionGuard.has(authentication, 'TENANT_CONFIG')")
     public Map<String, Object> updateRole(@PathVariable UUID tenantId,
                                           @PathVariable UUID userId,
                                           @RequestBody @Valid UpdateTenantUserRoleRequest request) {
-        return service.updateRole(tenantId, userId, request.role());
+        return service.updateRole(tenantId, userId, request.role(), request.roleId());
     }
 }

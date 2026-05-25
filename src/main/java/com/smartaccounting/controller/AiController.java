@@ -10,9 +10,12 @@ import com.smartaccounting.dto.CopilotWhatIfRequest;
 import com.smartaccounting.forecast.ForecastService;
 import com.smartaccounting.service.ActionQueueService;
 import com.smartaccounting.service.AiAnalyticsService;
+import com.smartaccounting.dto.SuggestPermissionsRequest;
+import com.smartaccounting.service.RolePermissionSuggestionService;
 import com.smartaccounting.service.ForecastJobService;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -41,6 +44,7 @@ public class AiController {
     private final ActionQueueService actionQueueService;
     private final AnomalyService anomalyService;
     private final AiAnalyticsService aiAnalyticsService;
+    private final RolePermissionSuggestionService rolePermissionSuggestionService;
 
     public AiController(CopilotService copilotService,
                         CopilotAgentService copilotAgentService,
@@ -48,7 +52,8 @@ public class AiController {
                         ForecastJobService forecastJobService,
                         ActionQueueService actionQueueService,
                         AnomalyService anomalyService,
-                        AiAnalyticsService aiAnalyticsService) {
+                        AiAnalyticsService aiAnalyticsService,
+                        RolePermissionSuggestionService rolePermissionSuggestionService) {
         this.copilotService = copilotService;
         this.copilotAgentService = copilotAgentService;
         this.forecastService = forecastService;
@@ -56,9 +61,11 @@ public class AiController {
         this.actionQueueService = actionQueueService;
         this.anomalyService = anomalyService;
         this.aiAnalyticsService = aiAnalyticsService;
+        this.rolePermissionSuggestionService = rolePermissionSuggestionService;
     }
 
     @GetMapping("/copilot/provider-status")
+    @PreAuthorize(PermissionExpressions.AI_COPILOT)
     public Map<String, Object> copilotProviderStatus() {
         boolean ready = copilotService.isAnthropicConfigured();
         return Map.of(
@@ -73,13 +80,13 @@ public class AiController {
     }
 
     @PostMapping("/copilot/query")
-    @PreAuthorize("@roleScopeGuard.canAccessRole(authentication, #request.role)")
+    @PreAuthorize(PermissionExpressions.AI_COPILOT + " and @roleScopeGuard.canAccessRole(authentication, #request.role)")
     public Map<String, Object> copilotQuery(@RequestBody @Valid CopilotQueryRequest request) {
         return copilotService.query(request.role(), request.question());
     }
 
     @PostMapping(value = "/copilot/query/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @PreAuthorize("@roleScopeGuard.canAccessRole(authentication, #request.role)")
+    @PreAuthorize(PermissionExpressions.AI_COPILOT + " and @roleScopeGuard.canAccessRole(authentication, #request.role)")
     public SseEmitter copilotQueryStream(@RequestBody @Valid CopilotQueryRequest request) {
         SseEmitter emitter = new SseEmitter(180_000L);
         copilotService.queryCopilotAnswerStream(request.role(), request.question())
@@ -106,24 +113,24 @@ public class AiController {
     }
 
     @PostMapping("/copilot/whatif")
-    @PreAuthorize("@roleScopeGuard.canAccessRole(authentication, #request.role)")
+    @PreAuthorize(PermissionExpressions.AI_COPILOT + " and @roleScopeGuard.canAccessRole(authentication, #request.role)")
     public Map<String, Object> copilotWhatIf(@RequestBody @Valid CopilotWhatIfRequest request) {
         return copilotService.whatIf(request.role(), request.scenario());
     }
 
     @PostMapping("/copilot/agent/run")
-    @PreAuthorize("@roleScopeGuard.canAccessRole(authentication, #request.role)")
+    @PreAuthorize(PermissionExpressions.AI_COPILOT + " and @roleScopeGuard.canAccessRole(authentication, #request.role)")
     public Map<String, Object> copilotAgentRun(@RequestBody @Valid CopilotAgentRunRequest request) {
-        return copilotAgentService.run(request.role(), request.question(), request.dryRun(), request.approveActions());
+        return copilotAgentService.run(request.role(), request.question(), request.dryRun(), request.approveActions(), request.uiContext());
     }
 
     @PostMapping(value = "/copilot/agent/run/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @PreAuthorize("@roleScopeGuard.canAccessRole(authentication, #request.role)")
+    @PreAuthorize(PermissionExpressions.AI_COPILOT + " and @roleScopeGuard.canAccessRole(authentication, #request.role)")
     public SseEmitter copilotAgentRunStream(@RequestBody @Valid CopilotAgentRunRequest request) {
         SseEmitter emitter = new SseEmitter(60_000L);
         CompletableFuture.runAsync(() -> {
             try {
-                copilotAgentService.runWithEvents(request.role(), request.question(), request.dryRun(), request.approveActions(), event -> {
+                copilotAgentService.runWithEvents(request.role(), request.question(), request.dryRun(), request.approveActions(), request.uiContext(), event -> {
                     try {
                         String eventName = String.valueOf(event.getOrDefault("event", "message"));
                         emitter.send(SseEmitter.event().name(eventName).data(event));
@@ -146,33 +153,39 @@ public class AiController {
     }
 
     @GetMapping("/copilot/agent/runs/{id}")
+    @PreAuthorize(PermissionExpressions.AI_COPILOT)
     public Map<String, Object> copilotAgentRunStatus(@PathVariable UUID id) {
         return copilotAgentService.runStatus(id);
     }
 
     @GetMapping("/copilot/agent/runs")
+    @PreAuthorize(PermissionExpressions.AI_COPILOT)
     public java.util.List<Map<String, Object>> copilotAgentRuns(@RequestParam(defaultValue = "0") int page,
                                                                  @RequestParam(defaultValue = "20") int size) {
         return copilotAgentService.runs(page, size);
     }
 
     @PostMapping("/copilot/agent/runs/{id}/cancel")
+    @PreAuthorize(PermissionExpressions.AI_COPILOT)
     public Map<String, Object> cancelAgentRun(@PathVariable UUID id) {
         return copilotAgentService.cancel(id);
     }
 
     @GetMapping("/copilot/agent/approvals")
+    @PreAuthorize(PermissionExpressions.AI_COPILOT)
     public java.util.List<Map<String, Object>> pendingApprovals(@RequestParam(defaultValue = "0") int page,
                                                                  @RequestParam(defaultValue = "20") int size) {
         return actionQueueService.pendingApprovals(page, size);
     }
 
     @PostMapping("/copilot/agent/approvals/{id}/approve")
+    @PreAuthorize(PermissionExpressions.AI_COPILOT)
     public Map<String, Object> approveAction(@PathVariable UUID id) {
         return actionQueueService.approve(id);
     }
 
     @PostMapping("/copilot/agent/approvals/{id}/reject")
+    @PreAuthorize(PermissionExpressions.AI_COPILOT)
     public Map<String, Object> rejectAction(@PathVariable UUID id,
                                             @RequestBody(required = false) ActionApprovalDecisionRequest request) {
         String reason = request == null ? null : request.reason();
@@ -180,37 +193,55 @@ public class AiController {
     }
 
     @PostMapping("/copilot/agent/approvals/expire")
+    @PreAuthorize(PermissionExpressions.AI_COPILOT)
     public Map<String, Object> expireApprovals() {
         return Map.of("expired", actionQueueService.expirePendingApprovals());
     }
 
+    @GetMapping("/copilot/actions/recent")
+    @PreAuthorize(PermissionExpressions.AI_COPILOT)
+    public java.util.List<Map<String, Object>> recentActions(@RequestParam(defaultValue = "10") int size) {
+        return actionQueueService.recentActions(size);
+    }
+
+    @PostMapping("/copilot/actions/{id}/undo")
+    @PreAuthorize(PermissionExpressions.AI_COPILOT)
+    public Map<String, Object> undoAction(@PathVariable UUID id) {
+        return actionQueueService.undo(id);
+    }
+
     @GetMapping("/forecast/{metric}")
+    @PreAuthorize(PermissionExpressions.AI_COPILOT + " and " + PermissionExpressions.ANALYTICS_ANY)
     public Map<String, Object> forecast(@PathVariable String metric) {
         return forecastService.forecast(metric);
     }
 
     @PostMapping("/forecast/jobs/{metric}")
+    @PreAuthorize(PermissionExpressions.AI_COPILOT + " and " + PermissionExpressions.ANALYTICS_ANY)
     public Map<String, Object> enqueueForecast(@PathVariable String metric) {
         return Map.of("jobId", forecastJobService.enqueue(metric));
     }
 
     @GetMapping("/forecast/jobs/{id}")
+    @PreAuthorize(PermissionExpressions.AI_COPILOT + " and " + PermissionExpressions.ANALYTICS_ANY)
     public Map<String, Object> forecastJob(@PathVariable UUID id) {
         return forecastJobService.get(id);
     }
 
     @GetMapping("/anomalies/explain/{id}")
+    @PreAuthorize(PermissionExpressions.AI_COPILOT + " and " + PermissionExpressions.ANALYTICS_ANY)
     public Map<String, Object> explain(@PathVariable String id) {
         return anomalyService.explain(id);
     }
 
     @GetMapping("/briefing/{role}")
-    @PreAuthorize("@roleScopeGuard.canAccessRole(authentication, #role)")
+    @PreAuthorize(PermissionExpressions.AI_COPILOT + " and @roleScopeGuard.canAccessRole(authentication, #role)")
     public Map<String, Object> briefing(@PathVariable String role) {
         return copilotService.briefing(role);
     }
 
     @PostMapping("/analytics/demand-forecast")
+    @PreAuthorize(PermissionExpressions.AI_COPILOT + " and " + PermissionExpressions.ANALYTICS_ANY)
     public Map<String, Object> demandForecast(@RequestBody(required = false) Map<String, Object> body) {
         int days = 7;
         if (body != null && body.get("horizonDays") instanceof Number n) {
@@ -220,18 +251,19 @@ public class AiController {
     }
 
     @GetMapping("/reorder-suggestions")
+    @PreAuthorize(PermissionExpressions.AI_COPILOT + " and " + PermissionExpressions.ANALYTICS_ANY)
     public Map<String, Object> reorderSuggestions() {
         return aiAnalyticsService.reorderSuggestions();
     }
 
     @PostMapping("/reorder-suggestions/approve-all")
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('CEO', 'CFO', 'OPS_MANAGER')")
+    @PreAuthorize(PermissionExpressions.AI_COPILOT + " and " + PermissionExpressions.PROCUREMENT_WRITE)
     public Map<String, Object> approveAllReorderSuggestions() {
         return aiAnalyticsService.approveAllReorderSuggestions(com.smartaccounting.tenant.TenantContext.userId());
     }
 
     @PostMapping("/analytics/demand-forecast/create-pos")
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('CEO', 'CFO', 'OPS_MANAGER')")
+    @PreAuthorize(PermissionExpressions.AI_COPILOT + " and " + PermissionExpressions.PROCUREMENT_WRITE)
     public Map<String, Object> createPosFromForecast(@RequestBody(required = false) Map<String, Object> body) {
         @SuppressWarnings("unchecked")
         List<String> productIds = body != null && body.get("productIds") instanceof List<?> list
@@ -240,7 +272,17 @@ public class AiController {
         return aiAnalyticsService.approveForecastGaps(productIds, com.smartaccounting.tenant.TenantContext.userId());
     }
 
+    @PostMapping("/suggest-permissions")
+    @PreAuthorize(PermissionExpressions.AI_COPILOT + " and @permissionGuard.has(authentication, 'ROLE_MANAGE')")
+    public Map<String, Object> suggestPermissions(@RequestBody @Valid SuggestPermissionsRequest request) {
+        return Map.of(
+            "roleName", request.roleName().trim(),
+            "permissionCodes", rolePermissionSuggestionService.suggest(request.roleName())
+        );
+    }
+
     @PostMapping("/analytics/cash-flow-forecast")
+    @PreAuthorize(PermissionExpressions.AI_COPILOT + " and " + PermissionExpressions.ANALYTICS_ANY)
     public Map<String, Object> cashFlowForecast(@RequestBody(required = false) Map<String, Object> body) {
         int days = 30;
         if (body != null && body.get("days") instanceof Number n) {

@@ -1,16 +1,18 @@
 import { type FormEvent, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { AlertCircle, ArrowRight, Eye, EyeOff, LogIn } from 'lucide-react'
 import { login } from '../../shared/api/auth'
 import { isApiError, normalizeApiError } from '../../shared/api/errors'
+import { resolvePostLoginRoute } from '../../shared/routing/postLoginRoute'
 import { useAuthStore } from '../../shared/stores/authStore'
-import { rolePathMap, roles, type Role } from '../../shared/types/roles'
+import { AuthLayout } from './AuthLayout'
 
 export function LoginPage() {
   const { t } = useTranslation()
-  const [username, setUsername] = useState('ceo')
-  const [password, setPassword] = useState('password')
-  const [selectedRole, setSelectedRole] = useState<Role>('CEO')
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const navigate = useNavigate()
@@ -22,9 +24,12 @@ export function LoginPage() {
     setError(null)
     try {
       const response = await login({ username, password, tenantId, userId })
-      const role = response.role ?? selectedRole
       setSession({
-        role,
+        role: response.role,
+        permissions: response.permissions,
+        assignedRoles: response.assignedRoles,
+        effectiveRoleProfile: response.effectiveRoleProfile,
+        setupComplete: response.setupComplete,
         accessToken: response.accessToken,
         refreshToken: response.refreshToken,
         expiresAt: response.expiresAt,
@@ -34,12 +39,21 @@ export function LoginPage() {
       if (response.tenantId) {
         setTenantId(response.tenantId)
       }
-      navigate(`/dashboard/${rolePathMap[role]}`)
+      navigate(
+        resolvePostLoginRoute(
+          response.setupComplete,
+          response.role,
+          response.permissions,
+          response.assignedRoles,
+          response.effectiveRoleProfile,
+        ),
+      )
     } catch (caughtError) {
       const apiError = normalizeApiError(caughtError)
-      setError(apiError.message)
       if (isApiError(apiError) && apiError.status === 401) {
         setError(t('auth.invalidCredentials'))
+      } else {
+        setError(apiError.message)
       }
     } finally {
       setSubmitting(false)
@@ -47,87 +61,96 @@ export function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[var(--surface-raised)] p-4">
-      <form
-        className="w-full max-w-md space-y-4 rounded-2xl border border-[var(--border-subtle)] bg-white p-6 shadow-[var(--shadow-card)]"
-        onSubmit={onSubmit}
-      >
-        <div>
-          <h1 className="m-0 font-[var(--font-display)] text-2xl font-bold text-[var(--color-brand-900)]">{t('auth.appName')}</h1>
-          <p className="m-0 mt-1 text-sm text-neutral-600">{t('auth.loginSubtitle')}</p>
-        </div>
+    <AuthLayout>
+      <form className="auth-card" onSubmit={onSubmit}>
+        <p className="auth-card__eyebrow">{t('auth.appName')}</p>
+        <h1 className="auth-card__title">{t('auth.loginWelcomeBack')}</h1>
+        <p className="auth-card__subtitle">{t('auth.loginIntro')}</p>
 
-        <label className="block text-sm">
-          {t('auth.tenantLabel')}
-          <input
-            id="tenant-id"
-            className="mt-1 w-full rounded-md border border-[var(--border-default)] px-3 py-2"
-            value={tenantId}
-            onChange={(event) => setTenantId(event.target.value)}
-            autoComplete="organization"
-            required
-          />
-        </label>
+        {error && (
+          <div className="auth-alert" role="alert" aria-live="assertive">
+            <AlertCircle size={16} strokeWidth={2} />
+            <span>{error}</span>
+          </div>
+        )}
 
-        <label className="block text-sm">
-          {t('auth.usernameLabel')}
+        <label className="auth-field">
+          <span className="auth-field__label">{t('auth.usernameLabel')}</span>
           <input
-            id="username"
-            className="mt-1 w-full rounded-md border border-[var(--border-default)] px-3 py-2"
+            type="text"
+            className="auth-input"
             value={username}
             onChange={(event) => setUsername(event.target.value)}
             autoComplete="username"
             required
             aria-invalid={Boolean(error)}
-            aria-describedby={error ? 'login-error' : undefined}
           />
         </label>
 
-        <label className="block text-sm">
-          {t('auth.passwordLabel')}
-          <input
-            id="password"
-            className="mt-1 w-full rounded-md border border-[var(--border-default)] px-3 py-2"
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            autoComplete="current-password"
-            required
-            aria-invalid={Boolean(error)}
-            aria-describedby={error ? 'login-error' : undefined}
-          />
+        <label className="auth-field">
+          <span className="auth-field__label">
+            {t('auth.passwordLabel')}
+            <Link to="/forgot-password" className="auth-field__label-secondary">
+              {t('auth.loginForgotPassword')}
+            </Link>
+          </span>
+          <span className="auth-input-wrap">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              className="auth-input"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete="current-password"
+              required
+              aria-invalid={Boolean(error)}
+            />
+            <button
+              type="button"
+              className="auth-input__toggle"
+              onClick={() => setShowPassword((prev) => !prev)}
+              aria-label={showPassword ? t('auth.loginHidePassword') : t('auth.loginShowPassword')}
+            >
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </span>
         </label>
 
-        <label className="block text-sm">
-          {t('auth.roleLabel')}
-          <select
-            id="role"
-            className="mt-1 w-full rounded-md border border-[var(--border-default)] px-3 py-2"
-            value={selectedRole}
-            onChange={(event) => setSelectedRole(event.target.value as Role)}
-          >
-            {roles.map((role) => (
-              <option key={role} value={role}>
-                {role}
-              </option>
-            ))}
-          </select>
-        </label>
+        <details className="auth-advanced">
+          <summary className="auth-advanced__summary">{t('auth.loginAdvancedToggle')}</summary>
+          <p className="auth-advanced__hint">{t('auth.loginAdvancedHelper')}</p>
+          <label className="auth-field">
+            <span className="auth-field__label">{t('auth.tenantLabel')}</span>
+            <input
+              className="auth-input"
+              value={tenantId}
+              onChange={(event) => setTenantId(event.target.value)}
+              autoComplete="organization"
+            />
+          </label>
+        </details>
 
-        {error && (
-          <p id="login-error" className="m-0 text-xs text-amber-700" role="alert" aria-live="assertive">
-            {error}
-          </p>
-        )}
         <button
           type="submit"
-          className="w-full rounded-md bg-[var(--color-brand-700)] px-3 py-2 font-medium text-white disabled:opacity-70"
+          className="auth-btn auth-btn--primary"
           disabled={submitting}
           aria-busy={submitting}
         >
-          {submitting ? t('auth.signingIn') : t('auth.signIn')}
+          {submitting ? (
+            t('auth.signingIn')
+          ) : (
+            <>
+              <LogIn size={16} strokeWidth={2} />
+              {t('auth.signIn')}
+              <ArrowRight size={16} strokeWidth={2} />
+            </>
+          )}
         </button>
+
+        <p className="auth-card__footer">
+          {t('auth.loginNewHere')}{' '}
+          <Link to="/signup">{t('auth.loginCreateLink')}</Link>
+        </p>
       </form>
-    </main>
+    </AuthLayout>
   )
 }

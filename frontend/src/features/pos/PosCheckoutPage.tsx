@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { FlowGuide } from '../../shared/components/ui/FlowGuide'
 import { posCheckoutFlowGuide, resolveFlowGuideSteps } from '../../shared/content/flowGuides'
 import { useTranslation } from 'react-i18next'
 import { Minus, Plus, Printer, ScanBarcode, ShoppingBag, Wallet } from 'lucide-react'
+import { MomoPaymentModal } from '../../components/pos/MomoPaymentModal'
+import { ReceiptDeliveryModal } from '../../components/pos/ReceiptDeliveryModal'
+import { appendPosSaleHistory, primaryTenderLabel } from '../../services/posSaleHistory'
+import { useAuthStore } from '../../shared/stores/authStore'
 import {
   posCheckout,
   posCreateCatalogItem,
@@ -23,6 +28,10 @@ import { printReceipt, printViaWebBluetooth, printViaWebSerial } from '../../hoo
 import { isDesktop } from '../../utils/platform'
 import { connectHidScanner } from '../../hooks/useWebHidScanner'
 import { BrowserCompatibilityBanner } from './BrowserCompatibilityBanner'
+import { EfdStatusBadge } from '../../components/fiscal/EfdStatusBadge'
+import { useEfdQueue } from '../../hooks/useEfdQueue'
+import { usePermission } from '../../hooks/usePermission'
+import { buildPosEfdCheckoutPayload } from '../../services/fiscal/efdCheckout'
 
 type CartLine = {
   key: string
@@ -57,6 +66,7 @@ function printHtmlFragment(html: string) {
 
 export function PosCheckoutPage() {
   const { t } = useTranslation()
+  const { submitEfd } = useEfdQueue()
   const posGuide = useMemo(() => resolveFlowGuideSteps(t, posCheckoutFlowGuide), [t])
   const scanId = useId()
   const currencyDatalistId = useId().replace(/:/g, '')
@@ -88,6 +98,15 @@ export function PosCheckoutPage() {
   const [card, setCard] = useState('')
   const [momoRef, setMomoRef] = useState('')
   const [airtelRef, setAirtelRef] = useState('')
+  const [momoVerified, setMomoVerified] = useState(false)
+  const [airtelVerified, setAirtelVerified] = useState(false)
+  const [momoModalOpen, setMomoModalOpen] = useState(false)
+  const [airtelModalOpen, setAirtelModalOpen] = useState(false)
+  const [deliveryOpen, setDeliveryOpen] = useState(false)
+  const userId = useAuthStore((s) => s.userId)
+  const canDiscount = usePermission('POS_DISCOUNT')
+  const canReturns = usePermission('POS_RETURNS')
+  const [discountAmount, setDiscountAmount] = useState('')
   const [onAcct, setOnAcct] = useState('')
   const [onAcctCustomer, setOnAcctCustomer] = useState('')
   const linesRef = useRef<CartLine[]>([])
@@ -208,6 +227,14 @@ export function PosCheckoutPage() {
     return sum
   }, [lines])
 
+  const payableTotal = useMemo(() => {
+    if (!canDiscount) {
+      return total
+    }
+    const discount = Number(discountAmount || '0')
+    return Math.max(0, Number(total) - discount).toFixed(2)
+  }, [canDiscount, discountAmount, total])
+
   const addFromScan = useCallback(() => void addBarcodeToCart(barcode), [addBarcodeToCart, barcode])
 
   const onScanKey = (e: React.KeyboardEvent) => {
@@ -237,7 +264,7 @@ export function PosCheckoutPage() {
   }, [cash, momo, airtel, card, onAcct])
 
   const fillRemainder = () => {
-    const rem = (Number(total) - Number(tenderSum)).toFixed(2)
+    const rem = (Number(payableTotal) - Number(tenderSum)).toFixed(2)
     const r = Number(rem)
     if (r <= 0) return
     if (!Number(cash || '0')) setCash(rem)
@@ -275,8 +302,16 @@ export function PosCheckoutPage() {
       setError(t('pos.fxRequired'))
       return
     }
-    if (Math.abs(Number(tenderSum) - Number(total)) > 0.009) {
-      setError(t('pos.tenderMismatch', { tenderSum, total }))
+    if (Math.abs(Number(tenderSum) - Number(payableTotal)) > 0.009) {
+      setError(t('pos.tenderMismatch', { tenderSum, total: payableTotal }))
+      return
+    }
+    if (Number(momo || '0') > 0 && !momoVerified) {
+      setError('Verify MTN MoMo payment before completing the sale.')
+      return
+    }
+    if (Number(airtel || '0') > 0 && !airtelVerified) {
+      setError('Verify Airtel Money payment before completing the sale.')
       return
     }
     const checkoutPayload = {
@@ -288,14 +323,37 @@ export function PosCheckoutPage() {
       ...(Number(onAcct || '0') > 0 ? { onAccountCustomerName: onAcctCustomer.trim() } : {}),
     }
 
-    // Offline path: persist the sale locally and clear the cart. The
-    // OfflineBanner will surface the pending count globally and drain the
-    // queue automatically when connectivity returns.
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    // Desktop offline: queue locally in SQLite (Sprint 4).
+    if (typeof navigator !== 'undefined' && !navigator.onLine && isDesktop()) {
       setBusy(true)
       try {
-        await queueOfflineSale(checkoutPayload)
-        setError('Sale saved offline. Will sync when connected.')
+        const { localId } = await queueOfflineSale(checkoutPayload)
+        const offlineReceipt = `OFFLINE-${localId.slice(0, 8).toUpperCase()}`
+        setLastSalesOrderId(localId)
+        setReceipt({
+          text: `Offline sale queued.\nReceipt: ${offlineReceipt}\nWill sync when connected.`,
+          html: `<div><p><strong>Sale saved offline</strong></p><p>Receipt: <code>${offlineReceipt}</code></p><p>Will sync when connected.</p></div>`,
+        })
+        appendPosSaleHistory({
+          salesOrderId: localId,
+          receiptNumber: offlineReceipt,
+          createdAt: new Date().toISOString(),
+          customerName: customer.trim() || 'Walk-in',
+          cashierId: userId,
+          registerCode: register || undefined,
+          itemCount: lines.length,
+          totalAmount: Number(total),
+          currencyCode: currency,
+          primaryTender: primaryTenderLabel(tenders),
+          status: 'OFFLINE_PENDING',
+          tenders,
+          lines: lines.map((l) => ({
+            product: l.displayName,
+            quantity: l.quantity,
+            unitPrice: Number(l.displayUnit),
+            lineTotal: Number(l.displayUnit) * l.quantity,
+          })),
+        })
         setLines([])
         setCash('')
         setMomo('')
@@ -313,18 +371,61 @@ export function PosCheckoutPage() {
       return
     }
 
+    const cartSnapshot = lines.map((l) => ({
+      displayName: l.displayName,
+      displayUnit: l.displayUnit,
+      quantity: l.quantity,
+    }))
+    const tendersSnapshot = [...tenders]
+
     setBusy(true)
     try {
       const result = await posCheckout(checkoutPayload)
       setLastSalesOrderId(result.salesOrderId)
       setReceipt({ text: result.receiptText, html: result.receiptHtml })
+      let receiptNumber = result.salesOrderId
       try {
         setPrintingReceipt(true)
         const printed = await posPrintReceipt(result.salesOrderId)
         setPrintedReceipt(printed)
+        receiptNumber = printed.transactionId || result.salesOrderId
       } finally {
         setPrintingReceipt(false)
       }
+
+      const efdPayload = buildPosEfdCheckoutPayload({
+        salesOrderId: result.salesOrderId,
+        receiptNumber,
+        cartLines: cartSnapshot,
+        tenders: tendersSnapshot,
+        currencyCode: currency,
+        totalAmount: Number(result.totalAmount ?? total),
+      })
+      void submitEfd(efdPayload).catch(() => {
+        /* Non-blocking: local queue + badge handle retry */
+      })
+
+      appendPosSaleHistory({
+        salesOrderId: result.salesOrderId,
+        receiptNumber: receiptNumber.slice(0, 8).toUpperCase(),
+        createdAt: new Date().toISOString(),
+        customerName: customer.trim() || 'Walk-in',
+        cashierId: userId,
+        registerCode: register || undefined,
+        itemCount: cartSnapshot.length,
+        totalAmount: Number(result.totalAmount ?? total),
+        currencyCode: currency,
+        primaryTender: primaryTenderLabel(tendersSnapshot),
+        status: 'COMPLETED',
+        tenders: tendersSnapshot,
+        lines: cartSnapshot.map((l) => ({
+          product: l.displayName,
+          quantity: l.quantity,
+          unitPrice: Number(l.displayUnit),
+          lineTotal: Number(l.displayUnit) * l.quantity,
+        })),
+      })
+
       setLines([])
       setCash('')
       setMomo('')
@@ -332,6 +433,8 @@ export function PosCheckoutPage() {
       setCard('')
       setMomoRef('')
       setAirtelRef('')
+      setMomoVerified(false)
+      setAirtelVerified(false)
       setOnAcct('')
       setOnAcctCustomer('')
     } catch (e) {
@@ -404,20 +507,28 @@ export function PosCheckoutPage() {
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-8rem)] flex-col gap-4">
+    <div className="pos-checkout page-container--wide">
       <BrowserCompatibilityBanner />
 
       <FlowGuide title={posGuide.title} steps={posGuide.steps} />
 
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] pb-4">
+      <header className="page-header page-header--split border-b border-[var(--border-subtle)] pb-4">
         <div className="flex items-center gap-2">
-          <ShoppingBag className="h-8 w-8 text-[var(--color-brand-700)]" aria-hidden />
+          <ShoppingBag className="h-8 w-8 shrink-0 text-[var(--color-brand-700)]" aria-hidden />
           <div>
-            <h1 className="m-0 font-[var(--font-display)] text-2xl font-bold text-neutral-900">{t('pos.title')}</h1>
-            <p className="m-0 text-sm text-neutral-600">{t('pos.subtitle')}</p>
+            <h1 className="page-title">{t('pos.title')}</h1>
+            <p className="page-lead">{t('pos.subtitle')}</p>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2 text-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          {canReturns ? (
+            <Link
+              to="/returns"
+              className="rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-sm text-[var(--color-brand-800)] no-underline hover:bg-neutral-50"
+            >
+              {t('nav.returns')}
+            </Link>
+          ) : null}
           <label className="flex items-center gap-1">
             <span className="text-neutral-600">{t('pos.currency')}</span>
             <input
@@ -450,8 +561,8 @@ export function PosCheckoutPage() {
         </div>
       </header>
 
-      <div className="grid flex-1 gap-4 lg:grid-cols-2">
-        <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--color-surface)] p-4 shadow-sm">
+      <div className="pos-checkout__grid">
+        <section className="surface-card">
           <div className="mb-3 flex items-center gap-2 text-sm font-medium text-neutral-800">
             <ScanBarcode className="h-4 w-4" />
             {t('pos.scan')}
@@ -462,7 +573,7 @@ export function PosCheckoutPage() {
               ref={scanRef}
               id={scanId}
               autoComplete="off"
-              className="min-w-0 flex-1 rounded-lg border-2 border-[var(--color-brand-300)] px-3 py-3 text-lg outline-none focus:border-[var(--color-brand-600)]"
+              className="ui-input pos-scan-input min-w-0 flex-1 border-2 border-[var(--color-brand-300)] focus:border-[var(--color-brand-600)]"
               placeholder={t('pos.scanPlaceholder')}
               value={barcode}
               onChange={(e) => setBarcode(e.target.value)}
@@ -472,7 +583,7 @@ export function PosCheckoutPage() {
             />
             <button
               type="button"
-              className="rounded-lg bg-[var(--color-brand-700)] px-4 py-2 font-medium text-white hover:bg-[var(--color-brand-800)] disabled:opacity-50"
+              className="btn btn--primary shrink-0"
               onClick={() => void addFromScan()}
               disabled={busy}
             >
@@ -583,46 +694,61 @@ export function PosCheckoutPage() {
           </label>
         </section>
 
-        <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--color-surface)] p-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
+        <section className="surface-card">
+          <div className="mb-3 flex items-center justify-between gap-2">
             <span className="text-sm font-medium text-neutral-800">{t('pos.cart')}</span>
-            <span className="text-lg font-bold text-[var(--color-brand-900)]">
-              {total} {currency}
+            <span className="text-lg font-bold tabular-nums text-[var(--color-brand-900)]">
+              {payableTotal} {currency}
             </span>
           </div>
-          <ul className="max-h-64 space-y-2 overflow-auto">
+          {canDiscount ? (
+            <label className="mb-3 block text-sm">
+              <span className="text-neutral-600">{t('pos.discount', { defaultValue: 'Discount (RWF)' })}</span>
+              <input
+                className="mt-1 w-full max-w-xs rounded border border-[var(--border-subtle)] px-2 py-2"
+                inputMode="decimal"
+                value={discountAmount}
+                onChange={(e) => setDiscountAmount(e.target.value)}
+                placeholder="0"
+              />
+            </label>
+          ) : null}
+          <ul className="pos-cart-list space-y-2">
             {lines.map((l) => (
               <li
                 key={l.key}
-                className={`flex items-center justify-between gap-2 rounded-lg border px-2 py-2 text-sm ${
-                  l.convertError ? 'border-amber-400 bg-amber-50' : 'border-[var(--border-subtle)]'
-                }`}
+                className={`pos-cart-line ${l.convertError ? 'border-amber-400 bg-amber-50' : ''}`}
               >
-                <div className="min-w-0 flex-1">
+                <div className="pos-cart-line__info min-w-0">
                   <div className="truncate font-medium">{l.displayName}</div>
                   <div className="text-xs text-neutral-500">{l.barcode}</div>
                   {l.currencyCode !== currency && (
                     <div className="text-xs text-neutral-500">
                       {t('pos.catalogNative')}: {l.unitPrice} {l.currencyCode}
-                      {l.convertError && ` â€” ${t('pos.fxMissing')}`}
+                      {l.convertError && ` — ${t('pos.fxMissing')}`}
                     </div>
                   )}
                 </div>
                 <div className="flex items-center gap-1">
-                  <button type="button" className="rounded border p-1" onClick={() => bumpQty(l.key, -1)} aria-label="dec">
+                  <button type="button" className="pos-qty-btn" onClick={() => bumpQty(l.key, -1)} aria-label="decrease quantity">
                     <Minus className="h-4 w-4" />
                   </button>
-                  <span className="w-8 text-center">{l.quantity}</span>
-                  <button type="button" className="rounded border p-1" onClick={() => bumpQty(l.key, 1)} aria-label="inc">
+                  <span className="min-w-[2rem] text-center font-semibold tabular-nums">{l.quantity}</span>
+                  <button type="button" className="pos-qty-btn" onClick={() => bumpQty(l.key, 1)} aria-label="increase quantity">
                     <Plus className="h-4 w-4" />
                   </button>
                 </div>
-                <div className="w-28 text-right">
-                  <div>{decMul(l.displayUnit, l.quantity)}</div>
-                  <div className="text-[10px] font-normal text-neutral-500">{currency}</div>
+                <div className="text-right tabular-nums">
+                  <div className="font-medium">{decMul(l.displayUnit, l.quantity)}</div>
+                  <div className="text-[10px] text-neutral-500">{currency}</div>
                 </div>
-                <button type="button" className="text-red-600" onClick={() => removeLine(l.key)}>
-                  Ã—
+                <button
+                  type="button"
+                  className="btn btn--sm btn--ghost text-red-600"
+                  onClick={() => removeLine(l.key)}
+                  aria-label="remove line"
+                >
+                  ×
                 </button>
               </li>
             ))}
@@ -631,10 +757,15 @@ export function PosCheckoutPage() {
         </section>
       </div>
 
-      <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--color-brand-10)] p-4">
-        <div className="mb-3 flex items-center gap-2 text-sm font-medium text-neutral-800">
-          <Wallet className="h-4 w-4" />
-          {t('pos.tenders')}
+      <section className="pos-tenders-panel surface-card bg-[var(--color-brand-10)]">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm font-medium text-neutral-800">
+          <span className="inline-flex items-center gap-2">
+            <Wallet className="h-4 w-4" />
+            {t('pos.tenders')}
+          </span>
+          <Link to="/pos/history" className="text-xs font-normal text-[var(--color-brand-700)] no-underline hover:underline">
+            Sale history
+          </Link>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <label className="text-sm">
@@ -642,12 +773,48 @@ export function PosCheckoutPage() {
             <input className="mt-1 w-full rounded border px-2 py-2" inputMode="decimal" value={cash} onChange={(e) => setCash(e.target.value)} />
           </label>
           <label className="text-sm">
-            <span className="text-neutral-600">{t('pos.momo')}</span>
-            <input className="mt-1 w-full rounded border px-2 py-2" inputMode="decimal" value={momo} onChange={(e) => setMomo(e.target.value)} />
+            <span className="text-neutral-600">Mobile Money (MoMo)</span>
+            <input
+              className="mt-1 w-full rounded border px-2 py-2"
+              inputMode="decimal"
+              value={momo}
+              onChange={(e) => {
+                setMomo(e.target.value)
+                setMomoVerified(false)
+                setMomoRef('')
+              }}
+            />
+            {Number(momo || '0') > 0 ? (
+              <button
+                type="button"
+                className="mt-1 w-full rounded border border-[var(--color-brand-200)] bg-[var(--color-brand-10)] px-2 py-1.5 text-xs font-medium text-[var(--color-brand-900)]"
+                onClick={() => setMomoModalOpen(true)}
+              >
+                {momoVerified ? `MoMo verified (${momoRef})` : 'Collect MoMo payment'}
+              </button>
+            ) : null}
           </label>
           <label className="text-sm">
-            <span className="text-neutral-600">{t('pos.airtel')}</span>
-            <input className="mt-1 w-full rounded border px-2 py-2" inputMode="decimal" value={airtel} onChange={(e) => setAirtel(e.target.value)} />
+            <span className="text-neutral-600">Airtel Money</span>
+            <input
+              className="mt-1 w-full rounded border px-2 py-2"
+              inputMode="decimal"
+              value={airtel}
+              onChange={(e) => {
+                setAirtel(e.target.value)
+                setAirtelVerified(false)
+                setAirtelRef('')
+              }}
+            />
+            {Number(airtel || '0') > 0 ? (
+              <button
+                type="button"
+                className="mt-1 w-full rounded border border-[var(--color-brand-200)] bg-[var(--color-brand-10)] px-2 py-1.5 text-xs font-medium text-[var(--color-brand-900)]"
+                onClick={() => setAirtelModalOpen(true)}
+              >
+                {airtelVerified ? `Airtel verified (${airtelRef})` : 'Collect Airtel payment'}
+              </button>
+            ) : null}
           </label>
           <label className="text-sm">
             <span className="text-neutral-600">{t('pos.card')}</span>
@@ -667,33 +834,36 @@ export function PosCheckoutPage() {
             placeholder={t('pos.walkIn')}
           />
         </label>
-        <div className="mt-2 grid gap-2 sm:grid-cols-2">
-          <label className="block text-sm">
-            <span className="text-neutral-600">{t('pos.momoRef')}</span>
-            <input className="mt-1 w-full rounded border px-2 py-2" value={momoRef} onChange={(e) => setMomoRef(e.target.value)} />
-          </label>
-          <label className="block text-sm">
-            <span className="text-neutral-600">{t('pos.airtelRef')}</span>
-            <input className="mt-1 w-full rounded border px-2 py-2" value={airtelRef} onChange={(e) => setAirtelRef(e.target.value)} />
-          </label>
-        </div>
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <button type="button" className="rounded-lg border border-[var(--border-subtle)] bg-[var(--color-surface)] px-3 py-2 text-sm" onClick={fillRemainder}>
+        <div className="pos-pay-inline mt-4 flex flex-wrap items-center gap-3">
+          <button type="button" className="btn btn--sm" onClick={fillRemainder}>
             {t('pos.fillRemainder')}
           </button>
           <span className="text-sm text-neutral-600">
-            {t('pos.tenderTotal')}: <strong>{tenderSum}</strong> / {total}
+            {t('pos.tenderTotal')}: <strong className="tabular-nums">{tenderSum}</strong> /{' '}
+            <span className="tabular-nums">{payableTotal}</span>
           </span>
-          <button
-            type="button"
-            className="ml-auto rounded-lg bg-emerald-700 px-6 py-3 text-lg font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
-            onClick={() => void pay()}
-            disabled={busy}
-          >
+          <button type="button" className="btn btn--pay ml-auto" onClick={() => void pay()} disabled={busy}>
             {t('pos.pay')}
           </button>
         </div>
       </section>
+
+      {lines.length > 0 && !receipt ? (
+        <div className="pos-pay-sticky" role="region" aria-label={t('pos.pay')}>
+          <div className="pos-pay-sticky__total">
+            {t('pos.cart')}
+            <strong>
+              {payableTotal} {currency}
+            </strong>
+            <span className="pos-pay-sticky__tender">
+              {t('pos.tenderTotal')}: {tenderSum}
+            </span>
+          </div>
+          <button type="button" className="btn btn--pay" onClick={() => void pay()} disabled={busy}>
+            {t('pos.pay')}
+          </button>
+        </div>
+      ) : null}
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
@@ -702,9 +872,12 @@ export function PosCheckoutPage() {
       )}
 
       {receipt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog">
-          <div className="max-h-[90vh] w-full max-w-md overflow-auto rounded-xl bg-[var(--color-surface)] p-4 shadow-xl">
-            <h2 className="mt-0 text-lg font-semibold">{t('pos.receipt')}</h2>
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal-panel modal-panel--md">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="mt-0 text-lg font-semibold">{t('pos.receipt')}</h2>
+              <EfdStatusBadge />
+            </div>
             {showHtmlPreview ? (
               <div className="receipt-print border border-dashed border-neutral-300 p-2" dangerouslySetInnerHTML={{ __html: receipt.html }} />
             ) : (
@@ -730,7 +903,16 @@ export function PosCheckoutPage() {
                 </>
               )}
             </div>
-            <div className="mt-4 flex gap-2">
+            <div className="mt-4 flex flex-wrap gap-2">
+              {lastSalesOrderId ? (
+                <button
+                  type="button"
+                  className="btn btn--primary w-full sm:w-auto"
+                  onClick={() => setDeliveryOpen(true)}
+                >
+                  Send receipt (WhatsApp / SMS)
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-neutral-900 py-2 text-white"
@@ -813,6 +995,36 @@ export function PosCheckoutPage() {
           </div>
         </div>
       )}
+
+      <ReceiptDeliveryModal
+        receiptId={deliveryOpen ? lastSalesOrderId : null}
+        defaultPhone={customer.trim() ? customer : ''}
+        title="Send sale receipt"
+        onClose={() => setDeliveryOpen(false)}
+      />
+
+      <MomoPaymentModal
+        open={momoModalOpen}
+        amount={Number(momo || '0')}
+        provider="MTN"
+        onCancel={() => setMomoModalOpen(false)}
+        onSuccess={(ref) => {
+          setMomoRef(ref)
+          setMomoVerified(true)
+          setMomoModalOpen(false)
+        }}
+      />
+      <MomoPaymentModal
+        open={airtelModalOpen}
+        amount={Number(airtel || '0')}
+        provider="AIRTEL_MONEY"
+        onCancel={() => setAirtelModalOpen(false)}
+        onSuccess={(ref) => {
+          setAirtelRef(ref)
+          setAirtelVerified(true)
+          setAirtelModalOpen(false)
+        }}
+      />
     </div>
   )
 }

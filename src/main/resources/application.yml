@@ -144,9 +144,20 @@ smartaccounting:
   sms:
     enabled: ${SMS_ENABLED:false}
     dry-run: ${SMS_DRY_RUN:true}
+    route-by-network: ${SMS_ROUTE_BY_NETWORK:true}
+    mtn-prefixes: ${SMS_MTN_PREFIXES:78,79}
+    airtel-prefixes: ${SMS_AIRTEL_PREFIXES:72,73}
     provider-url: ${SMS_PROVIDER_URL:}
     bearer-token: ${SMS_BEARER_TOKEN:}
     sender-id: ${SMS_SENDER_ID:SMARTACCOUNTING}
+    mtn:
+      provider-url: ${SMS_MTN_PROVIDER_URL:}
+      bearer-token: ${SMS_MTN_BEARER_TOKEN:}
+      sender-id: ${SMS_MTN_SENDER_ID:}
+    airtel:
+      provider-url: ${SMS_AIRTEL_PROVIDER_URL:}
+      bearer-token: ${SMS_AIRTEL_BEARER_TOKEN:}
+      sender-id: ${SMS_AIRTEL_SENDER_ID:}
     connect-timeout-ms: ${SMS_CONNECT_TIMEOUT_MS:5000}
     read-timeout-ms: ${SMS_READ_TIMEOUT_MS:10000}
   receipt:

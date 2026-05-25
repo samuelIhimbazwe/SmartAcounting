@@ -25,14 +25,14 @@ public class AdminProjectionController {
     }
 
     @PostMapping("/rebuild")
-    @PreAuthorize("@permissionGuard.has(authentication, 'PROJECTION_REBUILD')")
+    @PreAuthorize("@permissionGuard.has(authentication, 'TENANT_CONFIG')")
     public Map<String, UUID> rebuild(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
                                      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to) {
         return Map.of("jobId", projectionReplayService.rebuildAll(from, to));
     }
 
     @GetMapping("/jobs/{id}")
-    @PreAuthorize("@permissionGuard.has(authentication, 'PROJECTION_REBUILD')")
+    @PreAuthorize("@permissionGuard.has(authentication, 'TENANT_CONFIG')")
     public ProjectionRebuildJob job(@PathVariable UUID id) {
         return projectionReplayService.get(id);
     }

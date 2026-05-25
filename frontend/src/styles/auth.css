@@ -33,6 +33,13 @@
   display: none;
 }
 
+[data-theme='dark'] .auth-shell__hero {
+  background:
+    radial-gradient(120% 80% at 0% 0%, rgba(36, 180, 126, 0.24) 0%, transparent 55%),
+    radial-gradient(80% 60% at 100% 100%, rgba(142, 226, 191, 0.12) 0%, transparent 60%),
+    linear-gradient(140deg, #101513 0%, #151c18 44%, #1a231e 100%);
+}
+
 @media (min-width: 1024px) {
   .auth-shell__hero {
     display: block;
@@ -45,6 +52,10 @@
   inset: 0;
   background: linear-gradient(180deg, transparent 0%, rgba(8, 21, 46, 0.65) 100%);
   pointer-events: none;
+}
+
+[data-theme='dark'] .auth-shell__hero::before {
+  background: linear-gradient(180deg, transparent 0%, rgba(11, 15, 13, 0.74) 100%);
 }
 
 .auth-shell__hero-grid {
@@ -66,6 +77,10 @@
   filter: blur(40px);
   top: -120px;
   right: -120px;
+}
+
+[data-theme='dark'] .auth-shell__hero-glow {
+  background: radial-gradient(circle, rgba(95, 211, 165, 0.18) 0%, transparent 70%);
 }
 
 .auth-shell__hero-inner {
@@ -249,9 +264,11 @@
 }
 
 [data-theme='dark'] .auth-card {
+  background: var(--surface-card);
+  border-color: var(--border-default);
   box-shadow:
     0 1px 0 0 rgba(255, 255, 255, 0.04) inset,
-    0 20px 60px -25px rgba(0, 0, 0, 0.5);
+    0 24px 56px -32px rgba(0, 0, 0, 0.68);
 }
 
 .auth-card__eyebrow {
@@ -325,12 +342,17 @@
   margin-bottom: 10px;
   text-decoration: none;
   background: var(--color-surface);
-  color: var(--color-text);
+  color: var(--color-text-primary);
   border: 1px solid var(--color-border);
 }
 
 .oauth2-button:hover {
   border-color: var(--color-primary);
+}
+
+[data-theme='dark'] .oauth2-button {
+  background: var(--surface-card);
+  border-color: var(--border-default);
 }
 
 .oauth2-button__icon {
@@ -522,8 +544,16 @@
   box-shadow: 0 6px 20px -8px color-mix(in srgb, var(--color-primary) 60%, transparent);
 }
 
+[data-theme='dark'] .auth-btn--primary {
+  box-shadow: 0 18px 30px -20px color-mix(in srgb, var(--color-primary) 36%, transparent);
+}
+
 .auth-btn--primary:hover:not(:disabled) {
   box-shadow: 0 10px 24px -8px color-mix(in srgb, var(--color-primary) 70%, transparent);
+}
+
+[data-theme='dark'] .auth-btn--primary:hover:not(:disabled) {
+  box-shadow: 0 20px 34px -20px color-mix(in srgb, var(--color-primary) 40%, transparent);
 }
 
 .auth-btn--primary:active:not(:disabled) {
@@ -534,6 +564,11 @@
   background: var(--color-bg-base);
   color: var(--color-text-primary);
   border: 1px solid var(--color-border-strong);
+}
+
+[data-theme='dark'] .auth-btn--ghost {
+  background: var(--surface-card);
+  border-color: var(--border-default);
 }
 
 .auth-btn--ghost:hover:not(:disabled) {
@@ -580,6 +615,11 @@
   cursor: pointer;
   position: relative;
   font-family: inherit;
+}
+
+[data-theme='dark'] .auth-sso button {
+  background: var(--surface-card);
+  border-color: var(--border-default);
 }
 
 .auth-sso button:disabled {
@@ -647,6 +687,82 @@
   font-size: 13px;
   line-height: 1.4;
   margin-bottom: 16px;
+}
+
+.auth-verify-dev-code {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-bg-base));
+  border: 1px dashed color-mix(in srgb, var(--color-primary) 35%, transparent);
+  text-align: center;
+}
+
+.auth-verify-dev-code p {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+}
+
+.auth-verify-dev-code strong {
+  display: block;
+  font-size: 28px;
+  letter-spacing: 0.35em;
+  font-weight: 700;
+  color: var(--color-primary-dark);
+}
+
+.auth-verify-success {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--color-success, #15803d);
+  font-weight: 600;
+}
+
+.auth-verify-help {
+  margin-top: 20px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 16px;
+}
+
+.auth-verify-help__toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-primary);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.auth-verify-help__toggle:hover {
+  color: var(--color-primary-dark);
+}
+
+.auth-verify-help__panel {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--color-bg-subtle, var(--color-bg-base));
+  border: 1px solid var(--color-border);
+}
+
+.auth-verify-help__panel ul {
+  margin: 0 0 14px;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.auth-verify-help__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
 }
 
 /* ---------- Advanced (collapsible) tenant block ---------- */

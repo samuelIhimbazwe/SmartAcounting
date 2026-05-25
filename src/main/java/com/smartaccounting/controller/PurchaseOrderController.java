@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
+import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,26 +34,20 @@ public class PurchaseOrderController {
         this.purchaseOrderService = purchaseOrderService;
     }
 
-    @PostMapping
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'OPS_MANAGER')")
-    public ResponseEntity<PurchaseOrder> createPo(@RequestBody @Valid WorkflowCreatePurchaseOrderRequest request) {
-        return ResponseEntity.ok(purchaseOrderService.createPurchaseOrder(request, currentUserId()));
-    }
-
     @PostMapping("/create")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'OPS_MANAGER')")
+    @PreAuthorize(PermissionExpressions.PROCUREMENT_WRITE)
     public ResponseEntity<PurchaseOrder> createPoLegacy(@RequestBody @Valid WorkflowCreatePurchaseOrderRequest request) {
         return ResponseEntity.ok(purchaseOrderService.createPurchaseOrder(request, currentUserId()));
     }
 
     @PostMapping("/from-low-stock/{productId}")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'OPS_MANAGER')")
+    @PreAuthorize(PermissionExpressions.PROCUREMENT_WRITE)
     public ResponseEntity<PurchaseOrder> createFromLowStock(@PathVariable UUID productId) {
         return ResponseEntity.ok(purchaseOrderService.createFromLowStock(productId, currentUserId()));
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'OPS_MANAGER', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.PROCUREMENT_READ)
     public ResponseEntity<Page<PurchaseOrder>> listPos(
         @RequestParam(required = false) String status,
         @RequestParam(defaultValue = "0") int page,
@@ -61,13 +56,13 @@ public class PurchaseOrderController {
     }
 
     @GetMapping("/{poId}")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'OPS_MANAGER', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.PROCUREMENT_READ)
     public ResponseEntity<PurchaseOrderDetail> getPo(@PathVariable UUID poId) {
         return ResponseEntity.ok(purchaseOrderService.getPo(poId));
     }
 
     @PostMapping("/{poId}/send")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'OPS_MANAGER')")
+    @PreAuthorize(PermissionExpressions.PROCUREMENT_WRITE)
     public ResponseEntity<PurchaseOrder> sendPo(
         @PathVariable UUID poId,
         @RequestBody Map<String, String> body) {
@@ -75,13 +70,13 @@ public class PurchaseOrderController {
     }
 
     @PostMapping("/{poId}/confirm")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'OPS_MANAGER')")
+    @PreAuthorize(PermissionExpressions.PROCUREMENT_WRITE)
     public ResponseEntity<PurchaseOrder> confirmPo(@PathVariable UUID poId) {
         return ResponseEntity.ok(purchaseOrderService.confirmPo(poId));
     }
 
     @PostMapping("/{poId}/grn")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'OPS_MANAGER')")
+    @PreAuthorize(PermissionExpressions.PROCUREMENT_WRITE)
     public ResponseEntity<GoodsReceivedNote> createGrn(
         @PathVariable UUID poId,
         @RequestBody @Valid CreateGrnRequest request) {
@@ -89,13 +84,13 @@ public class PurchaseOrderController {
     }
 
     @PostMapping("/grn/{grnId}/confirm")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'OPS_MANAGER', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.PROCUREMENT_READ)
     public ResponseEntity<GoodsReceivedNote> confirmGrn(@PathVariable UUID grnId) {
         return ResponseEntity.ok(purchaseOrderService.confirmGrn(grnId));
     }
 
     @GetMapping("/{poId}/three-way-match/{billId}")
-    @PreAuthorize("hasAnyRole('CEO', 'CFO', 'ACCOUNTING_CONTROLLER')")
+    @PreAuthorize(PermissionExpressions.FINANCE_READ)
     public ResponseEntity<ThreeWayMatchResult> threeWayMatch(
         @PathVariable UUID poId,
         @PathVariable UUID billId) {

@@ -7,8 +7,11 @@ import com.smartaccounting.repository.CeoKpiSnapshotRepository;
 import com.smartaccounting.repository.CfoKpiSnapshotJdbcRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
@@ -20,13 +23,16 @@ public class CfoKpiProjector {
     private final CfoKpiSnapshotJdbcRepository cfoKpiSnapshotJdbcRepository;
     private final CeoKpiSnapshotRepository ceoKpiSnapshotRepository;
     private final ObjectMapper objectMapper;
+    private final JdbcTemplate jdbcTemplate;
 
     public CfoKpiProjector(CfoKpiSnapshotJdbcRepository cfoKpiSnapshotJdbcRepository,
                          CeoKpiSnapshotRepository ceoKpiSnapshotRepository,
-                         ObjectMapper objectMapper) {
+                         ObjectMapper objectMapper,
+                         JdbcTemplate jdbcTemplate) {
         this.cfoKpiSnapshotJdbcRepository = cfoKpiSnapshotJdbcRepository;
         this.ceoKpiSnapshotRepository = ceoKpiSnapshotRepository;
         this.objectMapper = objectMapper;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     public double getCashPosition(UUID tenantId) {
@@ -99,8 +105,38 @@ public class CfoKpiProjector {
     }
 
     public double getDpo(UUID tenantId) {
-        log.warn("getDpo stub called for tenant {} — implement DPO from supplier aging / AP snapshots", tenantId);
-        return 0d;
+        if (tenantId == null) {
+            return 0d;
+        }
+        try {
+            BigDecimal openAp = jdbcTemplate.queryForObject(
+                """
+                select coalesce(sum(amount), 0) from supplier_bills
+                where tenant_id = ? and deleted_at is null and upper(status) = 'OPEN'
+                """,
+                BigDecimal.class,
+                tenantId
+            );
+            BigDecimal purchases30 = jdbcTemplate.queryForObject(
+                """
+                select coalesce(sum(amount), 0) from supplier_bills
+                where tenant_id = ? and deleted_at is null
+                  and (created_at at time zone 'UTC')::date >= current_date - 30
+                """,
+                BigDecimal.class,
+                tenantId
+            );
+            if (openAp == null || purchases30 == null || purchases30.compareTo(BigDecimal.ZERO) == 0) {
+                return readDouble(tenantId, "dpoDays");
+            }
+            return openAp.divide(purchases30, 8, RoundingMode.HALF_UP)
+                .multiply(BigDecimal.valueOf(30))
+                .setScale(2, RoundingMode.HALF_UP)
+                .doubleValue();
+        } catch (Exception ex) {
+            log.debug("getDpo live query failed for {}: {}", tenantId, ex.getMessage());
+            return readDouble(tenantId, "dpoDays");
+        }
     }
 
     private double readDouble(UUID tenantId, String field) {

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { i18n } from '../i18n/i18n'
 
-type SupportedLocale = 'en' | 'fr'
+type SupportedLocale = 'en' | 'fr' | 'rw'
 
 interface IntlState {
   locale: SupportedLocale
@@ -12,7 +12,10 @@ interface IntlState {
 }
 
 function normalizeLocale(value: string): SupportedLocale {
-  return value === 'fr' ? 'fr' : 'en'
+  if (value === 'fr' || value === 'rw') {
+    return value
+  }
+  return 'en'
 }
 
 export const useIntlStore = create<IntlState>()(
@@ -22,6 +25,9 @@ export const useIntlStore = create<IntlState>()(
       currency: 'USD',
       setLocale: (locale) => {
         void i18n.changeLanguage(locale)
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem('smartchain-locale', locale)
+        }
         set({ locale })
       },
       setCurrency: (currency) => set({ currency }),
@@ -38,6 +44,9 @@ export const useIntlStore = create<IntlState>()(
         }
         const locale = normalizeLocale(state.locale)
         state.locale = locale
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem('smartchain-locale', locale)
+        }
         void i18n.changeLanguage(locale)
       },
     },

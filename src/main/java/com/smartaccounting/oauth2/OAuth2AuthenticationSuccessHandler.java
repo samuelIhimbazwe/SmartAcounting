@@ -1,7 +1,9 @@
 package com.smartaccounting.oauth2;
 
+import com.smartaccounting.dto.AuthSessionProfile;
 import com.smartaccounting.security.JwtService;
 import com.smartaccounting.security.RefreshTokenService;
+import com.smartaccounting.service.AuthSessionService;
 import com.smartaccounting.tenant.TenantContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -21,17 +23,20 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
     private final UserDetailsService userDetailsService;
+    private final AuthSessionService authSessionService;
     private final String redirectUri;
 
     public OAuth2AuthenticationSuccessHandler(
         JwtService jwtService,
         RefreshTokenService refreshTokenService,
         UserDetailsService userDetailsService,
+        AuthSessionService authSessionService,
         @Value("${smartaccounting.oauth2.redirect-uri:${SMARTACCOUNTING_OAUTH2_REDIRECT_URI:http://localhost:5173/auth/oauth2/callback}}") String redirectUri
     ) {
         this.jwtService = jwtService;
         this.refreshTokenService = refreshTokenService;
         this.userDetailsService = userDetailsService;
+        this.authSessionService = authSessionService;
         this.redirectUri = redirectUri;
     }
 
@@ -49,7 +54,13 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         TenantContext.set(user.tenantId(), user.id());
         try {
             UserDetails userDetails = userDetailsService.loadUserByUsername(user.username());
-            String accessToken = jwtService.generateToken(userDetails, tenantId, userId);
+            AuthSessionProfile session = authSessionService.buildSession(user.tenantId(), user.id());
+            String accessToken = jwtService.generateToken(
+                userDetails,
+                tenantId,
+                userId,
+                authSessionService.loadEffectivePermissions(user.tenantId(), user.id(), user.role())
+            );
             String refreshToken = refreshTokenService.issue(tenantId, userId, userDetails);
 
             String targetUrl = UriComponentsBuilder.fromUriString(redirectUri)
@@ -58,8 +69,8 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
                 .queryParam("expiresInSeconds", jwtService.expirationSeconds())
                 .queryParam("tenantId", tenantId)
                 .queryParam("userId", userId)
-                .queryParam("role", user.role())
-                .queryParam("provider", principal.getIdentity().provider().toLowerCase())
+                .queryParam("role", session.role())
+                .queryParam("setupComplete", session.setupComplete())
                 .build()
                 .toUriString();
 
