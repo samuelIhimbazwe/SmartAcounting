@@ -12,11 +12,15 @@ ALTER TABLE purchase_orders
     ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ,
     ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 
+ALTER TABLE purchase_orders NO FORCE ROW LEVEL SECURITY;
+
 UPDATE purchase_orders
 SET po_number = 'PO-' || replace(id::text, '-', '')
 WHERE po_number IS NULL;
 
 ALTER TABLE purchase_orders ALTER COLUMN po_number SET NOT NULL;
+
+ALTER TABLE purchase_orders FORCE ROW LEVEL SECURITY;
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_purchase_orders_tenant_po_number
     ON purchase_orders (tenant_id, po_number);
