@@ -41,12 +41,12 @@ smartaccounting:
     embedding:
       provider: openai
       model: text-embedding-3-small
-      api-key: ${OPENAI_API_KEY}
+      api-key: ${OPENAI_API_KEY:}
       dimensions: 1536
     completion:
       provider: anthropic
       model: claude-sonnet-4-20250514
-      api-key: ${ANTHROPIC_API_KEY}
+      api-key: ${ANTHROPIC_API_KEY:}
       max-tokens: 1000
   copilot:
     agent:
