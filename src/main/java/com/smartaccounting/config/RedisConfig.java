@@ -12,12 +12,15 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import org.springframework.util.StringUtils;
 
 import java.time.Duration;
 import java.util.Map;
 
 @Configuration
 public class RedisConfig {
+    @Value("${spring.data.redis.url:}")
+    private String redisUrl;
     @Value("${spring.data.redis.host:}")
     private String redisHost;
     @Value("${spring.data.redis.port:0}")
@@ -25,8 +28,11 @@ public class RedisConfig {
 
     @PostConstruct
     void validateEnv() {
+        if (StringUtils.hasText(redisUrl)) {
+            return;
+        }
         if (redisHost == null || redisHost.isBlank() || redisPort <= 0) {
-            throw new IllegalStateException("REDIS_HOST and REDIS_PORT must be configured");
+            throw new IllegalStateException("REDIS_URL or REDIS_HOST and REDIS_PORT must be configured");
         }
     }
 

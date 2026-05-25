@@ -1,0 +1,104 @@
+services:
+  - type: web
+    name: api
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    autoDeploy: true
+    healthCheckPath: /actuator/health/readiness
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: READINESS_HEALTH_COMPONENTS
+        value: db,redis,rls
+      - key: DB_HOST
+        fromDatabase:
+          name: smartaccounting-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: smartaccounting-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: smartaccounting-db
+          property: database
+      - key: DB_USERNAME
+        fromDatabase:
+          name: smartaccounting-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: smartaccounting-db
+          property: password
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: smartaccounting-redis
+          property: connectionString
+      - key: REDIS_HOST
+        fromService:
+          type: keyvalue
+          name: smartaccounting-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: keyvalue
+          name: smartaccounting-redis
+          property: port
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_KEY_ID
+        value: smartaccounting-k1
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://smartaccounting-web.onrender.com
+      - key: SMARTACCOUNTING_OAUTH2_REDIRECT_URI
+        value: https://smartaccounting-web.onrender.com/auth/oauth2/callback
+      - key: SMARTACCOUNTING_AI_FAIL_ON_MISSING_PROVIDER_KEYS
+        value: "false"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: MICROSOFT_CLIENT_ID
+        sync: false
+      - key: MICROSOFT_CLIENT_SECRET
+        sync: false
+      - key: MOBILE_MONEY_MTN_WEBHOOK_SECRET
+        sync: false
+      - key: MOBILE_MONEY_AIRTEL_WEBHOOK_SECRET
+        sync: false
+      - key: SMS_ENABLED
+        value: "false"
+      - key: WHATSAPP_ENABLED
+        value: "false"
+      - key: MOMO_STK_ENABLED
+        value: "false"
+
+  - type: web
+    name: smartaccounting-web
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: .
+    autoDeploy: true
+
+  - type: keyvalue
+    name: smartaccounting-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList:
+      - source: 0.0.0.0/0
+        description: allow Render service access
+
+databases:
+  - name: smartaccounting-db
+    plan: free
+    region: frankfurt
