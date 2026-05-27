@@ -103,9 +103,14 @@ export interface OAuth2Provider {
   iconUrl?: string
 }
 
+/** Returns [] when OAuth is disabled or the providers endpoint fails (non-fatal for signup/login). */
 export async function fetchOAuth2Providers(): Promise<OAuth2Provider[]> {
-  const response = await apiClient.get<OAuth2Provider[]>('/api/v1/auth/oauth2/providers')
-  return response.data
+  try {
+    const response = await apiClient.get<OAuth2Provider[]>('/api/v1/auth/oauth2/providers')
+    return response.data ?? []
+  } catch {
+    return []
+  }
 }
 
 /** Server-side OAuth2 redirect path (prepend API_BASE_URL). */

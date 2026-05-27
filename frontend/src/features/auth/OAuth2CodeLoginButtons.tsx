@@ -44,7 +44,9 @@ export function OAuth2CodeLoginButtons({ providers, disabled }: OAuth2CodeLoginB
             className="oauth2-button auth-btn"
             aria-disabled={disabled}
             onClick={(event) => {
-              void onOAuthClick(event)
+              void onOAuthClick(event).catch(() => {
+                /* desktop OAuth bridge or navigation failure */
+              })
             }}
           >
             <span className={`oauth2-button__icon oauth2-button__icon--${provider.provider}`} aria-hidden />

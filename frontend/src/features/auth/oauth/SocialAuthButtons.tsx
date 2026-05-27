@@ -80,13 +80,19 @@ function MicrosoftPopupButton({
       type="button"
       className="auth-sso__microsoft"
       disabled={disabled}
-      onClick={async () => {
-        const result = await instance.loginPopup({
-          scopes: ['openid', 'profile', 'email'],
-        })
-        if (result.idToken) {
-          onIdToken('microsoft', result.idToken)
-        }
+      onClick={() => {
+        void (async () => {
+          try {
+            const result = await instance.loginPopup({
+              scopes: ['openid', 'profile', 'email'],
+            })
+            if (result.idToken) {
+              onIdToken('microsoft', result.idToken)
+            }
+          } catch {
+            /* user closed popup or IdP error */
+          }
+        })()
       }}
     >
       {t('auth.loginSsoMicrosoft')}
