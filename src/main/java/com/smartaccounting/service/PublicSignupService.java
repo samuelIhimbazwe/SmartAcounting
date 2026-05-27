@@ -2,6 +2,7 @@ package com.smartaccounting.service;
 
 import com.smartaccounting.config.PublicSignupProperties;
 import com.smartaccounting.config.SmsProperties;
+import com.smartaccounting.config.TenantJdbcSessionBinder;
 import com.smartaccounting.dto.AuthResponse;
 import com.smartaccounting.dto.AuthSessionProfile;
 import com.smartaccounting.dto.signup.ForgotPasswordRequest;
@@ -74,6 +75,7 @@ public class PublicSignupService {
     private final org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
     private final OidcIdentityTokenService oidcIdentityTokenService;
     private final AuthSessionService authSessionService;
+    private final TenantJdbcSessionBinder tenantJdbcSessionBinder;
 
     public PublicSignupService(JdbcTemplate jdbcTemplate,
                                PasswordEncoder passwordEncoder,
@@ -87,7 +89,8 @@ public class PublicSignupService {
                                UserDetailsService userDetailsService,
                                org.springframework.data.redis.core.StringRedisTemplate redisTemplate,
                                OidcIdentityTokenService oidcIdentityTokenService,
-                               AuthSessionService authSessionService) {
+                               AuthSessionService authSessionService,
+                               TenantJdbcSessionBinder tenantJdbcSessionBinder) {
         this.jdbcTemplate = jdbcTemplate;
         this.passwordEncoder = passwordEncoder;
         this.otpService = otpService;
@@ -101,6 +104,12 @@ public class PublicSignupService {
         this.redisTemplate = redisTemplate;
         this.oidcIdentityTokenService = oidcIdentityTokenService;
         this.authSessionService = authSessionService;
+        this.tenantJdbcSessionBinder = tenantJdbcSessionBinder;
+    }
+
+    private void bindTenantSession(UUID tenantId, UUID userId) {
+        TenantContext.set(tenantId, userId);
+        tenantJdbcSessionBinder.bind(tenantId);
     }
 
     @Transactional
@@ -148,7 +157,7 @@ public class PublicSignupService {
                 plan,
                 billingCycle
             );
-            TenantContext.set(tenantId, userId);
+            bindTenantSession(tenantId, userId);
             try {
                 jdbcTemplate.update(
                     """
@@ -238,7 +247,7 @@ public class PublicSignupService {
                 plan,
                 billingCycle
             );
-            TenantContext.set(tenantId, userId);
+            bindTenantSession(tenantId, userId);
             try {
                 jdbcTemplate.update(
                     """
@@ -315,7 +324,7 @@ public class PublicSignupService {
         UUID userId = (UUID) pending.get("user_id");
         String username = pending.get("username").toString();
 
-        TenantContext.set(tenantId, userId);
+        bindTenantSession(tenantId, userId);
         try {
             jdbcTemplate.update("update tenants set phone_verified = true where id = ?", tenantId);
         } finally {
@@ -486,7 +495,7 @@ public class PublicSignupService {
         UUID userId = UUID.fromString(row.get("user_id").toString());
         UUID tenantId = UUID.fromString(row.get("tenant_id").toString());
         String hash = passwordEncoder.encode(req.newPassword());
-        TenantContext.set(tenantId, userId);
+        bindTenantSession(tenantId, userId);
         try {
             jdbcTemplate.update("update users set password_hash = ? where id = ?", hash, userId);
             refreshTokenService.revokeAllForUser(tenantId, userId);
