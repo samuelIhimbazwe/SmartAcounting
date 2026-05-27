@@ -69,11 +69,16 @@ public class PublicApiRateLimitFilter extends OncePerRequestFilter {
     }
 
     private long increment(String key, Duration window) {
-        Long count = redisTemplate.opsForValue().increment(key);
-        if (count != null && count == 1) {
-            redisTemplate.expire(key, window);
+        try {
+            Long count = redisTemplate.opsForValue().increment(key);
+            if (count != null && count == 1) {
+                redisTemplate.expire(key, window);
+            }
+            return count == null ? 1L : count;
+        } catch (RuntimeException ex) {
+            // Redis unavailable — do not fail public signup/login paths (matches PublicRateLimitService).
+            return 1L;
         }
-        return count == null ? 1L : count;
     }
 
     private String clientIp(HttpServletRequest request) {

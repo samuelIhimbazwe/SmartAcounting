@@ -227,7 +227,11 @@ public class SmsDispatchService {
         logRow.setResponseCode(result.responseCode());
         logRow.setErrorMessage(result.errorMessage());
         logRow.setCreatedAt(java.time.Instant.now());
-        smsDeliveryLogRepository.save(logRow);
+        try {
+            smsDeliveryLogRepository.save(logRow);
+        } catch (RuntimeException ex) {
+            log.warn("SMS delivery log not persisted tenant={} eventType={}: {}", tenantId, eventType, ex.getMessage());
+        }
     }
 
     private record DispatchResult(

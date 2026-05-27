@@ -172,6 +172,8 @@ smartaccounting:
   public-signup:
     platform-admin-phone: ${PLATFORM_ADMIN_PHONE:}
     login-url-text: ${SIGNUP_LOGIN_URL_TEXT:smartaccounting.rw}
+    rate-limit-enabled: ${SMARTACCOUNTING_PUBLIC_SIGNUP_RATE_LIMIT_ENABLED:true}
+    expose-otp-in-response: ${SMARTACCOUNTING_PUBLIC_SIGNUP_EXPOSE_OTP_IN_RESPONSE:false}
     otp-ttl-minutes: ${PUBLIC_SIGNUP_OTP_TTL_MINUTES:10}
     lock-minutes: ${PUBLIC_SIGNUP_LOCK_MINUTES:30}
     otp-max-failures: ${PUBLIC_SIGNUP_OTP_MAX_FAILURES:5}

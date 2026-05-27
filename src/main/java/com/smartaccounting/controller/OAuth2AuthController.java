@@ -32,17 +32,21 @@ public class OAuth2AuthController {
 
     @GetMapping("/providers")
     public List<OAuth2ProviderDto> listProviders(HttpServletRequest request) {
-        List<OAuth2ProviderDto> providers = new ArrayList<>();
-        for (ClientRegistration registration : iterableRegistrations()) {
-            String id = registration.getRegistrationId();
-            providers.add(OAuth2ProviderDto.builder()
-                .provider(id)
-                .displayName(registration.getClientName())
-                .loginUrl(authorizeUrl(request, id))
-                .iconUrl(iconUrl(id))
-                .build());
+        try {
+            List<OAuth2ProviderDto> providers = new ArrayList<>();
+            for (ClientRegistration registration : iterableRegistrations()) {
+                String id = registration.getRegistrationId();
+                providers.add(OAuth2ProviderDto.builder()
+                    .provider(id)
+                    .displayName(registration.getClientName())
+                    .loginUrl(authorizeUrl(request, id))
+                    .iconUrl(iconUrl(id))
+                    .build());
+            }
+            return providers;
+        } catch (RuntimeException ex) {
+            return List.of();
         }
-        return providers;
     }
 
     @GetMapping("/authorize/{provider}")
