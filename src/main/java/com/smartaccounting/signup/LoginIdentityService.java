@@ -1,7 +1,6 @@
 package com.smartaccounting.signup;
 
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.Locale;
@@ -29,21 +28,21 @@ public class LoginIdentityService {
         "accounting", new LoginIdentity(DEMO_TENANT, UUID.fromString("33333333-3333-4333-8333-333333333307"), "ACCOUNTING_CONTROLLER")
     );
 
-    private final JdbcTemplate jdbcTemplate;
+    private final PublicAuthSqlLookup authLookup;
     private final boolean demoFallbackEnabled;
 
     public LoginIdentityService(
-        JdbcTemplate jdbcTemplate,
+        PublicAuthSqlLookup authLookup,
         @Value("${smartaccounting.auth.demo-fallback-enabled:true}") boolean demoFallbackEnabled
     ) {
-        this.jdbcTemplate = jdbcTemplate;
+        this.authLookup = authLookup;
         this.demoFallbackEnabled = demoFallbackEnabled;
     }
 
     public LoginIdentity resolve(String username, String requestTenantId, String requestUserId) {
         String key = username == null ? "" : username.trim().toLowerCase(Locale.ROOT);
 
-        if (isPasswordBacked(key)) {
+        if (authLookup.isPasswordBacked(key)) {
             return resolveFromDatabase(key)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
         }
@@ -76,41 +75,7 @@ public class LoginIdentityService {
     }
 
     private Optional<LoginIdentity> resolveFromDatabase(String normalizedUsername) {
-        if (normalizedUsername.isEmpty()) {
-            return Optional.empty();
-        }
-        LoginIdentity identity = jdbcTemplate.query(
-            """
-                select li.tenant_id, li.user_id, li.role
-                from lookup_login_identity(cast(? as text)) li
-                """,
-            rs -> {
-                if (!rs.next()) {
-                    return null;
-                }
-                return new LoginIdentity(
-                    (UUID) rs.getObject("tenant_id"),
-                    (UUID) rs.getObject("user_id"),
-                    rs.getString("role")
-                );
-            },
-            normalizedUsername
-        );
-        return Optional.ofNullable(identity);
-    }
-
-    private boolean isPasswordBacked(String normalizedUsername) {
-        if (normalizedUsername.isEmpty()) {
-            return false;
-        }
-        Boolean backed = jdbcTemplate.query(
-            """
-                select u.password_hash is not null and length(trim(u.password_hash)) > 0
-                from lookup_user_for_authentication(cast(? as text)) u
-                """,
-            rs -> rs.next() && rs.getBoolean(1),
-            normalizedUsername
-        );
-        return Boolean.TRUE.equals(backed);
+        return authLookup.findLoginIdentity(normalizedUsername)
+            .map(row -> new LoginIdentity(row.tenantId(), row.userId(), row.role()));
     }
 }

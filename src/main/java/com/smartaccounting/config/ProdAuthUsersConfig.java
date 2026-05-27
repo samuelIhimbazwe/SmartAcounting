@@ -5,7 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.smartaccounting.signup.PublicAuthSqlLookup;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -19,8 +19,8 @@ public class ProdAuthUsersConfig {
 
     @Bean
     @Primary
-    UserDetailsService userDetailsService(JdbcTemplate jdbcTemplate) {
-        return new DatabaseUserDetailsService(jdbcTemplate);
+    UserDetailsService userDetailsService(PublicAuthSqlLookup authLookup) {
+        return new DatabaseUserDetailsService(authLookup);
     }
 
     @Bean

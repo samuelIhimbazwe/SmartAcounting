@@ -1,11 +1,11 @@
 package com.smartaccounting.config;
 
 import com.smartaccounting.signup.CompositeUserDetailsService;
+import com.smartaccounting.signup.PublicAuthSqlLookup;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -22,7 +22,7 @@ public class AuthUsersConfig {
      */
     @Bean
     @Primary
-    UserDetailsService userDetailsService(PasswordEncoder passwordEncoder, JdbcTemplate jdbcTemplate) {
+    UserDetailsService userDetailsService(PasswordEncoder passwordEncoder, PublicAuthSqlLookup authLookup) {
         UserDetailsService inMemoryUsers = new InMemoryUserDetailsManager(
             User.withUsername("ceo").password(passwordEncoder.encode("password")).roles("CEO").build(),
             User.withUsername("cfo").password(passwordEncoder.encode("password")).roles("CFO").build(),
@@ -32,7 +32,7 @@ public class AuthUsersConfig {
             User.withUsername("marketing").password(passwordEncoder.encode("password")).roles("MARKETING_MANAGER").build(),
             User.withUsername("accounting").password(passwordEncoder.encode("password")).roles("ACCOUNTING_CONTROLLER").build()
         );
-        return new CompositeUserDetailsService(inMemoryUsers, jdbcTemplate);
+        return new CompositeUserDetailsService(inMemoryUsers, authLookup);
     }
 
     @Bean

@@ -3,6 +3,7 @@ package com.smartaccounting.service;
 import com.smartaccounting.config.PublicSignupProperties;
 import com.smartaccounting.config.SmsProperties;
 import com.smartaccounting.config.TenantJdbcSessionBinder;
+import com.smartaccounting.signup.PublicAuthSqlLookup;
 import com.smartaccounting.dto.AuthResponse;
 import com.smartaccounting.dto.AuthSessionProfile;
 import com.smartaccounting.dto.signup.ForgotPasswordRequest;
@@ -76,6 +77,7 @@ public class PublicSignupService {
     private final OidcIdentityTokenService oidcIdentityTokenService;
     private final AuthSessionService authSessionService;
     private final TenantJdbcSessionBinder tenantJdbcSessionBinder;
+    private final PublicAuthSqlLookup authLookup;
 
     public PublicSignupService(JdbcTemplate jdbcTemplate,
                                PasswordEncoder passwordEncoder,
@@ -90,7 +92,8 @@ public class PublicSignupService {
                                org.springframework.data.redis.core.StringRedisTemplate redisTemplate,
                                OidcIdentityTokenService oidcIdentityTokenService,
                                AuthSessionService authSessionService,
-                               TenantJdbcSessionBinder tenantJdbcSessionBinder) {
+                               TenantJdbcSessionBinder tenantJdbcSessionBinder,
+                               PublicAuthSqlLookup authLookup) {
         this.jdbcTemplate = jdbcTemplate;
         this.passwordEncoder = passwordEncoder;
         this.otpService = otpService;
@@ -105,6 +108,7 @@ public class PublicSignupService {
         this.oidcIdentityTokenService = oidcIdentityTokenService;
         this.authSessionService = authSessionService;
         this.tenantJdbcSessionBinder = tenantJdbcSessionBinder;
+        this.authLookup = authLookup;
     }
 
     private void bindTenantSession(UUID tenantId, UUID userId) {
@@ -331,23 +335,13 @@ public class PublicSignupService {
     }
 
     private Map<String, Object> lookupSignupPendingByPhone(String phone) {
-        return jdbcTemplate.query(
-            """
-                select p.tenant_id, p.user_id, p.username
-                from lookup_signup_pending_by_phone(cast(? as text)) p
-                """,
-            rs -> {
-                if (!rs.next()) {
-                    return null;
-                }
-                return Map.<String, Object>of(
-                    "tenant_id", UUID.fromString(rs.getString("tenant_id")),
-                    "user_id", UUID.fromString(rs.getString("user_id")),
-                    "username", rs.getString("username")
-                );
-            },
-            phone
-        );
+        return authLookup.findSignupPendingByPhone(phone)
+            .map(row -> Map.<String, Object>of(
+                "tenant_id", row.tenantId(),
+                "user_id", row.userId(),
+                "username", row.username()
+            ))
+            .orElse(null);
     }
 
     public ResendOtpResponse resendOtp(String phoneRaw) {
@@ -435,7 +429,7 @@ public class PublicSignupService {
         UUID tenantId = jdbcTemplate.query(
             """
                 select r.tenant_id
-                from lookup_password_reset_user_by_phone(?::text) as r(user_id, tenant_id)
+                from lookup_password_reset_user_by_phone(?) r
                 """,
             rs -> rs.next() ? UUID.fromString(rs.getString("tenant_id")) : null,
             phone
@@ -460,7 +454,7 @@ public class PublicSignupService {
         if (req.email() != null && !req.email().isBlank()) {
             String em = normalizeEmail(req.email());
             return jdbcTemplate.query(
-                "select lookup_password_reset_phone_by_email(cast(? as text)) as phone",
+                "select lookup_password_reset_phone_by_email(?) as phone",
                 rs -> rs.next() ? rs.getString("phone") : null,
                 em
             );
@@ -478,7 +472,7 @@ public class PublicSignupService {
         Map<String, Object> row = jdbcTemplate.queryForMap(
             """
                 select r.user_id, r.tenant_id
-                from lookup_password_reset_user_by_phone(cast(? as text)) r
+                from lookup_password_reset_user_by_phone(?) r
                 """,
             phone
         );
@@ -516,7 +510,7 @@ public class PublicSignupService {
 
     private boolean existsOauthSubject(String provider, String subject) {
         return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
-            "select public_signup_oauth_subject_taken(cast(? as text), cast(? as text))",
+            "select public_signup_oauth_subject_taken(?, ?)",
             Boolean.class,
             provider,
             subject
@@ -525,7 +519,7 @@ public class PublicSignupService {
 
     private boolean existsPhone(String phone) {
         return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
-            "select public_signup_phone_taken(cast(? as text))",
+            "select public_signup_phone_taken(?)",
             Boolean.class,
             phone
         ));

@@ -1,56 +1,32 @@
 package com.smartaccounting.signup;
 
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.Locale;
-
 /**
  * Loads password-backed or OAuth-linked users from the {@code users} table (production auth).
  */
 public class DatabaseUserDetailsService implements UserDetailsService {
-    private final JdbcTemplate jdbcTemplate;
+    private final PublicAuthSqlLookup authLookup;
 
-    public DatabaseUserDetailsService(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public DatabaseUserDetailsService(PublicAuthSqlLookup authLookup) {
+        this.authLookup = authLookup;
     }
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        String normalized = username == null ? "" : username.trim().toLowerCase(Locale.ROOT);
-        if (normalized.isEmpty()) {
-            throw new UsernameNotFoundException(username);
-        }
-        try {
-            return jdbcTemplate.queryForObject(
-                """
-                    select u.username, u.password_hash, u.role
-                    from lookup_user_for_authentication(cast(? as text)) u
-                    """,
-                (rs, rowNum) -> mapRow(rs),
-                normalized
-            );
-        } catch (org.springframework.dao.EmptyResultDataAccessException ex) {
-            throw new UsernameNotFoundException(username);
-        }
-    }
-
-    private static UserDetails mapRow(ResultSet rs) throws SQLException {
-        String uname = rs.getString("username");
-        String hash = rs.getString("password_hash");
+        PublicAuthSqlLookup.AuthUserRow row = authLookup.findUserForAuthentication(username)
+            .orElseThrow(() -> new UsernameNotFoundException(username));
+        String hash = row.passwordHash();
         if (hash == null || hash.isBlank()) {
             hash = "{noop}oauth";
         }
-        String role = rs.getString("role");
         return User.builder()
-            .username(uname)
+            .username(row.username())
             .password(hash)
-            .authorities(DbUserRoleAuthorities.fromStoredRole(role))
+            .authorities(DbUserRoleAuthorities.fromStoredRole(row.role()))
             .build();
     }
 }

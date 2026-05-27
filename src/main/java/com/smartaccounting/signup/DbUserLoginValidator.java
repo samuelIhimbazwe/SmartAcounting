@@ -1,6 +1,5 @@
 package com.smartaccounting.signup;
 
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.Locale;
@@ -8,10 +7,10 @@ import java.util.UUID;
 
 @Component
 public class DbUserLoginValidator {
-    private final JdbcTemplate jdbcTemplate;
+    private final PublicAuthSqlLookup authLookup;
 
-    public DbUserLoginValidator(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public DbUserLoginValidator(PublicAuthSqlLookup authLookup) {
+        this.authLookup = authLookup;
     }
 
     /**
@@ -22,32 +21,15 @@ public class DbUserLoginValidator {
             return;
         }
         String un = username.trim().toLowerCase(Locale.ROOT);
-        Boolean passwordBacked = jdbcTemplate.query(
-            """
-                select u.password_hash is not null and length(trim(u.password_hash)) > 0
-                from lookup_user_for_authentication(cast(? as text)) u
-                """,
-            rs -> rs.next() && rs.getBoolean(1),
-            un
-        );
-        if (!Boolean.TRUE.equals(passwordBacked)) {
+        if (!authLookup.isPasswordBacked(un)) {
             return;
         }
         UUID tid = parseUuid(tenantId);
         UUID uid = parseUuid(userId);
-        Boolean ok = jdbcTemplate.query(
-            """
-                select count(*) > 0
-                from lookup_login_identity(cast(? as text)) li
-                where li.tenant_id = ? and li.user_id = ?
-                """,
-            rs -> {
-                rs.next();
-                return rs.getBoolean(1);
-            },
-            un, tid, uid
-        );
-        if (!Boolean.TRUE.equals(ok)) {
+        boolean ok = authLookup.findLoginIdentity(un)
+            .filter(row -> row.tenantId().equals(tid) && row.userId().equals(uid))
+            .isPresent();
+        if (!ok) {
             throw new IllegalArgumentException("Invalid credentials");
         }
     }
