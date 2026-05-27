@@ -24,15 +24,10 @@ public class DbUserLoginValidator {
         String un = username.trim().toLowerCase(Locale.ROOT);
         Boolean passwordBacked = jdbcTemplate.query(
             """
-                select case when password_hash is not null then true else false end as pwd
-                from users where lower(username) = ? limit 1
+                select password_hash is not null and length(trim(password_hash)) > 0
+                from lookup_user_for_authentication(?)
                 """,
-            rs -> {
-                if (!rs.next()) {
-                    return false;
-                }
-                return rs.getBoolean("pwd");
-            },
+            rs -> rs.next() && rs.getBoolean(1),
             un
         );
         if (!Boolean.TRUE.equals(passwordBacked)) {
@@ -42,8 +37,9 @@ public class DbUserLoginValidator {
         UUID uid = parseUuid(userId);
         Boolean ok = jdbcTemplate.query(
             """
-                select count(*) > 0 from users
-                where lower(username) = ? and password_hash is not null and tenant_id = ? and id = ?
+                select count(*) > 0
+                from lookup_login_identity(?)
+                where tenant_id = ? and user_id = ?
                 """,
             rs -> {
                 rs.next();
