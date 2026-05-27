@@ -16,7 +16,10 @@ public class SelfServiceUserLookup {
             return false;
         }
         Boolean b = jdbcTemplate.query(
-            "select self_service_owner from users where lower(username) = lower(?) limit 1",
+            """
+                select self_service_owner
+                from lookup_user_for_authentication(?)
+                """,
             rs -> rs.next() ? rs.getBoolean("self_service_owner") : null,
             username.trim()
         );
@@ -31,7 +34,7 @@ public class SelfServiceUserLookup {
         Boolean pwd = jdbcTemplate.query(
             """
                 select case when password_hash is not null then true else false end as pwd
-                from users where lower(username) = lower(?) limit 1
+                from lookup_user_for_authentication(?)
                 """,
             rs -> {
                 if (!rs.next()) {

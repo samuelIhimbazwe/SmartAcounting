@@ -30,9 +30,7 @@ public class DatabaseUserDetailsService implements UserDetailsService {
             return jdbcTemplate.queryForObject(
                 """
                     select username, password_hash, role
-                    from users
-                    where lower(username) = ? and (password_hash is not null or oauth_provider is not null)
-                    limit 1
+                    from lookup_user_for_authentication(?)
                     """,
                 (rs, rowNum) -> mapRow(rs),
                 normalized

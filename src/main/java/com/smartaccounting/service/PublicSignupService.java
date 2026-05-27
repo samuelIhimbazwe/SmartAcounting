@@ -22,6 +22,7 @@ import com.smartaccounting.sms.RwandaMobileNetwork;
 import com.smartaccounting.sms.RwandaMobileNetworkDetector;
 import com.smartaccounting.signup.PublicOtpService;
 import com.smartaccounting.signup.PublicRateLimitService;
+import com.smartaccounting.tenant.TenantContext;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -147,47 +148,48 @@ public class PublicSignupService {
                 plan,
                 billingCycle
             );
-            jdbcTemplate.update(
-                """
-                    insert into users (id, tenant_id, username, role, created_at, password_hash, phone, self_service_owner)
-                    values (?, ?, ?, 'CEO', now(), ?, ?, true)
-                    """,
-                userId,
-                tenantId,
-                email,
-                hash,
-                phone
-            );
-        } catch (DataIntegrityViolationException ex) {
-            throw new ConflictException();
+            TenantContext.set(tenantId, userId);
+            try {
+                jdbcTemplate.update(
+                    """
+                        insert into users (id, tenant_id, username, role, created_at, password_hash, phone, self_service_owner)
+                        values (?, ?, ?, 'CEO', now(), ?, ?, true)
+                        """,
+                    userId,
+                    tenantId,
+                    email,
+                    hash,
+                    phone
+                );
+            } catch (DataIntegrityViolationException ex) {
+                throw new ConflictException();
+            }
+
+            // RBAC roles are created during onboarding Q&A (POST /tenant/roles/setup), not at signup.
+            // Staff invited to an existing tenant receive role assignments via AdminTenantUserService.invite().
+            String otpCode = otpService.generateAndStore(OTP_SIGNUP, phone);
+            String sessionToken = UUID.randomUUID().toString();
+            storeSignupSession(sessionToken, tenantId, userId, email, req.businessName().trim());
+
+            String welcome = "Welcome to SmartAccounting " + req.businessName().trim()
+                + ". Login at " + signupProperties.getLoginUrlText()
+                + " with " + email + ". Your 30-day free trial has started.";
+            smsDispatchService.send(tenantId, UUID.randomUUID(), "SIGNUP_WELCOME", java.util.List.of(phone), welcome);
+            int otpSmsDelivered = dispatchSignupOtpSms(tenantId, phone, otpCode);
+
+            String adminPhone = signupProperties.getPlatformAdminPhone();
+            if (!adminPhone.isBlank()) {
+                String alert = "New signup: " + req.businessName().trim()
+                    + " owner " + req.ownerName().trim()
+                    + " email " + email + " phone " + phone;
+                smsDispatchService.send(tenantId, UUID.randomUUID(), "SIGNUP_ALERT",
+                    java.util.List.of(PhoneNormalizer.normalize(adminPhone)), alert);
+            }
+
+            return buildSignupResponse(tenantId, userId, sessionToken, phone, otpCode, otpSmsDelivered);
+        } finally {
+            TenantContext.clear();
         }
-
-        // RBAC roles are created during onboarding Q&A (POST /tenant/roles/setup), not at signup.
-        // Staff invited to an existing tenant receive role assignments via AdminTenantUserService.invite().
-        String otpCode = otpService.generateAndStore(OTP_SIGNUP, phone);
-        String sessionToken = UUID.randomUUID().toString();
-        redisTemplate.opsForValue().set(
-            SESSION_KEY + sessionToken,
-            tenantId + "|" + userId + "|" + email + "|" + req.businessName().trim(),
-            Duration.ofDays(7)
-        );
-
-        String welcome = "Welcome to SmartAccounting " + req.businessName().trim()
-            + ". Login at " + signupProperties.getLoginUrlText()
-            + " with " + email + ". Your 30-day free trial has started.";
-        smsDispatchService.send(tenantId, UUID.randomUUID(), "SIGNUP_WELCOME", java.util.List.of(phone), welcome);
-        int otpSmsDelivered = dispatchSignupOtpSms(tenantId, phone, otpCode);
-
-        String adminPhone = signupProperties.getPlatformAdminPhone();
-        if (!adminPhone.isBlank()) {
-            String alert = "New signup: " + req.businessName().trim()
-                + " owner " + req.ownerName().trim()
-                + " email " + email + " phone " + phone;
-            smsDispatchService.send(tenantId, UUID.randomUUID(), "SIGNUP_ALERT",
-                java.util.List.of(PhoneNormalizer.normalize(adminPhone)), alert);
-        }
-
-        return buildSignupResponse(tenantId, userId, sessionToken, phone, otpCode, otpSmsDelivered);
     }
 
     @Transactional
@@ -236,48 +238,49 @@ public class PublicSignupService {
                 plan,
                 billingCycle
             );
-            jdbcTemplate.update(
-                """
-                    insert into users (id, tenant_id, username, role, created_at, password_hash, phone, self_service_owner, oauth_provider, oauth_subject)
-                    values (?, ?, ?, 'CEO', now(), null, ?, true, ?, ?)
-                    """,
-                userId,
-                tenantId,
-                email,
-                phone,
-                identity.provider(),
-                identity.subject()
-            );
-        } catch (DataIntegrityViolationException ex) {
-            throw new ConflictException();
+            TenantContext.set(tenantId, userId);
+            try {
+                jdbcTemplate.update(
+                    """
+                        insert into users (id, tenant_id, username, role, created_at, password_hash, phone, self_service_owner, oauth_provider, oauth_subject)
+                        values (?, ?, ?, 'CEO', now(), null, ?, true, ?, ?)
+                        """,
+                    userId,
+                    tenantId,
+                    email,
+                    phone,
+                    identity.provider(),
+                    identity.subject()
+                );
+            } catch (DataIntegrityViolationException ex) {
+                throw new ConflictException();
+            }
+
+            // RBAC roles are created during onboarding Q&A (POST /tenant/roles/setup), not at signup.
+            // Staff invited to an existing tenant receive role assignments via AdminTenantUserService.invite().
+            String otpCode = otpService.generateAndStore(OTP_SIGNUP, phone);
+            String sessionToken = UUID.randomUUID().toString();
+            storeSignupSession(sessionToken, tenantId, userId, email, req.businessName().trim());
+
+            String welcome = "Welcome to SmartAccounting " + req.businessName().trim()
+                + ". Login at " + signupProperties.getLoginUrlText()
+                + " with " + email + ". Your 30-day free trial has started.";
+            smsDispatchService.send(tenantId, UUID.randomUUID(), "SIGNUP_WELCOME", java.util.List.of(phone), welcome);
+            int otpSmsDelivered = dispatchSignupOtpSms(tenantId, phone, otpCode);
+
+            String adminPhone = signupProperties.getPlatformAdminPhone();
+            if (!adminPhone.isBlank()) {
+                String alert = "New signup (OAuth): " + req.businessName().trim()
+                    + " owner " + ownerLabel
+                    + " email " + email + " phone " + phone;
+                smsDispatchService.send(tenantId, UUID.randomUUID(), "SIGNUP_ALERT",
+                    java.util.List.of(PhoneNormalizer.normalize(adminPhone)), alert);
+            }
+
+            return buildSignupResponse(tenantId, userId, sessionToken, phone, otpCode, otpSmsDelivered);
+        } finally {
+            TenantContext.clear();
         }
-
-        // RBAC roles are created during onboarding Q&A (POST /tenant/roles/setup), not at signup.
-        // Staff invited to an existing tenant receive role assignments via AdminTenantUserService.invite().
-        String otpCode = otpService.generateAndStore(OTP_SIGNUP, phone);
-        String sessionToken = UUID.randomUUID().toString();
-        redisTemplate.opsForValue().set(
-            SESSION_KEY + sessionToken,
-            tenantId + "|" + userId + "|" + email + "|" + req.businessName().trim(),
-            Duration.ofDays(7)
-        );
-
-        String welcome = "Welcome to SmartAccounting " + req.businessName().trim()
-            + ". Login at " + signupProperties.getLoginUrlText()
-            + " with " + email + ". Your 30-day free trial has started.";
-        smsDispatchService.send(tenantId, UUID.randomUUID(), "SIGNUP_WELCOME", java.util.List.of(phone), welcome);
-        int otpSmsDelivered = dispatchSignupOtpSms(tenantId, phone, otpCode);
-
-        String adminPhone = signupProperties.getPlatformAdminPhone();
-        if (!adminPhone.isBlank()) {
-            String alert = "New signup (OAuth): " + req.businessName().trim()
-                + " owner " + ownerLabel
-                + " email " + email + " phone " + phone;
-            smsDispatchService.send(tenantId, UUID.randomUUID(), "SIGNUP_ALERT",
-                java.util.List.of(PhoneNormalizer.normalize(adminPhone)), alert);
-        }
-
-        return buildSignupResponse(tenantId, userId, sessionToken, phone, otpCode, otpSmsDelivered);
     }
 
     @Transactional
@@ -288,27 +291,36 @@ public class PublicSignupService {
             throw new IllegalArgumentException("Invalid credentials");
         }
 
-        UUID tenantId = jdbcTemplate.query(
+        Map<String, Object> pending = jdbcTemplate.query(
             """
-                select t.id from tenants t
-                join users u on u.tenant_id = t.id
-                where u.phone = ? and t.phone_verified = false
-                limit 1
+                select tenant_id, user_id, username
+                from lookup_signup_pending_by_phone(?)
                 """,
-            rs -> rs.next() ? UUID.fromString(rs.getString("id")) : null,
+            rs -> {
+                if (!rs.next()) {
+                    return null;
+                }
+                return Map.<String, Object>of(
+                    "tenant_id", UUID.fromString(rs.getString("tenant_id")),
+                    "user_id", UUID.fromString(rs.getString("user_id")),
+                    "username", rs.getString("username")
+                );
+            },
             phone
         );
-        if (tenantId == null) {
+        if (pending == null) {
             throw new IllegalArgumentException("Verification failed");
         }
-        jdbcTemplate.update("update tenants set phone_verified = true where id = ?", tenantId);
+        UUID tenantId = (UUID) pending.get("tenant_id");
+        UUID userId = (UUID) pending.get("user_id");
+        String username = pending.get("username").toString();
 
-        Map<String, Object> row = jdbcTemplate.queryForMap(
-            "select id, tenant_id, username from users where phone = ? and tenant_id = ? limit 1",
-            phone, tenantId
-        );
-        UUID userId = UUID.fromString(row.get("id").toString());
-        String username = row.get("username").toString();
+        TenantContext.set(tenantId, userId);
+        try {
+            jdbcTemplate.update("update tenants set phone_verified = true where id = ?", tenantId);
+        } finally {
+            TenantContext.clear();
+        }
 
         UserDetails userDetails = userDetailsService.loadUserByUsername(username);
         AuthSessionProfile session = authSessionService.buildSession(tenantId, userId);
@@ -330,27 +342,28 @@ public class PublicSignupService {
             && !rateLimitService.allow("ratelimit:public:resend:" + phone, 3, Duration.ofHours(1))) {
             throw new com.smartaccounting.exception.RateLimitExceededException("Too many resend attempts.");
         }
-        Boolean pending = jdbcTemplate.query(
+        Map<String, Object> pending = jdbcTemplate.query(
             """
-                select count(*) > 0 from tenants t
-                join users u on u.tenant_id = t.id
-                where u.phone = ? and t.phone_verified = false
+                select tenant_id, user_id, username
+                from lookup_signup_pending_by_phone(?)
                 """,
             rs -> {
-                rs.next();
-                return rs.getBoolean(1);
+                if (!rs.next()) {
+                    return null;
+                }
+                return Map.<String, Object>of(
+                    "tenant_id", UUID.fromString(rs.getString("tenant_id")),
+                    "user_id", UUID.fromString(rs.getString("user_id")),
+                    "username", rs.getString("username")
+                );
             },
             phone
         );
-        if (!Boolean.TRUE.equals(pending)) {
+        if (pending == null) {
             throw new IllegalArgumentException("Cannot resend code");
         }
         String otpCode = otpService.generateAndStore(OTP_SIGNUP, phone);
-        UUID tenantId = jdbcTemplate.query(
-            "select tenant_id from users where phone = ? limit 1",
-            rs -> rs.next() ? UUID.fromString(rs.getString("tenant_id")) : UUID.randomUUID(),
-            phone
-        );
+        UUID tenantId = (UUID) pending.get("tenant_id");
         int delivered = dispatchSignupOtpSms(tenantId, phone, otpCode);
         return buildOtpDeliveryMeta(phone, otpCode, delivered);
     }
@@ -422,7 +435,9 @@ public class PublicSignupService {
         }
         String phone = PhoneNormalizer.normalize(phoneRaw);
         UUID tenantId = jdbcTemplate.query(
-            "select tenant_id from users where phone = ? and password_hash is not null limit 1",
+            """
+                select tenant_id from lookup_password_reset_user_by_phone(?)
+                """,
             rs -> rs.next() ? UUID.fromString(rs.getString("tenant_id")) : null,
             phone
         );
@@ -446,7 +461,7 @@ public class PublicSignupService {
         if (req.email() != null && !req.email().isBlank()) {
             String em = normalizeEmail(req.email());
             return jdbcTemplate.query(
-                "select phone from users where lower(username) = ? and password_hash is not null limit 1",
+                "select lookup_password_reset_phone_by_email(?) as phone",
                 rs -> rs.next() ? rs.getString("phone") : null,
                 em
             );
@@ -463,57 +478,58 @@ public class PublicSignupService {
         }
         Map<String, Object> row = jdbcTemplate.queryForMap(
             """
-                select id, tenant_id from users
-                where phone = ? and password_hash is not null
-                limit 1
+                select user_id, tenant_id
+                from lookup_password_reset_user_by_phone(?)
                 """,
             phone
         );
-        UUID userId = UUID.fromString(row.get("id").toString());
+        UUID userId = UUID.fromString(row.get("user_id").toString());
         UUID tenantId = UUID.fromString(row.get("tenant_id").toString());
         String hash = passwordEncoder.encode(req.newPassword());
-        jdbcTemplate.update("update users set password_hash = ? where id = ?", hash, userId);
-        refreshTokenService.revokeAllForUser(tenantId, userId);
+        TenantContext.set(tenantId, userId);
+        try {
+            jdbcTemplate.update("update users set password_hash = ? where id = ?", hash, userId);
+            refreshTokenService.revokeAllForUser(tenantId, userId);
+        } finally {
+            TenantContext.clear();
+        }
+    }
+
+    private void storeSignupSession(String sessionToken, UUID tenantId, UUID userId, String email, String businessName) {
+        try {
+            redisTemplate.opsForValue().set(
+                SESSION_KEY + sessionToken,
+                tenantId + "|" + userId + "|" + email + "|" + businessName,
+                Duration.ofDays(7)
+            );
+        } catch (RuntimeException ignored) {
+            // Signup OTP and verify flow do not require this session key; avoid failing signup when Redis is down.
+        }
     }
 
     private boolean existsSignupEmail(String emailLower) {
-        Boolean ok = jdbcTemplate.query(
-            """
-                select count(*) > 0 from users
-                where lower(username) = ? and (password_hash is not null or oauth_provider is not null)
-                """,
-            rs -> {
-                rs.next();
-                return rs.getBoolean(1);
-            },
+        return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
+            "select public_signup_email_taken(?)",
+            Boolean.class,
             emailLower
-        );
-        return Boolean.TRUE.equals(ok);
+        ));
     }
 
     private boolean existsOauthSubject(String provider, String subject) {
-        Boolean ok = jdbcTemplate.query(
-            "select count(*) > 0 from users where oauth_provider = ? and oauth_subject = ?",
-            rs -> {
-                rs.next();
-                return rs.getBoolean(1);
-            },
+        return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
+            "select public_signup_oauth_subject_taken(?, ?)",
+            Boolean.class,
             provider,
             subject
-        );
-        return Boolean.TRUE.equals(ok);
+        ));
     }
 
     private boolean existsPhone(String phone) {
-        Boolean ok = jdbcTemplate.query(
-            "select count(*) > 0 from users where phone = ?",
-            rs -> {
-                rs.next();
-                return rs.getBoolean(1);
-            },
+        return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
+            "select public_signup_phone_taken(?)",
+            Boolean.class,
             phone
-        );
-        return Boolean.TRUE.equals(ok);
+        ));
     }
 
     private static String normalizeEmail(String email) {
