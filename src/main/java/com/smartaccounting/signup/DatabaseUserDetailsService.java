@@ -29,8 +29,10 @@ public class DatabaseUserDetailsService implements UserDetailsService {
         try {
             return jdbcTemplate.queryForObject(
                 """
-                    select username, password_hash, role
-                    from lookup_user_for_authentication(?)
+                    select f.username, f.password_hash, f.role
+                    from lookup_user_for_authentication(?::text) as f(
+                        username, password_hash, role, self_service_owner
+                    )
                     """,
                 (rs, rowNum) -> mapRow(rs),
                 normalized

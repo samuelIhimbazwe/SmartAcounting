@@ -17,8 +17,10 @@ public class SelfServiceUserLookup {
         }
         Boolean b = jdbcTemplate.query(
             """
-                select self_service_owner
-                from lookup_user_for_authentication(?)
+                select f.self_service_owner
+                from lookup_user_for_authentication(?::text) as f(
+                    username, password_hash, role, self_service_owner
+                )
                 """,
             rs -> rs.next() ? rs.getBoolean("self_service_owner") : null,
             username.trim()
@@ -33,8 +35,10 @@ public class SelfServiceUserLookup {
         }
         Boolean pwd = jdbcTemplate.query(
             """
-                select case when password_hash is not null then true else false end as pwd
-                from lookup_user_for_authentication(?)
+                select case when f.password_hash is not null then true else false end as pwd
+                from lookup_user_for_authentication(?::text) as f(
+                    username, password_hash, role, self_service_owner
+                )
                 """,
             rs -> {
                 if (!rs.next()) {

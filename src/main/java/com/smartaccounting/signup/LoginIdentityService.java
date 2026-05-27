@@ -81,8 +81,8 @@ public class LoginIdentityService {
         }
         LoginIdentity identity = jdbcTemplate.query(
             """
-                select tenant_id, user_id, role
-                from lookup_login_identity(?)
+                select li.tenant_id, li.user_id, li.role
+                from lookup_login_identity(?::text) as li(tenant_id, user_id, role)
                 """,
             rs -> {
                 if (!rs.next()) {
@@ -105,8 +105,10 @@ public class LoginIdentityService {
         }
         Boolean backed = jdbcTemplate.query(
             """
-                select password_hash is not null and length(trim(password_hash)) > 0
-                from lookup_user_for_authentication(?)
+                select f.password_hash is not null and length(trim(f.password_hash)) > 0
+                from lookup_user_for_authentication(?::text) as f(
+                    username, password_hash, role, self_service_owner
+                )
                 """,
             rs -> rs.next() && rs.getBoolean(1),
             normalizedUsername

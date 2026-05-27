@@ -333,8 +333,8 @@ public class PublicSignupService {
     private Map<String, Object> lookupSignupPendingByPhone(String phone) {
         return jdbcTemplate.query(
             """
-                select tenant_id, user_id, username
-                from lookup_signup_pending_by_phone(?)
+                select p.tenant_id, p.user_id, p.username
+                from lookup_signup_pending_by_phone(?::text) as p(tenant_id, user_id, username)
                 """,
             rs -> {
                 if (!rs.next()) {
@@ -434,7 +434,8 @@ public class PublicSignupService {
         String phone = PhoneNormalizer.normalize(phoneRaw);
         UUID tenantId = jdbcTemplate.query(
             """
-                select tenant_id from lookup_password_reset_user_by_phone(?)
+                select r.tenant_id
+                from lookup_password_reset_user_by_phone(?::text) as r(user_id, tenant_id)
                 """,
             rs -> rs.next() ? UUID.fromString(rs.getString("tenant_id")) : null,
             phone
@@ -459,7 +460,7 @@ public class PublicSignupService {
         if (req.email() != null && !req.email().isBlank()) {
             String em = normalizeEmail(req.email());
             return jdbcTemplate.query(
-                "select lookup_password_reset_phone_by_email(?) as phone",
+                "select lookup_password_reset_phone_by_email(?::text) as phone",
                 rs -> rs.next() ? rs.getString("phone") : null,
                 em
             );
@@ -476,8 +477,8 @@ public class PublicSignupService {
         }
         Map<String, Object> row = jdbcTemplate.queryForMap(
             """
-                select user_id, tenant_id
-                from lookup_password_reset_user_by_phone(?)
+                select r.user_id, r.tenant_id
+                from lookup_password_reset_user_by_phone(?::text) as r(user_id, tenant_id)
                 """,
             phone
         );
@@ -507,7 +508,7 @@ public class PublicSignupService {
 
     private boolean existsSignupEmail(String emailLower) {
         return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
-            "select public_signup_email_taken(?)",
+            "select public_signup_email_taken(?::text)",
             Boolean.class,
             emailLower
         ));
@@ -515,7 +516,7 @@ public class PublicSignupService {
 
     private boolean existsOauthSubject(String provider, String subject) {
         return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
-            "select public_signup_oauth_subject_taken(?, ?)",
+            "select public_signup_oauth_subject_taken(?::text, ?::text)",
             Boolean.class,
             provider,
             subject
@@ -524,7 +525,7 @@ public class PublicSignupService {
 
     private boolean existsPhone(String phone) {
         return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
-            "select public_signup_phone_taken(?)",
+            "select public_signup_phone_taken(?::text)",
             Boolean.class,
             phone
         ));

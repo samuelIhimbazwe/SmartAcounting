@@ -24,8 +24,10 @@ public class DbUserLoginValidator {
         String un = username.trim().toLowerCase(Locale.ROOT);
         Boolean passwordBacked = jdbcTemplate.query(
             """
-                select password_hash is not null and length(trim(password_hash)) > 0
-                from lookup_user_for_authentication(?)
+                select f.password_hash is not null and length(trim(f.password_hash)) > 0
+                from lookup_user_for_authentication(?::text) as f(
+                    username, password_hash, role, self_service_owner
+                )
                 """,
             rs -> rs.next() && rs.getBoolean(1),
             un
@@ -38,8 +40,8 @@ public class DbUserLoginValidator {
         Boolean ok = jdbcTemplate.query(
             """
                 select count(*) > 0
-                from lookup_login_identity(?)
-                where tenant_id = ? and user_id = ?
+                from lookup_login_identity(?::text) as li(tenant_id, user_id, role)
+                where li.tenant_id = ? and li.user_id = ?
                 """,
             rs -> {
                 rs.next();
