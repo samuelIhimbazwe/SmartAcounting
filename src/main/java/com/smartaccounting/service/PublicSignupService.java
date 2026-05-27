@@ -334,7 +334,7 @@ public class PublicSignupService {
         return jdbcTemplate.query(
             """
                 select p.tenant_id, p.user_id, p.username
-                from lookup_signup_pending_by_phone(?::text) as p(tenant_id, user_id, username)
+                from lookup_signup_pending_by_phone(cast(? as text)) p
                 """,
             rs -> {
                 if (!rs.next()) {
@@ -460,7 +460,7 @@ public class PublicSignupService {
         if (req.email() != null && !req.email().isBlank()) {
             String em = normalizeEmail(req.email());
             return jdbcTemplate.query(
-                "select lookup_password_reset_phone_by_email(?::text) as phone",
+                "select lookup_password_reset_phone_by_email(cast(? as text)) as phone",
                 rs -> rs.next() ? rs.getString("phone") : null,
                 em
             );
@@ -478,7 +478,7 @@ public class PublicSignupService {
         Map<String, Object> row = jdbcTemplate.queryForMap(
             """
                 select r.user_id, r.tenant_id
-                from lookup_password_reset_user_by_phone(?::text) as r(user_id, tenant_id)
+                from lookup_password_reset_user_by_phone(cast(? as text)) r
                 """,
             phone
         );
@@ -516,7 +516,7 @@ public class PublicSignupService {
 
     private boolean existsOauthSubject(String provider, String subject) {
         return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
-            "select public_signup_oauth_subject_taken(?::text, ?::text)",
+            "select public_signup_oauth_subject_taken(cast(? as text), cast(? as text))",
             Boolean.class,
             provider,
             subject
@@ -525,7 +525,7 @@ public class PublicSignupService {
 
     private boolean existsPhone(String phone) {
         return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
-            "select public_signup_phone_taken(?::text)",
+            "select public_signup_phone_taken(cast(? as text))",
             Boolean.class,
             phone
         ));
