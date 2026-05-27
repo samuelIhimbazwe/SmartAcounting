@@ -296,11 +296,42 @@ public class PublicSignupService {
     public AuthResponse verifyPhone(VerifyPhoneRequest req) {
         String phone = PhoneNormalizer.normalize(req.phone());
         otpService.assertNotLocked(LOCK_SIGNUP, phone);
+
+        Map<String, Object> pending = lookupSignupPendingByPhone(phone);
+        if (pending == null) {
+            throw new IllegalArgumentException("Verification failed");
+        }
         if (!otpService.verifyAndConsume(OTP_SIGNUP, LOCK_SIGNUP, FAIL_SIGNUP, phone, req.otp())) {
             throw new IllegalArgumentException("Invalid credentials");
         }
 
-        Map<String, Object> pending = jdbcTemplate.query(
+        UUID tenantId = (UUID) pending.get("tenant_id");
+        UUID userId = (UUID) pending.get("user_id");
+        String username = pending.get("username").toString();
+
+        bindTenantSession(tenantId, userId);
+        try {
+            jdbcTemplate.update("update tenants set phone_verified = true where id = ?", tenantId);
+
+            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+            AuthSessionProfile session = authSessionService.buildSession(tenantId, userId);
+            String tid = tenantId.toString();
+            String uid = userId.toString();
+            String access = jwtService.generateToken(
+                userDetails,
+                tid,
+                uid,
+                authSessionService.loadEffectivePermissions(tenantId, userId, session.role())
+            );
+            String refresh = refreshTokenService.issue(tid, uid, userDetails);
+            return AuthResponse.fromSession(access, "Bearer", jwtService.expirationSeconds(), refresh, session);
+        } finally {
+            TenantContext.clear();
+        }
+    }
+
+    private Map<String, Object> lookupSignupPendingByPhone(String phone) {
+        return jdbcTemplate.query(
             """
                 select tenant_id, user_id, username
                 from lookup_signup_pending_by_phone(?)
@@ -317,32 +348,6 @@ public class PublicSignupService {
             },
             phone
         );
-        if (pending == null) {
-            throw new IllegalArgumentException("Verification failed");
-        }
-        UUID tenantId = (UUID) pending.get("tenant_id");
-        UUID userId = (UUID) pending.get("user_id");
-        String username = pending.get("username").toString();
-
-        bindTenantSession(tenantId, userId);
-        try {
-            jdbcTemplate.update("update tenants set phone_verified = true where id = ?", tenantId);
-        } finally {
-            TenantContext.clear();
-        }
-
-        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-        AuthSessionProfile session = authSessionService.buildSession(tenantId, userId);
-        String tid = tenantId.toString();
-        String uid = userId.toString();
-        String access = jwtService.generateToken(
-            userDetails,
-            tid,
-            uid,
-            authSessionService.loadEffectivePermissions(tenantId, userId, session.role())
-        );
-        String refresh = refreshTokenService.issue(tid, uid, userDetails);
-        return AuthResponse.fromSession(access, "Bearer", jwtService.expirationSeconds(), refresh, session);
     }
 
     public ResendOtpResponse resendOtp(String phoneRaw) {
@@ -351,23 +356,7 @@ public class PublicSignupService {
             && !rateLimitService.allow("ratelimit:public:resend:" + phone, 3, Duration.ofHours(1))) {
             throw new com.smartaccounting.exception.RateLimitExceededException("Too many resend attempts.");
         }
-        Map<String, Object> pending = jdbcTemplate.query(
-            """
-                select tenant_id, user_id, username
-                from lookup_signup_pending_by_phone(?)
-                """,
-            rs -> {
-                if (!rs.next()) {
-                    return null;
-                }
-                return Map.<String, Object>of(
-                    "tenant_id", UUID.fromString(rs.getString("tenant_id")),
-                    "user_id", UUID.fromString(rs.getString("user_id")),
-                    "username", rs.getString("username")
-                );
-            },
-            phone
-        );
+        Map<String, Object> pending = lookupSignupPendingByPhone(phone);
         if (pending == null) {
             throw new IllegalArgumentException("Cannot resend code");
         }
