@@ -3,6 +3,7 @@ import type { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import { normalizeApiError } from './errors'
 import { useAuthStore } from '../stores/authStore'
 import { captureError } from '../monitoring/sentry'
+import { isUuid } from '../tenant/uuid'
 
 interface RetryableRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean
@@ -25,8 +26,12 @@ apiClient.interceptors.request.use((config) => {
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`
   }
-  config.headers['X-Tenant-Id'] = tenantId
-  config.headers['X-User-Id'] = userId
+  if (isUuid(tenantId)) {
+    config.headers['X-Tenant-Id'] = tenantId
+  }
+  if (isUuid(userId)) {
+    config.headers['X-User-Id'] = userId
+  }
   return config
 })
 

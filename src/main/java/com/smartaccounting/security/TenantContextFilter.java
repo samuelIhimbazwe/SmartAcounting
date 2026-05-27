@@ -27,15 +27,18 @@ public class TenantContextFilter extends OncePerRequestFilter {
         try {
             String tenant = request.getHeader(TENANT_HEADER);
             String user = request.getHeader(USER_HEADER);
-            if (tenant != null && user != null) {
-                TenantContext.set(UUID.fromString(tenant), UUID.fromString(user));
-                MDC.put("tenantId", tenant);
-                MDC.put("userId", user);
+            UUID tenantId = parseUuidHeader(tenant);
+            UUID userId = parseUuidHeader(user);
+            if (tenantId != null && userId != null) {
+                TenantContext.set(tenantId, userId);
+                MDC.put("tenantId", tenantId.toString());
+                MDC.put("userId", userId.toString());
             }
             String location = request.getHeader(LOCATION_HEADER);
-            if (location != null && !location.isBlank()) {
-                LocationContext.set(UUID.fromString(location.trim()));
-                MDC.put("locationId", location.trim());
+            UUID locationId = parseUuidHeader(location);
+            if (locationId != null) {
+                LocationContext.set(locationId);
+                MDC.put("locationId", locationId.toString());
             }
             filterChain.doFilter(request, response);
         } finally {
@@ -44,6 +47,18 @@ public class TenantContextFilter extends OncePerRequestFilter {
             MDC.remove("locationId");
             TenantContext.clear();
             LocationContext.clear();
+        }
+    }
+
+    /** Ignore demo placeholders such as {@code public} — invalid values must not fail the request. */
+    static UUID parseUuidHeader(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(raw.trim());
+        } catch (IllegalArgumentException ex) {
+            return null;
         }
     }
 }
