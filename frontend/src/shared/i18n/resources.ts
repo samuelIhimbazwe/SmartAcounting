@@ -26,7 +26,7 @@ export const resources = {
         loginRememberMe: 'Keep me signed in',
         loginForgotPassword: 'Forgot password?',
         loginAdvancedToggle: 'Workspace settings',
-        loginAdvancedHelper: 'Override the tenant ID if you are joining a specific workspace.',
+        loginAdvancedHelper: 'Leave blank for normal email login. Only enter a workspace tenant UUID if support gave you one.',
         loginOr: 'or continue with',
         loginSsoGoogle: 'Google',
         loginSsoMicrosoft: 'Microsoft',

@@ -1,12 +1,13 @@
 import { apiClient } from './client'
 import type { Role } from '../types/roles'
 import { normalizeRoleProfile, type RoleProfile } from '../types/roleProfiles'
+import { isUuid } from '../tenant/uuid'
 
 interface LoginRequest {
   username: string
   password: string
-  tenantId: string
-  userId: string
+  tenantId?: string
+  userId?: string
 }
 
 export interface AssignedRoleSummary {
@@ -67,7 +68,17 @@ export function toExpiryTimestamp(expiresIn?: number) {
 }
 
 export async function login(request: LoginRequest): Promise<AuthSession> {
-  const response = await apiClient.post<LoginResponse>('/api/v1/auth/login', request)
+  const body: Record<string, string> = {
+    username: request.username,
+    password: request.password,
+  }
+  if (isUuid(request.tenantId)) {
+    body.tenantId = request.tenantId
+  }
+  if (isUuid(request.userId)) {
+    body.userId = request.userId
+  }
+  const response = await apiClient.post<LoginResponse>('/api/v1/auth/login', body)
   const accessToken = response.data.accessToken ?? response.data.token
   if (!accessToken) {
     throw new Error('Login response missing access token')

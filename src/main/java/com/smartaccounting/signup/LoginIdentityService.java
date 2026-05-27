@@ -60,35 +60,43 @@ public class LoginIdentityService {
             return db.get();
         }
 
-        return new LoginIdentity(
-            UUID.fromString(requestTenantId.trim()),
-            UUID.fromString(requestUserId.trim()),
-            "CEO"
-        );
+        if (requestTenantId == null || requestTenantId.isBlank()
+            || requestUserId == null || requestUserId.isBlank()) {
+            throw new IllegalArgumentException("Invalid credentials");
+        }
+        try {
+            return new LoginIdentity(
+                UUID.fromString(requestTenantId.trim()),
+                UUID.fromString(requestUserId.trim()),
+                "CEO"
+            );
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalArgumentException("Invalid credentials");
+        }
     }
 
     private Optional<LoginIdentity> resolveFromDatabase(String normalizedUsername) {
         if (normalizedUsername.isEmpty()) {
             return Optional.empty();
         }
-        try {
-            return Optional.of(jdbcTemplate.queryForObject(
-                """
-                    select tenant_id, id, role
-                    from users
-                    where lower(username) = ?
-                    limit 1
-                    """,
-                (rs, rowNum) -> new LoginIdentity(
+        LoginIdentity identity = jdbcTemplate.query(
+            """
+                select tenant_id, user_id, role
+                from lookup_login_identity(?)
+                """,
+            rs -> {
+                if (!rs.next()) {
+                    return null;
+                }
+                return new LoginIdentity(
                     (UUID) rs.getObject("tenant_id"),
-                    (UUID) rs.getObject("id"),
+                    (UUID) rs.getObject("user_id"),
                     rs.getString("role")
-                ),
-                normalizedUsername
-            ));
-        } catch (org.springframework.dao.EmptyResultDataAccessException ex) {
-            return Optional.empty();
-        }
+                );
+            },
+            normalizedUsername
+        );
+        return Optional.ofNullable(identity);
     }
 
     private boolean isPasswordBacked(String normalizedUsername) {
@@ -98,14 +106,9 @@ public class LoginIdentityService {
         Boolean backed = jdbcTemplate.query(
             """
                 select password_hash is not null and length(trim(password_hash)) > 0
-                from users where lower(username) = ? limit 1
+                from lookup_user_for_authentication(?)
                 """,
-            rs -> {
-                if (!rs.next()) {
-                    return false;
-                }
-                return rs.getBoolean(1);
-            },
+            rs -> rs.next() && rs.getBoolean(1),
             normalizedUsername
         );
         return Boolean.TRUE.equals(backed);
