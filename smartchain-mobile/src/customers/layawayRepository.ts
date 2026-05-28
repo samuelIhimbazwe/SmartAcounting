@@ -1,7 +1,14 @@
 import {database} from '../db';
 import {LayawayOrder} from '../db/models/LayawayOrder';
+import {Customer} from '../db/models/Customer';
 import {adjustVariantStock} from '../inventory/inventoryRepository';
 import type {CartItem} from '../store/slices/posSlice';
+import {
+  cancelLayawayOnServer,
+  collectLayawayOnServer,
+  createLayawayOnServer,
+  recordLayawayPaymentOnServer,
+} from '../api/layaway';
 
 const LAYAWAY_DEPOSIT_PCT = 0.3;
 
@@ -13,6 +20,61 @@ async function applyCartStockDelta(cartJson: string, sign: -1 | 1): Promise<void
     if (item.variantId && item.quantity > 0) {
       await adjustVariantStock(item.variantId, sign * item.quantity);
     }
+  }
+}
+
+async function resolveCustomerServerId(localCustomerId: string): Promise<string | null> {
+  try {
+    const customer = await database.get<Customer>('customers').find(localCustomerId);
+    return customer.serverId ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function syncCreateToServer(order: LayawayOrder): Promise<void> {
+  const customerServerId = await resolveCustomerServerId(order.customerId);
+  if (!customerServerId) {
+    return;
+  }
+  try {
+    const remote = await createLayawayOnServer(customerServerId, {
+      totalAmount: order.totalAmount,
+      depositAmount: order.depositAmount,
+      currencyCode: order.currencyCode,
+      cartJson: order.cartJson,
+      collectionDate: order.collectionDate,
+    });
+    await database.write(async () => {
+      await order.update(r => {
+        r.serverId = remote.id;
+        r.needsSync = false;
+      });
+    });
+  } catch {
+    // Offline or auth failure — local record kept; retry on next mutation.
+  }
+}
+
+async function syncMutationToServer(
+  order: LayawayOrder,
+  action: 'payment' | 'collect' | 'cancel',
+  amount?: number,
+): Promise<void> {
+  const customerServerId = await resolveCustomerServerId(order.customerId);
+  if (!customerServerId || !order.serverId) {
+    return;
+  }
+  try {
+    if (action === 'payment' && amount != null) {
+      await recordLayawayPaymentOnServer(customerServerId, order.serverId, amount);
+    } else if (action === 'collect') {
+      await collectLayawayOnServer(customerServerId, order.serverId);
+    } else if (action === 'cancel') {
+      await cancelLayawayOnServer(customerServerId, order.serverId);
+    }
+  } catch {
+    // Best-effort sync; local state remains source of truth on device.
   }
 }
 
@@ -39,6 +101,7 @@ export async function createLayaway(input: {
     }),
   );
   await applyCartStockDelta(input.cartJson, -1);
+  void syncCreateToServer(order);
   return order;
 }
 
@@ -73,7 +136,11 @@ export async function recordLayawayPayment(
       r.balanceDue = Math.max(0, r.totalAmount - r.depositAmount);
     });
   });
-  return getLayaway(id);
+  const updated = await getLayaway(id);
+  if (updated) {
+    void syncMutationToServer(updated, 'payment', amount);
+  }
+  return updated;
 }
 
 export async function collectLayaway(id: string): Promise<boolean> {
@@ -86,6 +153,10 @@ export async function collectLayaway(id: string): Promise<boolean> {
       r.status = 'COLLECTED';
     });
   });
+  const updated = await getLayaway(id);
+  if (updated) {
+    void syncMutationToServer(updated, 'collect');
+  }
   return true;
 }
 
@@ -100,5 +171,9 @@ export async function cancelLayaway(id: string): Promise<boolean> {
       r.status = 'CANCELLED';
     });
   });
+  const updated = await getLayaway(id);
+  if (updated) {
+    void syncMutationToServer(updated, 'cancel');
+  }
   return true;
 }

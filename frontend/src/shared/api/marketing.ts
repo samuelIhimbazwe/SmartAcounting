@@ -36,7 +36,7 @@ function unwrapArrayResponse<T>(data: unknown): T[] {
 
 export async function listCampaigns(page = 0, size = 50): Promise<CampaignRow[]> {
   const { data } = await apiClient.get<{ content?: CampaignRow[] } | CampaignRow[]>(
-    '/marketing/campaigns',
+    '/api/v1/marketing/campaigns',
     { params: { page, size } },
   )
   return unwrapArrayResponse<CampaignRow>(data)
@@ -44,7 +44,7 @@ export async function listCampaigns(page = 0, size = 50): Promise<CampaignRow[]>
 
 export async function listPromotions(page = 0, size = 50): Promise<PromotionRow[]> {
   const { data } = await apiClient.get<{ content?: PromotionRow[] } | PromotionRow[]>(
-    '/promotions',
+    '/api/v1/promotions',
     { params: { page, size } },
   )
   return unwrapArrayResponse<PromotionRow>(data)
@@ -52,7 +52,7 @@ export async function listPromotions(page = 0, size = 50): Promise<PromotionRow[
 
 export async function listSegments(): Promise<Array<{ segment: string; customerCount: number }>> {
   const { data } = await apiClient.get<unknown>(
-    '/marketing/segments',
+    '/api/v1/marketing/segments',
   )
   return unwrapArrayResponse<{ segment: string; customerCount: number }>(data)
 }

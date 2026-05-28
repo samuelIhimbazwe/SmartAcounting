@@ -117,6 +117,15 @@ export const NAV_ITEMS: NavItem[] = [
     requiredPermission: 'POS_ACCESS',
   },
   {
+    id: 'customers',
+    to: '/customers',
+    labelKey: 'nav.customers',
+    searchLabel: 'Customers',
+    group: 'nav.groupOperations',
+    icon: Users,
+    requiredPermission: 'POS_ACCESS',
+  },
+  {
     id: 'pos-history',
     to: '/pos/history',
     labelKey: 'nav.posHistory',

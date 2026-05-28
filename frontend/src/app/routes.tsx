@@ -87,6 +87,8 @@ const MarketingCampaignsRoute = lazyNamedRoute(
   'MarketingCampaignsRoute',
 )
 const PromotionsRoute = lazyNamedRoute(() => import('../features/production/ProductionRoutes'), 'PromotionsRoute')
+const CustomersRoute = lazyNamedRoute(() => import('../features/customers/CustomersRoute'), 'CustomersRoute')
+const CustomerDetailRoute = lazyNamedRoute(() => import('../features/customers/CustomersRoute'), 'CustomerDetailRoute')
 
 export const appRoutes: RouteObject[] = [
   {
@@ -108,6 +110,8 @@ export const appRoutes: RouteObject[] = [
       { path: '/admin/users-tenants', element: guard('USER_MANAGE', lazyElement(UserTenantManagementRoute)) },
       { path: '/admin/roles', element: guard('ROLE_MANAGE', lazyElement(RoleManagementRoute)) },
       { path: '/pos', element: guard('POS_ACCESS', lazyElement(PosRoute)) },
+      { path: '/customers', element: guard('POS_ACCESS', lazyElement(CustomersRoute)) },
+      { path: '/customers/:id', element: guard('POS_ACCESS', lazyElement(CustomerDetailRoute)) },
       { path: '/pos/history', element: guard('ANALYTICS_OWN', lazyElement(PosSaleHistoryRoute)) },
       { path: '/returns', element: guard('POS_RETURNS', lazyElement(ReturnsRoute)) },
       { path: '/pos/receipts/:receiptId/print', element: guard('POS_ACCESS', lazyElement(PosReceiptPrintRoute)) },

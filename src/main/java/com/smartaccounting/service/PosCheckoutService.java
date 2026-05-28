@@ -336,7 +336,7 @@ public class PosCheckoutService {
                 currency,
                 LocalDate.now().plusDays(14)
             ));
-            customerRetailService.applyOnAccountCharge(customer, onAccountTotal);
+            customerRetailService.applyOnAccountCharge(customer, onAccountTotal, orderId);
         }
 
         if (linkedCustomer != null) {

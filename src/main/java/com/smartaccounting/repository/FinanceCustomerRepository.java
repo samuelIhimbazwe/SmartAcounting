@@ -24,6 +24,7 @@ public interface FinanceCustomerRepository extends JpaRepository<FinanceCustomer
         AND (
             lower(c.customerName) LIKE lower(concat('%', :q, '%'))
             OR c.phone LIKE concat('%', :q, '%')
+            OR lower(c.email) LIKE lower(concat('%', :q, '%'))
         )
         ORDER BY c.customerName
         """)

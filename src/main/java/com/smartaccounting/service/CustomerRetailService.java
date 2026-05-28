@@ -1,18 +1,24 @@
 package com.smartaccounting.service;
 
+import com.smartaccounting.dto.CreateLayawayRequest;
 import com.smartaccounting.dto.CustomerPaymentRequest;
+import com.smartaccounting.dto.LayawayPaymentRequest;
 import com.smartaccounting.dto.LoyaltyTransactionRequest;
 import com.smartaccounting.dto.UpsertCustomerRequest;
+import com.smartaccounting.entity.CustomerCreditLedger;
 import com.smartaccounting.entity.CustomerLoyaltyTransaction;
 import com.smartaccounting.entity.FinanceCustomer;
 import com.smartaccounting.entity.LayawayOrder;
+import com.smartaccounting.entity.PosPaymentTender;
+import com.smartaccounting.entity.PosSaleLine;
 import com.smartaccounting.entity.SalesOrder;
-import com.smartaccounting.entity.SalesQuote;
+import com.smartaccounting.repository.CustomerCreditLedgerRepository;
 import com.smartaccounting.repository.CustomerLoyaltyTransactionRepository;
 import com.smartaccounting.repository.FinanceCustomerRepository;
 import com.smartaccounting.repository.LayawayOrderRepository;
+import com.smartaccounting.repository.PosPaymentTenderRepository;
+import com.smartaccounting.repository.PosSaleLineRepository;
 import com.smartaccounting.repository.SalesOrderRepository;
-import com.smartaccounting.repository.SalesQuoteRepository;
 import com.smartaccounting.tenant.TenantContext;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -21,12 +27,16 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -39,8 +49,10 @@ public class CustomerRetailService {
     private final CustomerLoyaltyTransactionRepository loyaltyRepository;
     private final SalesOrderRepository salesOrderRepository;
     private final LayawayOrderRepository layawayRepository;
-    private final SalesQuoteRepository quoteRepository;
-    private final ReceivablesPayablesService receivablesPayablesService;
+    private final CustomerCreditLedgerRepository creditLedgerRepository;
+    private final PosSaleLineRepository saleLineRepository;
+    private final PosPaymentTenderRepository tenderRepository;
+    private final PriceListService priceListService;
 
     @Value("${retail.credit-alert-threshold-pct:80}")
     private int creditAlertThresholdPct;
@@ -49,14 +61,18 @@ public class CustomerRetailService {
                                  CustomerLoyaltyTransactionRepository loyaltyRepository,
                                  SalesOrderRepository salesOrderRepository,
                                  LayawayOrderRepository layawayRepository,
-                                 SalesQuoteRepository quoteRepository,
-                                 ReceivablesPayablesService receivablesPayablesService) {
+                                 CustomerCreditLedgerRepository creditLedgerRepository,
+                                 PosSaleLineRepository saleLineRepository,
+                                 PosPaymentTenderRepository tenderRepository,
+                                 PriceListService priceListService) {
         this.customerRepository = customerRepository;
         this.loyaltyRepository = loyaltyRepository;
         this.salesOrderRepository = salesOrderRepository;
         this.layawayRepository = layawayRepository;
-        this.quoteRepository = quoteRepository;
-        this.receivablesPayablesService = receivablesPayablesService;
+        this.creditLedgerRepository = creditLedgerRepository;
+        this.saleLineRepository = saleLineRepository;
+        this.tenderRepository = tenderRepository;
+        this.priceListService = priceListService;
     }
 
     public List<Map<String, Object>> search(String q) {
@@ -67,11 +83,16 @@ public class CustomerRetailService {
                 .filter(c -> tenant.equals(c.getTenantId()) && c.getDeletedAt() == null)
                 .toList()
             : customerRepository.search(tenant, term);
-        return rows.stream().map(this::toCustomerMap).toList();
+        Map<String, Instant> lastPurchaseByName = buildLastPurchaseMap(tenant);
+        return rows.stream()
+            .map(c -> toCustomerMap(c, lastPurchaseByName.get(normalizeNameKey(c.getCustomerName()))))
+            .toList();
     }
 
     public Map<String, Object> get(UUID id) {
-        return toCustomerMap(requireCustomer(id));
+        FinanceCustomer c = requireCustomer(id);
+        Instant lastPurchase = resolveLastPurchase(c);
+        return toCustomerMap(c, lastPurchase);
     }
 
     public Map<String, Object> create(UpsertCustomerRequest req) {
@@ -85,7 +106,7 @@ public class CustomerRetailService {
         c.setCreatedAt(Instant.now());
         c.setUpdatedAt(Instant.now());
         customerRepository.save(c);
-        return toCustomerMap(c);
+        return toCustomerMap(c, null);
     }
 
     public Map<String, Object> update(UUID id, UpsertCustomerRequest req) {
@@ -93,7 +114,7 @@ public class CustomerRetailService {
         applyUpsert(c, req);
         c.setUpdatedAt(Instant.now());
         customerRepository.save(c);
-        return toCustomerMap(c);
+        return toCustomerMap(c, resolveLastPurchase(c));
     }
 
     public void softDelete(UUID id) {
@@ -109,29 +130,41 @@ public class CustomerRetailService {
         return salesOrderRepository.findAll().stream()
             .filter(o -> tenant.equals(o.getTenantId())
                 && c.getCustomerName().equalsIgnoreCase(o.getCustomerName()))
-            .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
+            .sorted(Comparator.comparing(SalesOrder::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
             .limit(50)
-            .map(o -> {
-                Map<String, Object> m = new LinkedHashMap<>();
-                m.put("salesOrderId", o.getId());
-                m.put("totalAmount", o.getTotalAmount());
-                m.put("currencyCode", o.getCurrencyCode());
-                m.put("createdAt", o.getCreatedAt());
-                return m;
-            })
+            .map(o -> toSaleMap(tenant, o))
             .toList();
     }
 
     public List<Map<String, Object>> creditStatement(UUID customerId) {
-        requireCustomer(customerId);
-        List<Map<String, Object>> out = new ArrayList<>();
         FinanceCustomer c = requireCustomer(customerId);
-        Map<String, Object> balance = new LinkedHashMap<>();
-        balance.put("type", "BALANCE");
-        balance.put("amount", c.getCreditBalance());
-        balance.put("runningBalance", c.getCreditBalance());
-        balance.put("createdAt", Instant.now());
-        out.add(balance);
+        UUID tenant = requireTenant();
+        ensureLegacyOnAccountCharges(tenant, c);
+
+        List<CustomerCreditLedger> ledger = creditLedgerRepository
+            .findByTenantIdAndCustomerIdOrderByCreatedAtDesc(tenant, customerId);
+
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (CustomerCreditLedger entry : ledger) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("type", entry.getEntryType());
+            row.put("amount", entry.getAmount());
+            row.put("runningBalance", entry.getRunningBalance());
+            row.put("createdAt", entry.getCreatedAt());
+            row.put("description", entry.getNotes() != null ? entry.getNotes() : entry.getReference());
+            row.put("reference", entry.getReference());
+            out.add(row);
+        }
+
+        if (out.isEmpty()) {
+            Map<String, Object> balance = new LinkedHashMap<>();
+            balance.put("type", "BALANCE");
+            balance.put("amount", c.getCreditBalance());
+            balance.put("runningBalance", c.getCreditBalance());
+            balance.put("createdAt", c.getUpdatedAt() != null ? c.getUpdatedAt() : Instant.now());
+            balance.put("description", "Current on-account balance");
+            out.add(balance);
+        }
         return out;
     }
 
@@ -139,17 +172,26 @@ public class CustomerRetailService {
         FinanceCustomer c = requireCustomer(customerId);
         BigDecimal amt = req.amount().setScale(2, RoundingMode.HALF_UP);
         BigDecimal bal = c.getCreditBalance() != null ? c.getCreditBalance() : BigDecimal.ZERO;
-        c.setCreditBalance(bal.subtract(amt).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP));
+        BigDecimal next = bal.subtract(amt).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+        c.setCreditBalance(next);
         c.setUpdatedAt(Instant.now());
         customerRepository.save(c);
+        appendCreditLedger(c.getId(), "PAYMENT", amt.negate(), next, req.reference(), req.notes(), null);
         return Map.of("customerId", customerId, "creditBalance", c.getCreditBalance());
     }
 
-    public void applyOnAccountCharge(FinanceCustomer customer, BigDecimal amount) {
+    public void applyOnAccountCharge(FinanceCustomer customer, BigDecimal amount, UUID salesOrderId) {
         BigDecimal bal = customer.getCreditBalance() != null ? customer.getCreditBalance() : BigDecimal.ZERO;
-        customer.setCreditBalance(bal.add(amount).setScale(2, RoundingMode.HALF_UP));
+        BigDecimal next = bal.add(amount).setScale(2, RoundingMode.HALF_UP);
+        customer.setCreditBalance(next);
         customer.setUpdatedAt(Instant.now());
         customerRepository.save(customer);
+        appendCreditLedger(customer.getId(), "CHARGE", amount, next, null,
+            salesOrderId != null ? "POS on-account sale" : "On-account charge", salesOrderId);
+    }
+
+    public void applyOnAccountCharge(FinanceCustomer customer, BigDecimal amount) {
+        applyOnAccountCharge(customer, amount, null);
     }
 
     public Map<String, Object> creditAlert(UUID customerId) {
@@ -231,15 +273,244 @@ public class CustomerRetailService {
     }
 
     public Map<String, Object> postLoyaltyTransaction(UUID customerId, LoyaltyTransactionRequest req) {
+        FinanceCustomer c = requireCustomer(customerId);
+        int current = c.getLoyaltyPoints() != null ? c.getLoyaltyPoints() : 0;
+        int signedDelta = signedLoyaltyDelta(req.transactionType(), req.points());
+        int next = Math.max(0, current + signedDelta);
+        c.setLoyaltyPoints(next);
+        c.setUpdatedAt(Instant.now());
+        customerRepository.save(c);
+        recordLoyaltyTx(customerId, req.transactionType().trim().toUpperCase(Locale.ROOT), signedDelta, null, req.notes());
+        return toCustomerMap(c, resolveLastPurchase(c));
+    }
+
+    public List<Map<String, Object>> listLayaways(UUID customerId, String status) {
         requireCustomer(customerId);
-        recordLoyaltyTx(customerId, req.transactionType(), req.points(), null, req.notes());
-        return get(customerId);
+        UUID tenant = requireTenant();
+        List<LayawayOrder> rows = status == null || status.isBlank()
+            ? layawayRepository.findByTenantIdAndCustomerIdOrderByCreatedAtDesc(tenant, customerId)
+            : layawayRepository.findByTenantIdAndCustomerIdAndStatusOrderByCreatedAtDesc(
+                tenant, customerId, status.trim().toUpperCase(Locale.ROOT));
+        return rows.stream().map(this::toLayawayMap).toList();
+    }
+
+    public Map<String, Object> createLayaway(UUID customerId, CreateLayawayRequest req) {
+        requireCustomer(customerId);
+        UUID tenant = requireTenant();
+        BigDecimal total = req.totalAmount().setScale(2, RoundingMode.HALF_UP);
+        BigDecimal deposit = req.depositAmount().setScale(2, RoundingMode.HALF_UP);
+        if (deposit.compareTo(total) > 0) {
+            throw new IllegalArgumentException("Deposit cannot exceed total amount");
+        }
+        BigDecimal minDeposit = total.multiply(new BigDecimal("0.30")).setScale(2, RoundingMode.HALF_UP);
+        if (deposit.compareTo(minDeposit) < 0) {
+            throw new IllegalArgumentException("Minimum deposit is 30% of total (" + minDeposit + ")");
+        }
+        LayawayOrder order = new LayawayOrder();
+        order.setId(UUID.randomUUID());
+        order.setTenantId(tenant);
+        order.setCustomerId(customerId);
+        order.setStatus("OPEN");
+        order.setCurrencyCode(req.currencyCode() != null && !req.currencyCode().isBlank() ? req.currencyCode() : "RWF");
+        order.setTotalAmount(total);
+        order.setDepositAmount(deposit);
+        order.setBalanceDue(total.subtract(deposit).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP));
+        order.setCollectionDate(req.collectionDate());
+        order.setCartJson(req.cartJson());
+        order.setCreatedAt(Instant.now());
+        order.setUpdatedAt(Instant.now());
+        layawayRepository.save(order);
+        return toLayawayMap(order);
+    }
+
+    public Map<String, Object> recordLayawayPayment(UUID customerId, UUID layawayId, LayawayPaymentRequest req) {
+        LayawayOrder order = requireLayaway(customerId, layawayId);
+        if (!"OPEN".equalsIgnoreCase(order.getStatus())) {
+            throw new IllegalArgumentException("Layaway is not open");
+        }
+        BigDecimal amount = req.amount().setScale(2, RoundingMode.HALF_UP);
+        BigDecimal deposit = order.getDepositAmount().add(amount).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal balance = order.getTotalAmount().subtract(deposit).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+        order.setDepositAmount(deposit);
+        order.setBalanceDue(balance);
+        order.setUpdatedAt(Instant.now());
+        layawayRepository.save(order);
+        return toLayawayMap(order);
+    }
+
+    public Map<String, Object> collectLayaway(UUID customerId, UUID layawayId) {
+        LayawayOrder order = requireLayaway(customerId, layawayId);
+        if (!"OPEN".equalsIgnoreCase(order.getStatus())) {
+            throw new IllegalArgumentException("Layaway is not open");
+        }
+        if (order.getBalanceDue().compareTo(new BigDecimal("0.01")) > 0) {
+            throw new IllegalArgumentException("Balance must be paid before collection");
+        }
+        order.setStatus("COLLECTED");
+        order.setUpdatedAt(Instant.now());
+        layawayRepository.save(order);
+        return toLayawayMap(order);
+    }
+
+    public Map<String, Object> cancelLayaway(UUID customerId, UUID layawayId) {
+        LayawayOrder order = requireLayaway(customerId, layawayId);
+        if (!"OPEN".equalsIgnoreCase(order.getStatus())) {
+            throw new IllegalArgumentException("Layaway is not open");
+        }
+        order.setStatus("CANCELLED");
+        order.setUpdatedAt(Instant.now());
+        layawayRepository.save(order);
+        return toLayawayMap(order);
+    }
+
+    private LayawayOrder requireLayaway(UUID customerId, UUID layawayId) {
+        requireCustomer(customerId);
+        return layawayRepository.findByIdAndTenantId(layawayId, requireTenant())
+            .filter(o -> customerId.equals(o.getCustomerId()))
+            .orElseThrow(() -> new IllegalArgumentException("Layaway order not found"));
+    }
+
+    public List<Map<String, Object>> priceListOptions() {
+        return priceListService.listPriceLists().stream()
+            .map(row -> {
+                Map<String, Object> out = new LinkedHashMap<>();
+                out.put("id", row.get("id"));
+                out.put("name", row.get("name"));
+                return out;
+            })
+            .toList();
     }
 
     public FinanceCustomer requireCustomer(UUID id) {
         return customerRepository.findByIdAndTenantId(id, requireTenant())
             .filter(c -> c.getDeletedAt() == null)
             .orElseThrow(() -> new IllegalArgumentException("Customer not found"));
+    }
+
+    private Map<String, Object> toSaleMap(UUID tenant, SalesOrder o) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("salesOrderId", o.getId());
+        m.put("totalAmount", o.getTotalAmount());
+        m.put("currencyCode", o.getCurrencyCode());
+        m.put("createdAt", o.getCreatedAt());
+        m.put("status", o.getStatus());
+        m.put("itemSummary", buildItemSummary(tenant, o.getId()));
+        m.put("paymentMethod", buildPaymentMethod(tenant, o.getId()));
+        return m;
+    }
+
+    private String buildItemSummary(UUID tenant, UUID salesOrderId) {
+        List<PosSaleLine> lines = saleLineRepository.findByTenantIdAndSalesOrderIdOrderByIdAsc(tenant, salesOrderId);
+        if (lines.isEmpty()) {
+            return "POS sale";
+        }
+        String summary = lines.stream()
+            .limit(3)
+            .map(PosSaleLine::getProductNameSnapshot)
+            .filter(Objects::nonNull)
+            .filter(s -> !s.isBlank())
+            .collect(Collectors.joining(", "));
+        if (lines.size() > 3) {
+            summary = summary + " +" + (lines.size() - 3) + " more";
+        }
+        return summary.isBlank() ? "POS sale" : summary;
+    }
+
+    private String buildPaymentMethod(UUID tenant, UUID salesOrderId) {
+        List<PosPaymentTender> tenders = tenderRepository.findByTenantIdAndSalesOrderIdOrderByCreatedAtAsc(tenant, salesOrderId);
+        if (tenders.isEmpty()) {
+            return null;
+        }
+        return tenders.stream()
+            .map(PosPaymentTender::getTenderType)
+            .filter(Objects::nonNull)
+            .distinct()
+            .collect(Collectors.joining(" / "));
+    }
+
+    private Map<String, Object> toLayawayMap(LayawayOrder order) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", order.getId());
+        m.put("status", order.getStatus());
+        m.put("currencyCode", order.getCurrencyCode());
+        m.put("totalAmount", order.getTotalAmount());
+        m.put("depositAmount", order.getDepositAmount());
+        m.put("balanceDue", order.getBalanceDue());
+        m.put("collectionDate", order.getCollectionDate());
+        m.put("salesOrderId", order.getSalesOrderId());
+        m.put("createdAt", order.getCreatedAt());
+        return m;
+    }
+
+    private void ensureLegacyOnAccountCharges(UUID tenant, FinanceCustomer customer) {
+        List<SalesOrder> onAccountSales = salesOrderRepository.findOnAccountSalesForCustomer(tenant, customer.getCustomerName());
+        for (SalesOrder order : onAccountSales) {
+            if (creditLedgerRepository.existsByTenantIdAndCustomerIdAndSalesOrderIdAndEntryType(
+                tenant, customer.getId(), order.getId(), "CHARGE")) {
+                continue;
+            }
+            BigDecimal charge = onAccountAmount(tenant, order.getId(), order.getTotalAmount());
+            appendCreditLedger(customer.getId(), "CHARGE", charge, null, null,
+                "POS on-account sale", order.getId());
+        }
+        recomputeRunningBalances(tenant, customer.getId());
+    }
+
+    private BigDecimal onAccountAmount(UUID tenant, UUID salesOrderId, BigDecimal fallback) {
+        List<PosPaymentTender> tenders = tenderRepository.findByTenantIdAndSalesOrderIdOrderByCreatedAtAsc(tenant, salesOrderId);
+        BigDecimal sum = tenders.stream()
+            .filter(t -> "ON_ACCOUNT".equalsIgnoreCase(t.getTenderType()))
+            .map(PosPaymentTender::getAmount)
+            .filter(Objects::nonNull)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return sum.signum() > 0 ? sum : (fallback != null ? fallback : BigDecimal.ZERO);
+    }
+
+    private void appendCreditLedger(UUID customerId, String entryType, BigDecimal amount, BigDecimal runningBalance,
+                                    String reference, String notes, UUID salesOrderId) {
+        CustomerCreditLedger row = new CustomerCreditLedger();
+        row.setId(UUID.randomUUID());
+        row.setTenantId(requireTenant());
+        row.setCustomerId(customerId);
+        row.setEntryType(entryType);
+        row.setAmount(amount.setScale(2, RoundingMode.HALF_UP));
+        row.setRunningBalance(runningBalance);
+        row.setReference(reference);
+        row.setNotes(notes);
+        row.setSalesOrderId(salesOrderId);
+        row.setCreatedAt(Instant.now());
+        creditLedgerRepository.save(row);
+        if (runningBalance == null) {
+            recomputeRunningBalances(requireTenant(), customerId);
+        }
+    }
+
+    private void recomputeRunningBalances(UUID tenant, UUID customerId) {
+        List<CustomerCreditLedger> rows = creditLedgerRepository.findByTenantIdAndCustomerIdOrderByCreatedAtDesc(tenant, customerId);
+        List<CustomerCreditLedger> chronological = new ArrayList<>(rows);
+        chronological.sort(Comparator.comparing(CustomerCreditLedger::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())));
+        BigDecimal running = BigDecimal.ZERO;
+        for (CustomerCreditLedger row : chronological) {
+            if ("CHARGE".equalsIgnoreCase(row.getEntryType())) {
+                running = running.add(row.getAmount());
+            } else if ("PAYMENT".equalsIgnoreCase(row.getEntryType())) {
+                running = running.add(row.getAmount());
+            } else {
+                running = row.getAmount() != null ? row.getAmount() : running;
+            }
+            row.setRunningBalance(running.setScale(2, RoundingMode.HALF_UP));
+            creditLedgerRepository.save(row);
+        }
+    }
+
+    private int signedLoyaltyDelta(String transactionType, int points) {
+        String type = transactionType == null ? "" : transactionType.trim().toUpperCase(Locale.ROOT);
+        int magnitude = Math.abs(points);
+        return switch (type) {
+            case "ADJUST_ADD", "EARN" -> magnitude;
+            case "ADJUST_SUB", "REDEEM" -> -magnitude;
+            default -> points;
+        };
     }
 
     private void recordLoyaltyTx(UUID customerId, String type, int points, UUID saleId, String notes) {
@@ -276,6 +547,10 @@ public class CustomerRetailService {
     }
 
     public Map<String, Object> toCustomerMap(FinanceCustomer c) {
+        return toCustomerMap(c, resolveLastPurchase(c));
+    }
+
+    private Map<String, Object> toCustomerMap(FinanceCustomer c, Instant lastPurchaseAt) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", c.getId());
         m.put("name", c.getCustomerName());
@@ -290,8 +565,32 @@ public class CustomerRetailService {
         m.put("loyaltyEnabled", c.getLoyaltyEnabled());
         m.put("taxExempt", c.isTaxExempt());
         m.put("notes", c.getNotes());
+        m.put("createdAt", c.getCreatedAt());
+        m.put("lastPurchaseAt", lastPurchaseAt);
         m.putAll(creditAlert(c.getId()));
         return m;
+    }
+
+    private Instant resolveLastPurchase(FinanceCustomer c) {
+        return salesOrderRepository
+            .findFirstByTenantIdAndCustomerNameIgnoreCaseOrderByCreatedAtDesc(requireTenant(), c.getCustomerName())
+            .map(SalesOrder::getCreatedAt)
+            .orElse(null);
+    }
+
+    private Map<String, Instant> buildLastPurchaseMap(UUID tenant) {
+        Map<String, Instant> out = new HashMap<>();
+        for (Object[] row : salesOrderRepository.lastPurchaseGroupedByCustomerName(tenant)) {
+            if (row[0] == null || row[1] == null) {
+                continue;
+            }
+            out.put(normalizeNameKey(String.valueOf(row[0])), (Instant) row[1]);
+        }
+        return out;
+    }
+
+    private static String normalizeNameKey(String name) {
+        return name == null ? "" : name.trim().toLowerCase(Locale.ROOT);
     }
 
     private UUID requireTenant() {
