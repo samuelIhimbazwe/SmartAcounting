@@ -426,11 +426,7 @@ public class PublicSignupService {
             return;
         }
         String phone = PhoneNormalizer.normalize(phoneRaw);
-        UUID tenantId = jdbcTemplate.query(
-            "select lookup_password_reset_tenant_by_phone_v2(?) as tenant_id",
-            rs -> rs.next() ? (UUID) rs.getObject("tenant_id") : null,
-            phone
-        );
+        UUID tenantId = authLookup.findResetTenantByPhone(phone).orElse(null);
         if (tenantId == null) {
             return;
         }
@@ -450,11 +446,7 @@ public class PublicSignupService {
         }
         if (req.email() != null && !req.email().isBlank()) {
             String em = normalizeEmail(req.email());
-            return jdbcTemplate.query(
-                "select lookup_password_reset_phone_by_email_v2(?) as phone",
-                rs -> rs.next() ? rs.getString("phone") : null,
-                em
-            );
+            return authLookup.findResetPhoneByEmail(em).orElse(null);
         }
         return null;
     }
@@ -466,16 +458,8 @@ public class PublicSignupService {
         if (!otpService.verifyAndConsume(OTP_PWD, LOCK_PWD, FAIL_PWD, phone, req.otp())) {
             throw new IllegalArgumentException("Invalid credentials");
         }
-        UUID userId = jdbcTemplate.query(
-            "select lookup_password_reset_user_id_by_phone_v2(?) as user_id",
-            rs -> rs.next() ? (UUID) rs.getObject("user_id") : null,
-            phone
-        );
-        UUID tenantId = jdbcTemplate.query(
-            "select lookup_password_reset_tenant_by_phone_v2(?) as tenant_id",
-            rs -> rs.next() ? (UUID) rs.getObject("tenant_id") : null,
-            phone
-        );
+        UUID userId = authLookup.findResetUserByPhone(phone).orElse(null);
+        UUID tenantId = authLookup.findResetTenantByPhone(phone).orElse(null);
         if (userId == null || tenantId == null) {
             throw new IllegalArgumentException("Invalid credentials");
         }
@@ -502,28 +486,15 @@ public class PublicSignupService {
     }
 
     private boolean existsSignupEmail(String emailLower) {
-        return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
-            "select public_signup_email_taken(?)",
-            Boolean.class,
-            emailLower
-        ));
+        return authLookup.emailTaken(emailLower);
     }
 
     private boolean existsOauthSubject(String provider, String subject) {
-        return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
-            "select public_signup_oauth_subject_taken(?, ?)",
-            Boolean.class,
-            provider,
-            subject
-        ));
+        return authLookup.oauthSubjectTaken(provider, subject);
     }
 
     private boolean existsPhone(String phone) {
-        return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
-            "select public_signup_phone_taken(?)",
-            Boolean.class,
-            phone
-        ));
+        return authLookup.phoneTaken(phone);
     }
 
     private static String normalizeEmail(String email) {

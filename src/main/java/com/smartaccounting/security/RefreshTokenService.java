@@ -2,6 +2,7 @@ package com.smartaccounting.security;
 
 import com.smartaccounting.entity.RefreshToken;
 import com.smartaccounting.repository.RefreshTokenRepository;
+import com.smartaccounting.signup.PublicAuthSqlLookup;
 import com.smartaccounting.tenant.TenantContext;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -25,14 +26,17 @@ import java.util.UUID;
 public class RefreshTokenService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final PublicAuthSqlLookup authLookup;
     private final boolean postgresDefinerLookup;
     private final long expirationDays;
 
     public RefreshTokenService(RefreshTokenRepository refreshTokenRepository,
                                JdbcTemplate jdbcTemplate,
+                               PublicAuthSqlLookup authLookup,
                                @Value("${smartaccounting.security.refresh-expiration-days:14}") long expirationDays) {
         this.refreshTokenRepository = refreshTokenRepository;
         this.jdbcTemplate = jdbcTemplate;
+        this.authLookup = authLookup;
         this.postgresDefinerLookup = isPostgres(jdbcTemplate.getDataSource());
         this.expirationDays = expirationDays;
     }
@@ -115,11 +119,12 @@ public class RefreshTokenService {
     }
 
     private Optional<TenantUser> lookupSubject(String tokenHash) {
-        String sql = postgresDefinerLookup
-            ? "select tenant_id, user_id from lookup_refresh_token_subject(?)"
-            : "select tenant_id, user_id from refresh_tokens where token_hash = ?";
+        if (postgresDefinerLookup) {
+            return authLookup.findRefreshSubject(tokenHash)
+                .map(row -> new TenantUser(row.tenantId(), row.userId()));
+        }
         List<TenantUser> rows = jdbcTemplate.query(
-            sql,
+            "select tenant_id, user_id from refresh_tokens where token_hash = ?",
             (rs, rowNum) -> new TenantUser(rs.getObject(1, UUID.class), rs.getObject(2, UUID.class)),
             tokenHash
         );

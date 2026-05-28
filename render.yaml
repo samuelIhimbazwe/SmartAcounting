@@ -12,7 +12,7 @@ services:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
       - key: READINESS_HEALTH_COMPONENTS
-        value: db,redis,rls
+        value: db,redis
       - key: DB_HOST
         fromDatabase:
           name: smartaccounting-db

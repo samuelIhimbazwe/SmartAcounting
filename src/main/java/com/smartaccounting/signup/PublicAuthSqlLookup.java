@@ -11,7 +11,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Loads cross-tenant auth rows via SECURITY DEFINER SQL functions (varchar signatures for JDBC).
+ * Cross-tenant auth reads via scalar PostgreSQL helpers (no table-function FROM syntax).
  */
 @Component
 public class PublicAuthSqlLookup {
@@ -33,16 +33,39 @@ public class PublicAuthSqlLookup {
     public record SignupPendingRow(UUID tenantId, UUID userId, String username) {
     }
 
+    public record RefreshSubjectRow(UUID tenantId, UUID userId) {
+    }
+
+    public boolean emailTaken(String email) {
+        return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
+            "select auth_email_taken(?)",
+            Boolean.class,
+            normalizeEmail(email)
+        ));
+    }
+
+    public boolean phoneTaken(String phone) {
+        if (phone == null || phone.isBlank()) {
+            return false;
+        }
+        return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
+            "select auth_phone_taken(?)",
+            Boolean.class,
+            phone
+        ));
+    }
+
+    public boolean oauthSubjectTaken(String provider, String subject) {
+        return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
+            "select auth_oauth_subject_taken(?, ?)",
+            Boolean.class,
+            provider,
+            subject
+        ));
+    }
+
     public Optional<AuthUserRow> findUserForAuthentication(String username) {
-        String normalized = normalizeUsername(username);
-        if (normalized.isEmpty()) {
-            return Optional.empty();
-        }
-        Optional<AuthUserRow> fromTableFn = queryAuthUserFromTableFunction(normalized);
-        if (fromTableFn.isPresent()) {
-            return fromTableFn;
-        }
-        return queryAuthUserFromJsonFunction(normalized);
+        return parseUserRow(queryJson("select auth_user_row_json(?)", normalizeUsername(username)));
     }
 
     public boolean isPasswordBacked(String username) {
@@ -52,96 +75,132 @@ public class PublicAuthSqlLookup {
     }
 
     public Optional<LoginIdentityRow> findLoginIdentity(String username) {
-        String normalized = normalizeUsername(username);
-        if (normalized.isEmpty()) {
-            return Optional.empty();
-        }
-        LoginIdentityRow row = jdbcTemplate.query(
-            """
-                select li.tenant_id, li.user_id, li.role
-                from lookup_login_identity(?) li
-                """,
-            rs -> {
-                if (!rs.next()) {
-                    return null;
-                }
-                return new LoginIdentityRow(
-                    (UUID) rs.getObject("tenant_id"),
-                    (UUID) rs.getObject("user_id"),
-                    rs.getString("role")
-                );
-            },
-            normalized
-        );
-        return Optional.ofNullable(row);
+        return parseLoginIdentity(queryJson("select auth_login_identity_json(?)", normalizeUsername(username)));
     }
 
     public Optional<SignupPendingRow> findSignupPendingByPhone(String phone) {
         if (phone == null || phone.isBlank()) {
             return Optional.empty();
         }
-        SignupPendingRow row = jdbcTemplate.query(
-            """
-                select p.tenant_id, p.user_id, p.username
-                from lookup_signup_pending_by_phone(?) p
-                """,
-            rs -> {
-                if (!rs.next()) {
-                    return null;
-                }
-                return new SignupPendingRow(
-                    (UUID) rs.getObject("tenant_id"),
-                    (UUID) rs.getObject("user_id"),
-                    rs.getString("username")
-                );
-            },
-            phone
-        );
-        return Optional.ofNullable(row);
+        return parseSignupPending(queryJson("select auth_signup_pending_json(?)", phone));
     }
 
-    private Optional<AuthUserRow> queryAuthUserFromTableFunction(String normalized) {
+    public Optional<String> findResetPhoneByEmail(String email) {
         try {
-            AuthUserRow row = jdbcTemplate.queryForObject(
-                """
-                    select u.username, u.password_hash, u.role, u.self_service_owner
-                    from lookup_user_for_authentication(?) u
-                    """,
-                (rs, rowNum) -> new AuthUserRow(
-                    rs.getString("username"),
-                    rs.getString("password_hash"),
-                    rs.getString("role"),
-                    rs.getBoolean("self_service_owner")
-                ),
-                normalized
+            String phone = jdbcTemplate.queryForObject(
+                "select auth_reset_phone_by_email(?)",
+                String.class,
+                normalizeEmail(email)
             );
-            return Optional.of(row);
+            return Optional.ofNullable(phone).filter(p -> !p.isBlank());
         } catch (EmptyResultDataAccessException ex) {
-            return Optional.empty();
-        } catch (RuntimeException ex) {
             return Optional.empty();
         }
     }
 
-    private Optional<AuthUserRow> queryAuthUserFromJsonFunction(String normalized) {
+    public Optional<UUID> findResetTenantByPhone(String phone) {
+        return queryUuid("select auth_reset_tenant_by_phone(?)", phone);
+    }
+
+    public Optional<UUID> findResetUserByPhone(String phone) {
+        return queryUuid("select auth_reset_user_by_phone(?)", phone);
+    }
+
+    public Optional<RefreshSubjectRow> findRefreshSubject(String tokenHash) {
+        return parseRefreshSubject(queryJson("select auth_refresh_subject_json(?)", tokenHash));
+    }
+
+    private String queryJson(String sql, String arg) {
         try {
-            String json = jdbcTemplate.queryForObject(
-                "select lookup_user_for_authentication_json(?)",
-                String.class,
-                normalized
-            );
-            if (json == null || json.isBlank()) {
+            return jdbcTemplate.queryForObject(sql, String.class, arg);
+        } catch (EmptyResultDataAccessException ex) {
+            return null;
+        }
+    }
+
+    private Optional<UUID> queryUuid(String sql, String arg) {
+        if (arg == null || arg.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            UUID value = jdbcTemplate.queryForObject(sql, UUID.class, arg);
+            return Optional.ofNullable(value);
+        } catch (EmptyResultDataAccessException ex) {
+            return Optional.empty();
+        }
+    }
+
+    private Optional<AuthUserRow> parseUserRow(String json) {
+        if (json == null || json.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            JsonNode node = objectMapper.readTree(json);
+            if (node.isNull() || node.isMissingNode()) {
                 return Optional.empty();
             }
-            JsonNode node = objectMapper.readTree(json);
             return Optional.of(new AuthUserRow(
                 node.path("username").asText(null),
                 node.path("password_hash").asText(null),
                 node.path("role").asText(null),
                 node.path("self_service_owner").asBoolean(false)
             ));
-        } catch (EmptyResultDataAccessException ex) {
+        } catch (Exception ex) {
             return Optional.empty();
+        }
+    }
+
+    private Optional<LoginIdentityRow> parseLoginIdentity(String json) {
+        if (json == null || json.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            JsonNode node = objectMapper.readTree(json);
+            if (node.isNull() || node.isMissingNode()) {
+                return Optional.empty();
+            }
+            return Optional.of(new LoginIdentityRow(
+                UUID.fromString(node.path("tenant_id").asText()),
+                UUID.fromString(node.path("user_id").asText()),
+                node.path("role").asText(null)
+            ));
+        } catch (Exception ex) {
+            return Optional.empty();
+        }
+    }
+
+    private Optional<SignupPendingRow> parseSignupPending(String json) {
+        if (json == null || json.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            JsonNode node = objectMapper.readTree(json);
+            if (node.isNull() || node.isMissingNode()) {
+                return Optional.empty();
+            }
+            return Optional.of(new SignupPendingRow(
+                UUID.fromString(node.path("tenant_id").asText()),
+                UUID.fromString(node.path("user_id").asText()),
+                node.path("username").asText(null)
+            ));
+        } catch (Exception ex) {
+            return Optional.empty();
+        }
+    }
+
+    private Optional<RefreshSubjectRow> parseRefreshSubject(String json) {
+        if (json == null || json.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            JsonNode node = objectMapper.readTree(json);
+            if (node.isNull() || node.isMissingNode()) {
+                return Optional.empty();
+            }
+            return Optional.of(new RefreshSubjectRow(
+                UUID.fromString(node.path("tenant_id").asText()),
+                UUID.fromString(node.path("user_id").asText())
+            ));
         } catch (Exception ex) {
             return Optional.empty();
         }
@@ -149,5 +208,9 @@ public class PublicAuthSqlLookup {
 
     private static String normalizeUsername(String username) {
         return username == null ? "" : username.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private static String normalizeEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
     }
 }
