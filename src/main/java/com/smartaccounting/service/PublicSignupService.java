@@ -427,11 +427,8 @@ public class PublicSignupService {
         }
         String phone = PhoneNormalizer.normalize(phoneRaw);
         UUID tenantId = jdbcTemplate.query(
-            """
-                select r.tenant_id
-                from lookup_password_reset_user_by_phone(?) r
-                """,
-            rs -> rs.next() ? UUID.fromString(rs.getString("tenant_id")) : null,
+            "select lookup_password_reset_tenant_by_phone(?) as tenant_id",
+            rs -> rs.next() ? (UUID) rs.getObject("tenant_id") : null,
             phone
         );
         if (tenantId == null) {
@@ -469,15 +466,19 @@ public class PublicSignupService {
         if (!otpService.verifyAndConsume(OTP_PWD, LOCK_PWD, FAIL_PWD, phone, req.otp())) {
             throw new IllegalArgumentException("Invalid credentials");
         }
-        Map<String, Object> row = jdbcTemplate.queryForMap(
-            """
-                select r.user_id, r.tenant_id
-                from lookup_password_reset_user_by_phone(?) r
-                """,
+        UUID userId = jdbcTemplate.query(
+            "select lookup_password_reset_user_id_by_phone(?) as user_id",
+            rs -> rs.next() ? (UUID) rs.getObject("user_id") : null,
             phone
         );
-        UUID userId = UUID.fromString(row.get("user_id").toString());
-        UUID tenantId = UUID.fromString(row.get("tenant_id").toString());
+        UUID tenantId = jdbcTemplate.query(
+            "select lookup_password_reset_tenant_by_phone(?) as tenant_id",
+            rs -> rs.next() ? (UUID) rs.getObject("tenant_id") : null,
+            phone
+        );
+        if (userId == null || tenantId == null) {
+            throw new IllegalArgumentException("Invalid credentials");
+        }
         String hash = passwordEncoder.encode(req.newPassword());
         bindTenantSession(tenantId, userId);
         try {
@@ -502,7 +503,7 @@ public class PublicSignupService {
 
     private boolean existsSignupEmail(String emailLower) {
         return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
-            "select public_signup_email_taken(?::text)",
+            "select public_signup_email_taken(?)",
             Boolean.class,
             emailLower
         ));
