@@ -427,7 +427,7 @@ public class PublicSignupService {
         }
         String phone = PhoneNormalizer.normalize(phoneRaw);
         UUID tenantId = jdbcTemplate.query(
-            "select lookup_password_reset_tenant_by_phone(?) as tenant_id",
+            "select lookup_password_reset_tenant_by_phone_v2(?) as tenant_id",
             rs -> rs.next() ? (UUID) rs.getObject("tenant_id") : null,
             phone
         );
@@ -451,7 +451,7 @@ public class PublicSignupService {
         if (req.email() != null && !req.email().isBlank()) {
             String em = normalizeEmail(req.email());
             return jdbcTemplate.query(
-                "select lookup_password_reset_phone_by_email(?) as phone",
+                "select lookup_password_reset_phone_by_email_v2(?) as phone",
                 rs -> rs.next() ? rs.getString("phone") : null,
                 em
             );
@@ -467,12 +467,12 @@ public class PublicSignupService {
             throw new IllegalArgumentException("Invalid credentials");
         }
         UUID userId = jdbcTemplate.query(
-            "select lookup_password_reset_user_id_by_phone(?) as user_id",
+            "select lookup_password_reset_user_id_by_phone_v2(?) as user_id",
             rs -> rs.next() ? (UUID) rs.getObject("user_id") : null,
             phone
         );
         UUID tenantId = jdbcTemplate.query(
-            "select lookup_password_reset_tenant_by_phone(?) as tenant_id",
+            "select lookup_password_reset_tenant_by_phone_v2(?) as tenant_id",
             rs -> rs.next() ? (UUID) rs.getObject("tenant_id") : null,
             phone
         );
