@@ -52,6 +52,10 @@ export function CustomerForm({ mode, initial, onSaved, onCancel }: CustomerFormP
       setError('Name is required.')
       return
     }
+    if (trimmedName.length > 200) {
+      setError('Name must be 200 characters or fewer.')
+      return
+    }
     const normalizedPhone = phone.trim() ? normalizePhone(phone.trim()) : undefined
     if (normalizedPhone && !RW_PHONE.test(normalizedPhone.replace(/\s/g, ''))) {
       setError('Enter a valid Rwanda mobile number (+250 7XX XXX XXX).')
@@ -66,7 +70,11 @@ export function CustomerForm({ mode, initial, onSaved, onCancel }: CustomerFormP
       loyaltyEnabled: true,
     }
     const limit = creditLimit.trim() ? Number(creditLimit) : undefined
-    if (limit != null && Number.isFinite(limit) && limit >= 0) {
+    if (limit != null) {
+      if (!Number.isFinite(limit) || limit < 0) {
+        setError('Credit limit must be zero or a positive number.')
+        return
+      }
       payload.creditLimit = limit
     }
     if (priceListId) {

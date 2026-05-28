@@ -1,7 +1,9 @@
 package com.smartaccounting.repository;
 
 import com.smartaccounting.entity.FinanceCustomer;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -11,6 +13,17 @@ import java.util.UUID;
 
 public interface FinanceCustomerRepository extends JpaRepository<FinanceCustomer, UUID> {
     Optional<FinanceCustomer> findByIdAndTenantId(UUID id, UUID tenantId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        SELECT c FROM FinanceCustomer c
+        WHERE c.id = :id AND c.tenantId = :tenantId AND c.deletedAt IS NULL
+        """)
+    Optional<FinanceCustomer> findForUpdate(@Param("id") UUID id, @Param("tenantId") UUID tenantId);
+
+    List<FinanceCustomer> findByTenantIdAndDeletedAtIsNullOrderByCustomerNameAsc(UUID tenantId);
+
+    Optional<FinanceCustomer> findFirstByTenantIdAndPhoneAndDeletedAtIsNull(UUID tenantId, String phone);
 
     Optional<FinanceCustomer> findFirstByTenantIdAndCustomerNameIgnoreCaseAndDeletedAtIsNull(
         UUID tenantId, String customerName);

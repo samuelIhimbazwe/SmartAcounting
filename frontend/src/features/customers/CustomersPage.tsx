@@ -4,10 +4,12 @@ import { listCustomers, type CustomerSummary } from '../../shared/api/customers'
 import { normalizeApiError } from '../../shared/api/errors'
 import { Button } from '../../shared/components/ui/Button'
 import { PageSkeleton } from '../../shared/components/ui/LoadingSkeleton'
+import { useAnyPermission } from '../../shared/hooks/usePermission'
+import { CUSTOMER_ACCESS_ANY } from '../../shared/security/permissions'
 import { CustomerForm } from './components/CustomerForm'
 import { CustomerTable } from './components/CustomerTable'
 
-type FilterKey = 'hasCredit' | 'hasLoyalty' | 'activeOnly'
+type FilterKey = 'hasCredit' | 'hasLoyalty' | 'hideCreditAlert'
 
 function whatsAppReminderUrl(phone: string, name: string) {
   const digits = phone.replace(/\D/g, '')
@@ -17,11 +19,12 @@ function whatsAppReminderUrl(phone: string, name: string) {
 }
 
 export function CustomersPage() {
+  const canWrite = useAnyPermission([...CUSTOMER_ACCESS_ANY])
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState<Record<FilterKey, boolean>>({
     hasCredit: false,
     hasLoyalty: false,
-    activeOnly: true,
+    hideCreditAlert: true,
   })
   const [rows, setRows] = useState<CustomerSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -50,7 +53,7 @@ export function CustomersPage() {
     return rows.filter(row => {
       if (filters.hasCredit && Number(row.creditBalance ?? 0) <= 0) return false
       if (filters.hasLoyalty && Number(row.loyaltyPoints ?? 0) <= 0) return false
-      if (filters.activeOnly && row.level === 'EXCEEDED') return false
+      if (filters.hideCreditAlert && row.level === 'EXCEEDED') return false
       return true
     })
   }, [rows, filters])
@@ -94,6 +97,8 @@ export function CustomersPage() {
         </div>
         <Button
           type="button"
+          disabled={!canWrite}
+          title={canWrite ? undefined : 'You do not have permission to add customers.'}
           onClick={() => {
             setEditTarget(null)
             setFormOpen(true)
@@ -123,14 +128,15 @@ export function CustomersPage() {
             Has loyalty
           </label>
           <label className="flex items-center gap-2">
-            <input type="checkbox" checked={filters.activeOnly} onChange={() => toggleFilter('activeOnly')} />
-            Active only
+            <input type="checkbox" checked={filters.hideCreditAlert} onChange={() => toggleFilter('hideCreditAlert')} />
+            Hide over credit limit
           </label>
         </div>
       </div>
 
       <CustomerTable
         rows={filtered}
+        canWrite={canWrite}
         onEdit={c => {
           setEditTarget(c)
           setFormOpen(true)
@@ -138,7 +144,7 @@ export function CustomersPage() {
         onSendReminder={handleSendReminder}
       />
 
-      {formOpen ? (
+      {formOpen && canWrite ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
             <h2 className="mb-4 text-lg font-semibold">{editTarget ? 'Edit customer' : 'Add customer'}</h2>

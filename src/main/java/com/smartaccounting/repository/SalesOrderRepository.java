@@ -30,4 +30,14 @@ public interface SalesOrderRepository extends JpaRepository<SalesOrder, UUID> {
         """)
     List<SalesOrder> findOnAccountSalesForCustomer(
         @Param("tenantId") UUID tenantId, @Param("customerName") String customerName);
+
+    @Query("""
+        SELECT o FROM SalesOrder o
+        WHERE o.tenantId = :tenantId AND lower(o.customerName) = lower(:customerName)
+        ORDER BY o.createdAt DESC
+        """)
+    List<SalesOrder> findByTenantIdAndCustomerNameIgnoreCaseOrderByCreatedAtDesc(
+        @Param("tenantId") UUID tenantId,
+        @Param("customerName") String customerName,
+        org.springframework.data.domain.Pageable pageable);
 }

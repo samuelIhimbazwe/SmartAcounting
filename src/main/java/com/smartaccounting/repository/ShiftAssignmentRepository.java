@@ -9,4 +9,10 @@ import java.util.UUID;
 
 public interface ShiftAssignmentRepository extends JpaRepository<ShiftAssignment, UUID> {
     List<ShiftAssignment> findByTenantIdAndAssignedDate(UUID tenantId, LocalDate assignedDate);
+
+    List<ShiftAssignment> findByTenantIdAndAssignedDateBetweenOrderByAssignedDateAsc(
+        UUID tenantId, LocalDate start, LocalDate end);
+
+    boolean existsByTenantIdAndEmployeeIdAndShiftIdAndAssignedDate(
+        UUID tenantId, UUID employeeId, UUID shiftId, LocalDate assignedDate);
 }

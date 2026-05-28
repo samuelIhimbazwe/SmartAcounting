@@ -20,7 +20,9 @@ import com.smartaccounting.repository.PosPaymentTenderRepository;
 import com.smartaccounting.repository.PosSaleLineRepository;
 import com.smartaccounting.repository.SalesOrderRepository;
 import com.smartaccounting.tenant.TenantContext;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,6 +55,7 @@ public class CustomerRetailService {
     private final PosSaleLineRepository saleLineRepository;
     private final PosPaymentTenderRepository tenderRepository;
     private final PriceListService priceListService;
+    private final ObjectMapper objectMapper;
 
     @Value("${retail.credit-alert-threshold-pct:80}")
     private int creditAlertThresholdPct;
@@ -64,7 +67,8 @@ public class CustomerRetailService {
                                  CustomerCreditLedgerRepository creditLedgerRepository,
                                  PosSaleLineRepository saleLineRepository,
                                  PosPaymentTenderRepository tenderRepository,
-                                 PriceListService priceListService) {
+                                 PriceListService priceListService,
+                                 ObjectMapper objectMapper) {
         this.customerRepository = customerRepository;
         this.loyaltyRepository = loyaltyRepository;
         this.salesOrderRepository = salesOrderRepository;
@@ -73,15 +77,14 @@ public class CustomerRetailService {
         this.saleLineRepository = saleLineRepository;
         this.tenderRepository = tenderRepository;
         this.priceListService = priceListService;
+        this.objectMapper = objectMapper;
     }
 
     public List<Map<String, Object>> search(String q) {
         UUID tenant = requireTenant();
         String term = q == null ? "" : q.trim();
         List<FinanceCustomer> rows = term.isEmpty()
-            ? customerRepository.findAll().stream()
-                .filter(c -> tenant.equals(c.getTenantId()) && c.getDeletedAt() == null)
-                .toList()
+            ? customerRepository.findByTenantIdAndDeletedAtIsNullOrderByCustomerNameAsc(tenant)
             : customerRepository.search(tenant, term);
         Map<String, Instant> lastPurchaseByName = buildLastPurchaseMap(tenant);
         return rows.stream()
@@ -97,6 +100,7 @@ public class CustomerRetailService {
 
     public Map<String, Object> create(UpsertCustomerRequest req) {
         UUID tenant = requireTenant();
+        validateUpsert(req, null);
         FinanceCustomer c = new FinanceCustomer();
         c.setId(UUID.randomUUID());
         c.setTenantId(tenant);
@@ -111,6 +115,7 @@ public class CustomerRetailService {
 
     public Map<String, Object> update(UUID id, UpsertCustomerRequest req) {
         FinanceCustomer c = requireCustomer(id);
+        validateUpsert(req, id);
         applyUpsert(c, req);
         c.setUpdatedAt(Instant.now());
         customerRepository.save(c);
@@ -127,11 +132,10 @@ public class CustomerRetailService {
     public List<Map<String, Object>> purchaseHistory(UUID customerId) {
         FinanceCustomer c = requireCustomer(customerId);
         UUID tenant = requireTenant();
-        return salesOrderRepository.findAll().stream()
-            .filter(o -> tenant.equals(o.getTenantId())
-                && c.getCustomerName().equalsIgnoreCase(o.getCustomerName()))
-            .sorted(Comparator.comparing(SalesOrder::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
-            .limit(50)
+        return salesOrderRepository
+            .findByTenantIdAndCustomerNameIgnoreCaseOrderByCreatedAtDesc(
+                tenant, c.getCustomerName(), PageRequest.of(0, 50))
+            .stream()
             .map(o -> toSaleMap(tenant, o))
             .toList();
     }
@@ -169,10 +173,16 @@ public class CustomerRetailService {
     }
 
     public Map<String, Object> recordPayment(UUID customerId, CustomerPaymentRequest req) {
-        FinanceCustomer c = requireCustomer(customerId);
+        FinanceCustomer c = lockCustomer(customerId);
         BigDecimal amt = req.amount().setScale(2, RoundingMode.HALF_UP);
+        if (amt.signum() <= 0) {
+            throw new IllegalArgumentException("Payment amount must be positive");
+        }
         BigDecimal bal = c.getCreditBalance() != null ? c.getCreditBalance() : BigDecimal.ZERO;
-        BigDecimal next = bal.subtract(amt).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+        if (amt.compareTo(bal) > 0) {
+            throw new IllegalArgumentException("Payment amount exceeds outstanding balance of " + bal);
+        }
+        BigDecimal next = bal.subtract(amt).setScale(2, RoundingMode.HALF_UP);
         c.setCreditBalance(next);
         c.setUpdatedAt(Instant.now());
         customerRepository.save(c);
@@ -181,6 +191,14 @@ public class CustomerRetailService {
     }
 
     public void applyOnAccountCharge(FinanceCustomer customer, BigDecimal amount, UUID salesOrderId) {
+        if (amount == null || amount.signum() <= 0) {
+            return;
+        }
+        UUID tenant = requireTenant();
+        if (salesOrderId != null && creditLedgerRepository.existsByTenantIdAndCustomerIdAndSalesOrderIdAndEntryType(
+            tenant, customer.getId(), salesOrderId, "CHARGE")) {
+            return;
+        }
         BigDecimal bal = customer.getCreditBalance() != null ? customer.getCreditBalance() : BigDecimal.ZERO;
         BigDecimal next = bal.add(amount).setScale(2, RoundingMode.HALF_UP);
         customer.setCreditBalance(next);
@@ -195,7 +213,10 @@ public class CustomerRetailService {
     }
 
     public Map<String, Object> creditAlert(UUID customerId) {
-        FinanceCustomer c = requireCustomer(customerId);
+        return creditAlertFor(requireCustomer(customerId));
+    }
+
+    private Map<String, Object> creditAlertFor(FinanceCustomer c) {
         BigDecimal limit = c.getCreditLimit() != null ? c.getCreditLimit() : BigDecimal.ZERO;
         BigDecimal bal = c.getCreditBalance() != null ? c.getCreditBalance() : BigDecimal.ZERO;
         boolean alert = false;
@@ -273,10 +294,13 @@ public class CustomerRetailService {
     }
 
     public Map<String, Object> postLoyaltyTransaction(UUID customerId, LoyaltyTransactionRequest req) {
-        FinanceCustomer c = requireCustomer(customerId);
+        FinanceCustomer c = lockCustomer(customerId);
         int current = c.getLoyaltyPoints() != null ? c.getLoyaltyPoints() : 0;
         int signedDelta = signedLoyaltyDelta(req.transactionType(), req.points());
-        int next = Math.max(0, current + signedDelta);
+        int next = current + signedDelta;
+        if (next < 0) {
+            throw new IllegalArgumentException("Insufficient loyalty points for this adjustment");
+        }
         c.setLoyaltyPoints(next);
         c.setUpdatedAt(Instant.now());
         customerRepository.save(c);
@@ -287,16 +311,29 @@ public class CustomerRetailService {
     public List<Map<String, Object>> listLayaways(UUID customerId, String status) {
         requireCustomer(customerId);
         UUID tenant = requireTenant();
-        List<LayawayOrder> rows = status == null || status.isBlank()
+        String normalizedStatus = normalizeLayawayStatus(status);
+        List<LayawayOrder> rows = normalizedStatus == null
             ? layawayRepository.findByTenantIdAndCustomerIdOrderByCreatedAtDesc(tenant, customerId)
             : layawayRepository.findByTenantIdAndCustomerIdAndStatusOrderByCreatedAtDesc(
-                tenant, customerId, status.trim().toUpperCase(Locale.ROOT));
+                tenant, customerId, normalizedStatus);
         return rows.stream().map(this::toLayawayMap).toList();
+    }
+
+    private static String normalizeLayawayStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+        String s = status.trim().toUpperCase(Locale.ROOT);
+        if (!List.of("OPEN", "COLLECTED", "CANCELLED").contains(s)) {
+            throw new IllegalArgumentException("Invalid layaway status filter");
+        }
+        return s;
     }
 
     public Map<String, Object> createLayaway(UUID customerId, CreateLayawayRequest req) {
         requireCustomer(customerId);
         UUID tenant = requireTenant();
+        validateCartJson(req.cartJson());
         BigDecimal total = req.totalAmount().setScale(2, RoundingMode.HALF_UP);
         BigDecimal deposit = req.depositAmount().setScale(2, RoundingMode.HALF_UP);
         if (deposit.compareTo(total) > 0) {
@@ -329,6 +366,12 @@ public class CustomerRetailService {
             throw new IllegalArgumentException("Layaway is not open");
         }
         BigDecimal amount = req.amount().setScale(2, RoundingMode.HALF_UP);
+        if (amount.signum() <= 0) {
+            throw new IllegalArgumentException("Payment amount must be positive");
+        }
+        if (amount.compareTo(order.getBalanceDue()) > 0) {
+            throw new IllegalArgumentException("Payment exceeds remaining balance of " + order.getBalanceDue());
+        }
         BigDecimal deposit = order.getDepositAmount().add(amount).setScale(2, RoundingMode.HALF_UP);
         BigDecimal balance = order.getTotalAmount().subtract(deposit).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
         order.setDepositAmount(deposit);
@@ -509,7 +552,7 @@ public class CustomerRetailService {
         return switch (type) {
             case "ADJUST_ADD", "EARN" -> magnitude;
             case "ADJUST_SUB", "REDEEM" -> -magnitude;
-            default -> points;
+            default -> throw new IllegalArgumentException("Unsupported loyalty transaction type: " + type);
         };
     }
 
@@ -528,7 +571,7 @@ public class CustomerRetailService {
 
     private void applyUpsert(FinanceCustomer c, UpsertCustomerRequest req) {
         c.setCustomerName(req.name().trim());
-        c.setPhone(req.phone());
+        c.setPhone(normalizePhone(req.phone()));
         c.setEmail(req.email());
         c.setTinNumber(req.tinNumber());
         c.setCustomerType(req.customerType() != null ? req.customerType() : "RETAIL");
@@ -567,8 +610,48 @@ public class CustomerRetailService {
         m.put("notes", c.getNotes());
         m.put("createdAt", c.getCreatedAt());
         m.put("lastPurchaseAt", lastPurchaseAt);
-        m.putAll(creditAlert(c.getId()));
+        m.putAll(creditAlertFor(c));
         return m;
+    }
+
+    private FinanceCustomer lockCustomer(UUID id) {
+        return customerRepository.findForUpdate(id, requireTenant())
+            .orElseThrow(() -> new IllegalArgumentException("Customer not found"));
+    }
+
+    private void validateUpsert(UpsertCustomerRequest req, UUID existingId) {
+        if (req.name() == null || req.name().isBlank()) {
+            throw new IllegalArgumentException("Customer name is required");
+        }
+        String phone = normalizePhone(req.phone());
+        if (phone != null) {
+            customerRepository.findFirstByTenantIdAndPhoneAndDeletedAtIsNull(requireTenant(), phone)
+                .filter(c -> existingId == null || !existingId.equals(c.getId()))
+                .ifPresent(c -> {
+                    throw new IllegalArgumentException("Phone number is already assigned to another customer");
+                });
+        }
+        if (req.creditLimit() != null && req.creditLimit().signum() < 0) {
+            throw new IllegalArgumentException("Credit limit cannot be negative");
+        }
+    }
+
+    private static String normalizePhone(String phone) {
+        if (phone == null || phone.isBlank()) {
+            return null;
+        }
+        return phone.trim();
+    }
+
+    private void validateCartJson(String cartJson) {
+        if (cartJson == null || cartJson.isBlank()) {
+            throw new IllegalArgumentException("Layaway cart is required");
+        }
+        try {
+            objectMapper.readTree(cartJson);
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("Layaway cart must be valid JSON");
+        }
     }
 
     private Instant resolveLastPurchase(FinanceCustomer c) {

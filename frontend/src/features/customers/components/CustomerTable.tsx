@@ -15,11 +15,12 @@ function moneyRwf(amount: number) {
 
 export interface CustomerTableProps {
   rows: CustomerSummary[]
+  canWrite?: boolean
   onEdit: (customer: CustomerSummary) => void
   onSendReminder: (customer: CustomerSummary) => void
 }
 
-export function CustomerTable({ rows, onEdit, onSendReminder }: CustomerTableProps) {
+export function CustomerTable({ rows, canWrite = true, onEdit, onSendReminder }: CustomerTableProps) {
   if (rows.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-4 py-8 text-center text-sm text-neutral-600">
@@ -60,7 +61,7 @@ export function CustomerTable({ rows, onEdit, onSendReminder }: CustomerTablePro
                       View
                     </Button>
                   </Link>
-                  <Button type="button" variant="ghost" onClick={() => onEdit(row)}>
+                  <Button type="button" variant="ghost" onClick={() => onEdit(row)} disabled={!canWrite}>
                     Edit
                   </Button>
                   <Button

@@ -1,5 +1,6 @@
 package com.smartaccounting.controller;
 
+import com.smartaccounting.dto.ShiftAssignRequest;
 import com.smartaccounting.dto.ShiftAssignmentRequest;
 import com.smartaccounting.dto.ShiftRequest;
 import com.smartaccounting.entity.Shift;
@@ -11,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import com.smartaccounting.security.PermissionExpressions;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -45,6 +47,22 @@ public class ShiftController {
     @PreAuthorize(PermissionExpressions.HR_WRITE)
     public ResponseEntity<ShiftAssignment> assignShift(@RequestBody @Valid ShiftAssignmentRequest request) {
         return ResponseEntity.ok(shiftService.assignShift(request));
+    }
+
+    @PostMapping("/{id}/assign")
+    @PreAuthorize(PermissionExpressions.HR_WRITE)
+    public ResponseEntity<ShiftAssignment> assignEmployeeToShift(
+        @PathVariable java.util.UUID id,
+        @RequestBody @Valid ShiftAssignRequest request) {
+        return ResponseEntity.ok(shiftService.assignShift(new ShiftAssignmentRequest(
+            request.employeeId(), id, request.assignedDate(), request.tillCode())));
+    }
+
+    @GetMapping("/roster/week")
+    @PreAuthorize(PermissionExpressions.HR_READ)
+    public ResponseEntity<List<ShiftAssignment>> getWeeklyRoster(
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart) {
+        return ResponseEntity.ok(shiftService.getRosterWeek(weekStart));
     }
 
     @GetMapping("/roster")

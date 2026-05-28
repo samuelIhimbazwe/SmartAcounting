@@ -11,8 +11,9 @@ import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage'
 import { ResetPasswordPage } from '../features/auth/ResetPasswordPage'
 import { UnauthorizedPage } from '../features/common/UnauthorizedPage'
 import { DashboardIndexRedirect } from '../features/common/DashboardIndexRedirect'
+import { CUSTOMER_ACCESS_ANY } from '../shared/security/permissions'
 
-function guard(permission: string | undefined, element: ReactNode) {
+function guard(permission: string | readonly string[] | undefined, element: ReactNode) {
   return <ProtectedRoute permission={permission}>{element}</ProtectedRoute>
 }
 
@@ -73,6 +74,10 @@ const PurchaseOrdersRoute = lazyNamedRoute(
   'PurchaseOrdersRoute',
 )
 const HrPayrollRoute = lazyNamedRoute(() => import('../features/hr/HrPayrollRoute'), 'HrPayrollRoute')
+const EmployeesRoute = lazyNamedRoute(() => import('../features/hr/HrRoutes'), 'EmployeesRoute')
+const EmployeeDetailRoute = lazyNamedRoute(() => import('../features/hr/HrRoutes'), 'EmployeeDetailRoute')
+const LeaveRoute = lazyNamedRoute(() => import('../features/hr/HrRoutes'), 'LeaveRoute')
+const ShiftsRoute = lazyNamedRoute(() => import('../features/hr/HrRoutes'), 'ShiftsRoute')
 const EbmComplianceRoute = lazyNamedRoute(() => import('../features/compliance/EbmComplianceRoute'), 'EbmComplianceRoute')
 const SettingsRoute = lazyNamedRoute(() => import('../features/settings/SettingsRoute'), 'SettingsRoute')
 const MyTeamRoute = lazyNamedRoute(() => import('../features/settings/MyTeamRoute'), 'MyTeamRoute')
@@ -110,8 +115,8 @@ export const appRoutes: RouteObject[] = [
       { path: '/admin/users-tenants', element: guard('USER_MANAGE', lazyElement(UserTenantManagementRoute)) },
       { path: '/admin/roles', element: guard('ROLE_MANAGE', lazyElement(RoleManagementRoute)) },
       { path: '/pos', element: guard('POS_ACCESS', lazyElement(PosRoute)) },
-      { path: '/customers', element: guard('POS_ACCESS', lazyElement(CustomersRoute)) },
-      { path: '/customers/:id', element: guard('POS_ACCESS', lazyElement(CustomerDetailRoute)) },
+      { path: '/customers', element: guard(CUSTOMER_ACCESS_ANY, lazyElement(CustomersRoute)) },
+      { path: '/customers/:id', element: guard(CUSTOMER_ACCESS_ANY, lazyElement(CustomerDetailRoute)) },
       { path: '/pos/history', element: guard('ANALYTICS_OWN', lazyElement(PosSaleHistoryRoute)) },
       { path: '/returns', element: guard('POS_RETURNS', lazyElement(ReturnsRoute)) },
       { path: '/pos/receipts/:receiptId/print', element: guard('POS_ACCESS', lazyElement(PosReceiptPrintRoute)) },
@@ -126,6 +131,10 @@ export const appRoutes: RouteObject[] = [
       { path: '/finance/bank-accounts', element: guard('FINANCE_READ', lazyElement(BankReconciliationRoute)) },
       { path: '/procurement/purchase-orders', element: guard('PROCUREMENT_READ', lazyElement(PurchaseOrdersRoute)) },
       { path: '/hr/payroll', element: guard('HR_READ', lazyElement(HrPayrollRoute)) },
+      { path: '/hr/employees', element: guard('HR_READ', lazyElement(EmployeesRoute)) },
+      { path: '/hr/employees/:id', element: guard('HR_READ', lazyElement(EmployeeDetailRoute)) },
+      { path: '/hr/leave', element: guard('HR_READ', lazyElement(LeaveRoute)) },
+      { path: '/hr/shifts', element: guard('HR_READ', lazyElement(ShiftsRoute)) },
       { path: '/hr/attendance', element: guard('HR_READ', lazyElement(AttendanceRoute)) },
       { path: '/finance/payment-runs', element: guard('FINANCE_READ', lazyElement(PaymentRunsRoute)) },
       { path: '/finance/assets', element: guard('FINANCE_READ', lazyElement(FixedAssetsRoute)) },

@@ -7,7 +7,7 @@ const LEGACY_ROUTE_ALIASES: Record<string, string> = {
   '/retail/till': '/till',
   '/finance/reconciliation': '/finance/bank-accounts',
   '/finance/journal-entries': '/finance/close',
-  '/hr/leave': '/hr/attendance',
+  '/hr/leave': '/hr/leave',
 }
 
 function simpleHash(input: string): string {

@@ -48,12 +48,18 @@ export function CustomerLoyaltyTab({ customer, onCustomerUpdated }: CustomerLoya
       setError('Enter a non-zero points adjustment.')
       return
     }
+    const magnitude = Math.abs(Math.trunc(delta))
+    const isAdd = delta > 0
+    if (!isAdd && magnitude > balance) {
+      setError(`Cannot subtract ${magnitude} points — current balance is ${balance}.`)
+      return
+    }
     setBusy(true)
     setError(null)
     try {
       const updated = await adjustCustomerLoyaltyPoints(customer.id, {
-        transactionType: delta > 0 ? 'ADJUST_ADD' : 'ADJUST_SUB',
-        points: delta,
+        transactionType: isAdd ? 'ADJUST_ADD' : 'ADJUST_SUB',
+        points: magnitude,
         notes: notes.trim() || undefined,
       })
       onCustomerUpdated(updated)

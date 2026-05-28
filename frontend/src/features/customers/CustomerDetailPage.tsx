@@ -13,6 +13,8 @@ import { CustomerLayawayTab } from './components/CustomerLayawayTab'
 import { normalizeApiError } from '../../shared/api/errors'
 import { formatDate } from '../../shared/utils/intl'
 import { PageSkeleton } from '../../shared/components/ui/LoadingSkeleton'
+import { useAnyPermission } from '../../shared/hooks/usePermission'
+import { CUSTOMER_ACCESS_ANY } from '../../shared/security/permissions'
 import { Button } from '../../shared/components/ui/Button'
 import { CustomerCreditTab } from './components/CustomerCreditTab'
 import { CustomerForm } from './components/CustomerForm'
@@ -37,6 +39,7 @@ function creditTone(used: number, limit: number): string {
 
 export function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const canWrite = useAnyPermission([...CUSTOMER_ACCESS_ANY])
   const [customer, setCustomer] = useState<CustomerSummary | null>(null)
   const [sales, setSales] = useState<CustomerSaleRow[]>([])
   const [tab, setTab] = useState<TabId>('history')
@@ -103,7 +106,7 @@ export function CustomerDetailPage() {
             <h1 className="m-0 text-2xl font-bold text-neutral-900">{customer.name}</h1>
             <p className="mt-1 text-sm text-neutral-600">{customer.phone ?? 'No phone'} · {customer.email ?? 'No email'}</p>
           </div>
-          <Button type="button" variant="ghost" onClick={() => setEditOpen(true)}>
+          <Button type="button" variant="ghost" onClick={() => setEditOpen(true)} disabled={!canWrite}>
             Edit customer
           </Button>
         </div>
@@ -152,14 +155,14 @@ export function CustomerDetailPage() {
 
       {tab === 'history' ? <CustomerHistoryTab sales={sales} loading={loading} /> : null}
       {tab === 'credit' ? (
-        <CustomerCreditTab customer={customer} onCustomerUpdated={setCustomer} />
+        <CustomerCreditTab customer={customer} canWrite={canWrite} onCustomerUpdated={setCustomer} />
       ) : null}
       {tab === 'loyalty' ? (
         <CustomerLoyaltyTab customer={customer} onCustomerUpdated={setCustomer} />
       ) : null}
       {tab === 'layaway' ? <CustomerLayawayTab customerId={id} /> : null}
 
-      {editOpen ? (
+      {editOpen && canWrite ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
             <h2 className="mb-4 text-lg font-semibold">Edit customer</h2>

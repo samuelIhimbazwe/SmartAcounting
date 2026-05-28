@@ -14,6 +14,13 @@ export const Permission = {
   CUSTOMER_ACCESS: 'CUSTOMER_ACCESS',
 } as const
 
+/** Mirrors backend {@code PermissionExpressions.CUSTOMER_ACCESS}. */
+export const CUSTOMER_ACCESS_ANY: readonly string[] = [
+  Permission.POS_ACCESS,
+  Permission.FINANCE_READ,
+  'INVENTORY_READ',
+]
+
 export type PermissionCode = (typeof Permission)[keyof typeof Permission]
 
 /** Backend {@code PermissionExpressions.ANALYTICS_ANY} — own or tenant-wide analytics. */

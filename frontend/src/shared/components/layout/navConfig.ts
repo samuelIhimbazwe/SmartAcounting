@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react'
+import { CUSTOMER_ACCESS_ANY } from '../../security/permissions'
 import {
   Banknote,
   BarChart3,
@@ -43,6 +44,8 @@ export interface NavItem {
   icon: ComponentType<{ className?: string; size?: number; strokeWidth?: number }>
   /** RBAC: user must have this permission code. Omit to show for any authenticated user. */
   requiredPermission?: string
+  /** RBAC: user must have at least one of these permission codes. */
+  requiredAnyPermissions?: string[]
   /** Optional decoration badge (e.g. "Beta"). */
   badge?: string
 }
@@ -123,7 +126,7 @@ export const NAV_ITEMS: NavItem[] = [
     searchLabel: 'Customers',
     group: 'nav.groupOperations',
     icon: Users,
-    requiredPermission: 'POS_ACCESS',
+    requiredAnyPermissions: [...CUSTOMER_ACCESS_ANY],
   },
   {
     id: 'pos-history',
@@ -223,6 +226,33 @@ export const NAV_ITEMS: NavItem[] = [
     group: 'nav.groupOperations',
     icon: FileText,
     requiredPermission: 'FINANCE_READ',
+  },
+  {
+    id: 'hr-employees',
+    to: '/hr/employees',
+    labelKey: 'nav.hrEmployees',
+    searchLabel: 'Employees',
+    group: 'nav.groupAdmin',
+    icon: Users,
+    requiredPermission: 'HR_READ',
+  },
+  {
+    id: 'hr-leave',
+    to: '/hr/leave',
+    labelKey: 'nav.hrLeave',
+    searchLabel: 'Leave management',
+    group: 'nav.groupAdmin',
+    icon: Users,
+    requiredPermission: 'HR_READ',
+  },
+  {
+    id: 'hr-shifts',
+    to: '/hr/shifts',
+    labelKey: 'nav.hrShifts',
+    searchLabel: 'Shift management',
+    group: 'nav.groupAdmin',
+    icon: Users,
+    requiredPermission: 'HR_READ',
   },
   {
     id: 'attendance',
@@ -328,6 +358,9 @@ export function filterNavItems(hasPermission: (code: string) => boolean, allowed
   return NAV_ITEMS.filter((item) => {
     if (allowed && !allowed.has(item.id)) {
       return false
+    }
+    if (item.requiredAnyPermissions?.length) {
+      return item.requiredAnyPermissions.some((code) => hasPermission(code))
     }
     return !item.requiredPermission || hasPermission(item.requiredPermission)
   })

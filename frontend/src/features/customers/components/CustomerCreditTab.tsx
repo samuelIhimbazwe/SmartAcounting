@@ -38,10 +38,11 @@ function whatsAppReminderUrl(phone: string, customerName: string, amount: number
 
 export interface CustomerCreditTabProps {
   customer: CustomerSummary
+  canWrite?: boolean
   onCustomerUpdated: (c: CustomerSummary) => void
 }
 
-export function CustomerCreditTab({ customer, onCustomerUpdated }: CustomerCreditTabProps) {
+export function CustomerCreditTab({ customer, canWrite = true, onCustomerUpdated }: CustomerCreditTabProps) {
   const [creditLines, setCreditLines] = useState<CustomerCreditLine[]>([])
   const [invoices, setInvoices] = useState<InvoiceLedgerRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -79,6 +80,10 @@ export function CustomerCreditTab({ customer, onCustomerUpdated }: CustomerCredi
       setError('Enter a valid payment amount.')
       return
     }
+    if (amount > balance) {
+      setError(`Payment cannot exceed the outstanding balance of ${moneyRwf(balance)}.`)
+      return
+    }
     setBusy(true)
     setError(null)
     try {
@@ -107,9 +112,11 @@ export function CustomerCreditTab({ customer, onCustomerUpdated }: CustomerCredi
       {error ? <p className="rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-800">{error}</p> : null}
 
       <div className="flex flex-wrap gap-2">
-        <Button type="button" onClick={() => setPayOpen(v => !v)}>
-          Record payment
-        </Button>
+        {canWrite ? (
+          <Button type="button" onClick={() => setPayOpen(v => !v)} disabled={balance <= 0}>
+            Record payment
+          </Button>
+        ) : null}
         {customer.phone ? (
           <a
             href={whatsAppReminderUrl(customer.phone, customer.name, balance)}

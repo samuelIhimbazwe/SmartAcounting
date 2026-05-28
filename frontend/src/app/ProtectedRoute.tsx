@@ -7,7 +7,8 @@ export function ProtectedRoute({
   permission,
   children,
 }: {
-  permission?: string
+  /** Single permission or any-of list (mirrors backend hasAny). */
+  permission?: string | readonly string[]
   children: ReactNode
 }) {
   const accessToken = useAuthStore((s) => s.accessToken)
@@ -30,8 +31,14 @@ export function ProtectedRoute({
     return <Navigate to="/login" replace />
   }
 
-  if (permission && !hasPermission(permission)) {
-    return <Navigate to={getDefaultRoute(role, permissions, effectiveRoleProfile)} replace />
+  if (permission) {
+    const allowed =
+      typeof permission === 'string'
+        ? hasPermission(permission)
+        : permission.some((code) => hasPermission(code))
+    if (!allowed) {
+      return <Navigate to={getDefaultRoute(role, permissions, effectiveRoleProfile)} replace />
+    }
   }
 
   return <>{children}</>

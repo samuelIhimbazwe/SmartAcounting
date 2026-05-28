@@ -1,0 +1,8 @@
+ALTER TABLE hr_employee_profiles
+    ADD COLUMN IF NOT EXISTS phone VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS email VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS hire_date DATE,
+    ADD COLUMN IF NOT EXISTS profile_json JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+ALTER TABLE hr_leave_requests
+    ADD COLUMN IF NOT EXISTS reason TEXT;
