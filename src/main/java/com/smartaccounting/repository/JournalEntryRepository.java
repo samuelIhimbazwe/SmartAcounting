@@ -14,6 +14,10 @@ import java.util.UUID;
 public interface JournalEntryRepository extends JpaRepository<JournalEntry, UUID> {
     Optional<JournalEntry> findByIdAndDeletedAtIsNull(UUID id);
 
+    List<JournalEntry> findByTenantIdAndDeletedAtIsNullOrderByEntryDateDescCreatedAtDesc(UUID tenantId);
+
+    long countByTenantIdAndEntryDateBetweenAndDeletedAtIsNull(UUID tenantId, LocalDate from, LocalDate to);
+
     @Query("""
         select j from JournalEntry j
         where j.tenantId = :tenantId and j.deletedAt is null

@@ -25,6 +25,13 @@ public class JournalEntry {
     private String currencyCode;
     private Instant createdAt;
     private Instant deletedAt;
+    private String referenceNumber;
+    private String status;
+    private Instant postedAt;
+    private UUID postedBy;
+    private UUID reversedFromId;
+    @Column(columnDefinition = "jsonb")
+    private String linesJson;
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
@@ -46,4 +53,16 @@ public class JournalEntry {
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
     public Instant getDeletedAt() { return deletedAt; }
     public void setDeletedAt(Instant deletedAt) { this.deletedAt = deletedAt; }
+    public String getReferenceNumber() { return referenceNumber; }
+    public void setReferenceNumber(String referenceNumber) { this.referenceNumber = referenceNumber; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+    public Instant getPostedAt() { return postedAt; }
+    public void setPostedAt(Instant postedAt) { this.postedAt = postedAt; }
+    public UUID getPostedBy() { return postedBy; }
+    public void setPostedBy(UUID postedBy) { this.postedBy = postedBy; }
+    public UUID getReversedFromId() { return reversedFromId; }
+    public void setReversedFromId(UUID reversedFromId) { this.reversedFromId = reversedFromId; }
+    public String getLinesJson() { return linesJson; }
+    public void setLinesJson(String linesJson) { this.linesJson = linesJson; }
 }

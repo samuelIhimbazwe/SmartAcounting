@@ -6,7 +6,7 @@ const LEGACY_ROUTE_ALIASES: Record<string, string> = {
   '/inventory/shrinkage': '/retail/shrinkage',
   '/retail/till': '/till',
   '/finance/reconciliation': '/finance/bank-accounts',
-  '/finance/journal-entries': '/finance/close',
+  '/finance/journal-entries': '/finance/journals',
   '/hr/leave': '/hr/leave',
 }
 

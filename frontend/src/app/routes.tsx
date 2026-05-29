@@ -73,6 +73,7 @@ const BankReconciliationRoute = lazyNamedRoute(
   () => import('../features/finance/BankReconciliationRoute'),
   'BankReconciliationRoute',
 )
+const JournalsRoute = lazyNamedRoute(() => import('../features/finance/JournalsRoute'), 'JournalsRoute')
 const PurchaseOrdersRoute = lazyNamedRoute(
   () => import('../features/procurement/PurchaseOrdersRoute'),
   'PurchaseOrdersRoute',
@@ -139,6 +140,7 @@ export const appRoutes: RouteObject[] = [
       { path: '/finance/fx-rates', element: guard('FINANCE_READ', lazyElement(FxRatesRoute)) },
       { path: '/finance/credit-ledger', element: guard('FINANCE_READ', lazyElement(CreditLedgerRoute)) },
       { path: '/finance/supplier-bills', element: guard('FINANCE_READ', lazyElement(SupplierBillsRoute)) },
+      { path: '/finance/journals', element: guard('FINANCE_WRITE', lazyElement(JournalsRoute)) },
       { path: '/finance/customers/:customerId', element: guard('FINANCE_READ', lazyElement(CustomerRecordRoute)) },
       { path: '/finance/suppliers/:supplierId', element: guard('FINANCE_READ', lazyElement(SupplierRecordRoute)) },
       { path: '/finance/sms-deliveries', element: guard('FINANCE_READ', lazyElement(SmsDeliveryLogRoute)) },

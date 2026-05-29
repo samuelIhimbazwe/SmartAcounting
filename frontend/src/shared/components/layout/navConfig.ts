@@ -233,6 +233,15 @@ export const NAV_ITEMS: NavItem[] = [
     requiredPermission: 'FINANCE_READ',
   },
   {
+    id: 'journals',
+    to: '/finance/journals',
+    labelKey: 'nav.journals',
+    searchLabel: 'Journal entries',
+    group: 'nav.groupFinance',
+    icon: BookOpen,
+    requiredPermission: 'FINANCE_WRITE',
+  },
+  {
     id: 'payment-runs',
     to: '/finance/payment-runs',
     labelKey: 'nav.paymentRuns',
