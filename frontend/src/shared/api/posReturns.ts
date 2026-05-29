@@ -57,3 +57,36 @@ export async function approvePosReturn(returnId: string): Promise<PosReturnDto> 
   const { data } = await apiClient.post<PosReturnDto>(`/api/v1/pos/returns/${returnId}/approve`)
   return data
 }
+
+export type ReturnHistoryRow = {
+  id: string
+  returnNumber: string
+  returnDate: string
+  createdAt: string
+  customerName: string
+  products: string
+  totalRefundAmount: number
+  refundMethod: string
+  processedBy: string
+  status: string
+  currencyCode: string
+}
+
+export async function listPosReturns(params?: {
+  fromDate?: string
+  toDate?: string
+  status?: string
+  page?: number
+  size?: number
+}): Promise<{ content: ReturnHistoryRow[] }> {
+  const { data } = await apiClient.get<{ content: ReturnHistoryRow[] }>('/api/v1/pos/returns', {
+    params: {
+      page: params?.page ?? 0,
+      size: params?.size ?? 50,
+      ...(params?.fromDate ? { fromDate: params.fromDate } : {}),
+      ...(params?.toDate ? { toDate: params.toDate } : {}),
+      ...(params?.status ? { status: params.status } : {}),
+    },
+  })
+  return data
+}

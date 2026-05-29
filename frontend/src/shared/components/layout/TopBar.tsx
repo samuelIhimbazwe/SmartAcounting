@@ -3,6 +3,7 @@ import { TillStatusChip } from '../../../components/till/TillStatusChip'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getDefaultRoute } from '../../routing/getDefaultRoute'
+import { signOut } from '../../auth/signOut'
 import { useAuthStore } from '../../stores/authStore'
 import { useAlertStore } from '../../stores/alertStore'
 import { useDateRangeStore } from '../../stores/dateRangeStore'
@@ -19,7 +20,6 @@ interface TopBarProps {
 
 export function TopBar({ role, onOpenAlerts, onOpenMenu }: TopBarProps) {
   const { t } = useTranslation()
-  const clearSession = useAuthStore((state) => state.clearSession)
   const permissions = useAuthStore((state) => state.permissions)
   const effectiveRoleProfile = useAuthStore((state) => state.effectiveRoleProfile)
   const unreadCount = useAlertStore((state) => state.unreadCount)
@@ -80,7 +80,7 @@ export function TopBar({ role, onOpenAlerts, onOpenMenu }: TopBarProps) {
             {unreadCount > 0 ? <span className="topbar__icon-btn__dot">{unreadCount}</span> : null}
           </button>
 
-          <button type="button" className="btn btn--sm" onClick={clearSession}>
+          <button type="button" className="btn btn--sm" onClick={() => void signOut().then(() => { window.location.assign('/login') })}>
             <LogOut className="h-4 w-4" />
             <span className="hidden sm:inline">{t('topbar.logout')}</span>
           </button>

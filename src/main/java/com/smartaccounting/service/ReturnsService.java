@@ -6,8 +6,12 @@ import com.smartaccounting.dto.ReturnLineRequest;
 import com.smartaccounting.entity.PosReturn;
 import com.smartaccounting.entity.PosReturnLine;
 import com.smartaccounting.exception.BusinessException;
+import com.smartaccounting.repository.GoodsReceivedNoteRepository;
+import com.smartaccounting.repository.GrnLineRepository;
 import com.smartaccounting.repository.PosReturnLineRepository;
 import com.smartaccounting.repository.PosReturnRepository;
+import com.smartaccounting.repository.SalesOrderRepository;
+import com.smartaccounting.repository.UserRepository;
 import com.smartaccounting.tenant.TenantContext;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,8 +21,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -27,17 +34,23 @@ public class ReturnsService {
 
     private final PosReturnRepository posReturnRepository;
     private final PosReturnLineRepository posReturnLineRepository;
+    private final SalesOrderRepository salesOrderRepository;
+    private final UserRepository userRepository;
     private final InventoryService inventoryService;
     private final ShrinkageService shrinkageService;
     private final SalesAnalyticsService salesAnalyticsService;
 
     public ReturnsService(PosReturnRepository posReturnRepository,
                           PosReturnLineRepository posReturnLineRepository,
+                          SalesOrderRepository salesOrderRepository,
+                          UserRepository userRepository,
                           InventoryService inventoryService,
                           ShrinkageService shrinkageService,
                           SalesAnalyticsService salesAnalyticsService) {
         this.posReturnRepository = posReturnRepository;
         this.posReturnLineRepository = posReturnLineRepository;
+        this.salesOrderRepository = salesOrderRepository;
+        this.userRepository = userRepository;
         this.inventoryService = inventoryService;
         this.shrinkageService = shrinkageService;
         this.salesAnalyticsService = salesAnalyticsService;
@@ -107,6 +120,71 @@ public class ReturnsService {
         posReturn = posReturnRepository.save(posReturn);
         processApprovedReturn(tid.toString(), returnId);
         return posReturn;
+    }
+
+    @Transactional(readOnly = true)
+    public Page<Map<String, Object>> listReturnSummaries(
+        LocalDate fromDate,
+        LocalDate toDate,
+        String status,
+        Pageable pageable) {
+        UUID tid = requireTenant();
+        Page<PosReturn> page = listReturns(status, pageable);
+        List<Map<String, Object>> content = page.getContent().stream()
+            .filter(r -> fromDate == null || !r.getReturnDate().isBefore(fromDate))
+            .filter(r -> toDate == null || !r.getReturnDate().isAfter(toDate))
+            .map(r -> toSummary(r, tid))
+            .toList();
+        return new org.springframework.data.domain.PageImpl<>(content, pageable, page.getTotalElements());
+    }
+
+    private Map<String, Object> toSummary(PosReturn posReturn, UUID tenantId) {
+        List<PosReturnLine> lines = posReturnLineRepository.findByReturnId(posReturn.getId());
+        String products = lines.stream()
+            .map(l -> l.getProductName() + " ×" + l.getQuantity())
+            .collect(Collectors.joining(", "));
+        String customer = resolveCustomerName(posReturn.getOriginalTransactionId(), tenantId);
+        String processedBy = resolveProcessedBy(posReturn.getCashierId());
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", posReturn.getId());
+        row.put("returnNumber", posReturn.getReturnNumber());
+        row.put("returnDate", posReturn.getReturnDate());
+        row.put("createdAt", posReturn.getCreatedAt());
+        row.put("customerName", customer);
+        row.put("products", products);
+        row.put("totalRefundAmount", posReturn.getTotalRefundAmount());
+        row.put("refundMethod", posReturn.getRefundMethod());
+        row.put("processedBy", processedBy);
+        row.put("status", posReturn.getStatus());
+        row.put("currencyCode", posReturn.getCurrencyCode());
+        return row;
+    }
+
+    private String resolveCustomerName(String originalTransactionId, UUID tenantId) {
+        if (originalTransactionId == null || originalTransactionId.isBlank()) {
+            return "Walk-in";
+        }
+        try {
+            UUID saleId = UUID.fromString(originalTransactionId);
+            return salesOrderRepository.findById(saleId)
+                .filter(o -> tenantId.equals(o.getTenantId()))
+                .map(o -> o.getCustomerName() != null ? o.getCustomerName() : "Walk-in")
+                .orElse("Walk-in");
+        } catch (IllegalArgumentException ex) {
+            return "Walk-in";
+        }
+    }
+
+    private String resolveProcessedBy(String cashierId) {
+        if (cashierId == null || cashierId.isBlank()) {
+            return "—";
+        }
+        try {
+            UUID userId = UUID.fromString(cashierId);
+            return userRepository.findById(userId).map(u -> u.getUsername()).orElse(cashierId);
+        } catch (IllegalArgumentException ex) {
+            return cashierId;
+        }
     }
 
     @Transactional(readOnly = true)

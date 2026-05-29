@@ -7,5 +7,6 @@ import java.time.LocalDate;
 
 public record DisposeAssetRequest(
     @NotNull LocalDate disposedDate,
-    @NotNull BigDecimal disposalProceeds
+    @NotNull BigDecimal disposalProceeds,
+    String notes
 ) {}

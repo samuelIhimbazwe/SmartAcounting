@@ -5,6 +5,7 @@ import com.smartaccounting.dto.PurchaseOrderDetail;
 import com.smartaccounting.dto.ThreeWayMatchResult;
 import com.smartaccounting.dto.WorkflowCreatePurchaseOrderRequest;
 import com.smartaccounting.entity.GoodsReceivedNote;
+import com.smartaccounting.entity.GrnLine;
 import com.smartaccounting.entity.PurchaseOrder;
 import com.smartaccounting.service.PurchaseOrderService;
 import com.smartaccounting.tenant.TenantContext;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -73,6 +75,18 @@ public class PurchaseOrderController {
     @PreAuthorize(PermissionExpressions.PROCUREMENT_WRITE)
     public ResponseEntity<PurchaseOrder> confirmPo(@PathVariable UUID poId) {
         return ResponseEntity.ok(purchaseOrderService.confirmPo(poId));
+    }
+
+    @GetMapping("/{poId}/grns")
+    @PreAuthorize(PermissionExpressions.PROCUREMENT_READ)
+    public ResponseEntity<List<GoodsReceivedNote>> listGrns(@PathVariable UUID poId) {
+        return ResponseEntity.ok(purchaseOrderService.listGrnsForPo(poId));
+    }
+
+    @GetMapping("/grn/{grnId}/lines")
+    @PreAuthorize(PermissionExpressions.PROCUREMENT_READ)
+    public ResponseEntity<List<GrnLine>> listGrnLines(@PathVariable UUID grnId) {
+        return ResponseEntity.ok(purchaseOrderService.listGrnLines(grnId));
     }
 
     @PostMapping("/{poId}/grn")

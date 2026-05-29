@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { completeCloseTask, listCloseTasks, type CloseTask } from '../../shared/api/productionFinance'
+import { completeCloseTask, createCloseTask, listCloseTasks, type CloseTask } from '../../shared/api/productionFinance'
 import { normalizeApiError } from '../../shared/api/errors'
 import { PageSkeleton } from '../../shared/components/ui/LoadingSkeleton'
+
+function slugify(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'task'
+}
 
 export function MonthEndClosePage() {
   const { t } = useTranslation()
@@ -10,10 +14,16 @@ export function MonthEndClosePage() {
   const [tasks, setTasks] = useState<CloseTask[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [taskName, setTaskName] = useState('')
+  const [assignedTo, setAssignedTo] = useState('ACCOUNTING')
+  const [dueDate, setDueDate] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const reload = () => listCloseTasks(period).then(setTasks)
 
   useEffect(() => {
-    void listCloseTasks(period)
-      .then(setTasks)
+    void reload()
       .catch((e) => setError(normalizeApiError(e).message))
       .finally(() => setLoading(false))
   }, [period])
@@ -21,11 +31,40 @@ export function MonthEndClosePage() {
   const done = tasks.filter((x) => x.status === 'DONE').length
   const pct = tasks.length ? Math.round((done / tasks.length) * 100) : 0
 
+  const submitTask = async () => {
+    if (!taskName.trim()) return
+    setBusy(true)
+    setError(null)
+    try {
+      const key = `${slugify(taskName)}${dueDate ? `-${dueDate}` : ''}`
+      await createCloseTask({
+        period,
+        taskKey: key,
+        ownerRole: assignedTo,
+        dependsOn: dueDate ? [`due:${dueDate}`] : [],
+        riskScore: 1,
+      })
+      setModalOpen(false)
+      setTaskName('')
+      setDueDate('')
+      await reload()
+    } catch (e) {
+      setError(normalizeApiError(e).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (loading) return <PageSkeleton />
 
   return (
     <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-4">
-      <h1 className="text-2xl font-semibold">{t('nav.monthEndClose')}</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold">{t('nav.monthEndClose')}</h1>
+        <button type="button" className="rounded-lg bg-indigo-600 px-3 py-2 text-sm text-white" onClick={() => setModalOpen(true)}>
+          + Add task
+        </button>
+      </div>
       <p className="text-sm text-slate-600">{period}</p>
       <div className="flex items-center gap-4">
         <svg width="88" height="88" viewBox="0 0 88 88" aria-hidden>
@@ -49,14 +88,12 @@ export function MonthEndClosePage() {
       <ul className="space-y-2">
         {tasks.map((task) => (
           <li key={task.id} className="flex items-center justify-between rounded-lg border bg-white px-3 py-2 text-sm">
-            <span>{task.title ?? task.taskKey}</span>
+            <span>{task.title ?? task.taskKey.replace(/-/g, ' ')}</span>
             {task.status !== 'DONE' ? (
               <button
                 type="button"
                 className="text-indigo-600"
-                onClick={() => void completeCloseTask(period, task.taskKey).then(() =>
-                  listCloseTasks(period).then(setTasks),
-                )}
+                onClick={() => void completeCloseTask(period, task.taskKey).then(() => reload())}
               >
                 {t('pages.close.markDone')}
               </button>
@@ -67,7 +104,39 @@ export function MonthEndClosePage() {
         ))}
       </ul>
       {tasks.length === 0 ? <p className="text-sm text-slate-500">{t('common.empty')}</p> : null}
+
+      {modalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-5 space-y-3 shadow-xl">
+            <h2 className="text-lg font-semibold">Add close task</h2>
+            <label className="block text-sm">
+              Task name
+              <input className="mt-1 w-full rounded border px-2 py-1.5" value={taskName} onChange={(e) => setTaskName(e.target.value)} />
+            </label>
+            <label className="block text-sm">
+              Assigned to
+              <select className="mt-1 w-full rounded border px-2 py-1.5" value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)}>
+                <option value="ACCOUNTING">Accounting</option>
+                <option value="CFO">CFO</option>
+                <option value="HR">HR</option>
+                <option value="OPERATIONS">Operations</option>
+              </select>
+            </label>
+            <label className="block text-sm">
+              Due date
+              <input type="date" className="mt-1 w-full rounded border px-2 py-1.5" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            </label>
+            <div className="flex justify-end gap-2">
+              <button type="button" className="rounded border px-3 py-1.5 text-sm" onClick={() => setModalOpen(false)}>
+                {t('common.cancel')}
+              </button>
+              <button type="button" disabled={busy || !taskName.trim()} className="rounded bg-indigo-600 px-3 py-1.5 text-sm text-white disabled:opacity-50" onClick={() => void submitTask()}>
+                Save task
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
-

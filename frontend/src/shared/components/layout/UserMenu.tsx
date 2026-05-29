@@ -7,6 +7,7 @@ import {
   type BillingCycle,
   type PlanId,
 } from '../../../features/auth/subscriptionPlans'
+import { signOut } from '../../auth/signOut'
 import { useAuthStore } from '../../stores/authStore'
 import { useIntlStore } from '../../stores/intlStore'
 import type { Role } from '../../types/roles'
@@ -27,7 +28,6 @@ const PLAN_LABEL_KEYS: Record<PlanId | 'TRIAL', string> = {
 export function UserMenu({ role, open, onClose }: UserMenuProps) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
-  const clearSession = useAuthStore((state) => state.clearSession)
   const tenantId = useAuthStore((state) => state.tenantId)
   const permissions = useAuthStore((state) => state.permissions)
   const effectiveRoleProfile = useAuthStore((state) => state.effectiveRoleProfile)
@@ -76,8 +76,7 @@ export function UserMenu({ role, open, onClose }: UserMenuProps) {
 
   function handleSignOut() {
     onClose()
-    clearSession()
-    navigate('/login')
+    void signOut().then(() => navigate('/login'))
   }
 
   return (

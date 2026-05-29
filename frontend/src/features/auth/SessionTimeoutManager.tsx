@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { refreshAccessToken } from '../../shared/api/auth'
 import { normalizeApiError } from '../../shared/api/errors'
 import { useModalFocusTrap } from '../../shared/hooks/useModalFocusTrap'
+import { signOut } from '../../shared/auth/signOut'
 import { useAuthStore } from '../../shared/stores/authStore'
 
 const WARNING_WINDOW_MS = 2 * 60 * 1000
@@ -77,8 +78,7 @@ export function SessionTimeoutManager() {
   }
 
   function onSignOutNow() {
-    clearSession()
-    window.location.assign('/login')
+    void signOut().then(() => window.location.assign('/login'))
   }
 
   if (!isOpen || !countdownLabel) {

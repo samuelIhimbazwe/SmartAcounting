@@ -3,8 +3,10 @@ import { useSearchParams } from 'react-router-dom'
 import { fetchPosSaleDetail, type PosSaleDetail } from '../../shared/api/posSales'
 import {
   initiatePosReturn,
+  listPosReturns,
   type PosReturnDto,
   type RefundMethodCode,
+  type ReturnHistoryRow,
   type ReturnReasonCode,
 } from '../../shared/api/posReturns'
 import { normalizeApiError } from '../../shared/api/errors'
@@ -17,6 +19,7 @@ import { Button } from '../../shared/components/ui/Button'
 import { formatTenderType } from '../../services/posSaleHistory'
 
 type Step = 1 | 2 | 3 | 4
+type MainTab = 'new' | 'history'
 
 const RETURN_REASONS: { value: ReturnReasonCode; label: string }[] = [
   { value: 'DEFECTIVE', label: 'Defective' },
@@ -94,6 +97,7 @@ function buildLineRows(detail: PosSaleDetail): ReturnLineRow[] {
 }
 
 export function ReturnsPage() {
+  const [mainTab, setMainTab] = useState<MainTab>('new')
   const [searchParams, setSearchParams] = useSearchParams()
   const [step, setStep] = useState<Step>(1)
   const [lookup, setLookup] = useState('')
@@ -244,6 +248,27 @@ export function ReturnsPage() {
         </div>
       </header>
 
+      <div className="flex gap-2 border-b border-[var(--border-subtle)] pb-2">
+        <button
+          type="button"
+          className={`rounded-full px-3 py-1 text-sm font-medium ${mainTab === 'new' ? 'bg-[var(--color-brand-10)] text-[var(--color-brand-900)]' : 'text-neutral-600'}`}
+          onClick={() => setMainTab('new')}
+        >
+          New return
+        </button>
+        <button
+          type="button"
+          className={`rounded-full px-3 py-1 text-sm font-medium ${mainTab === 'history' ? 'bg-[var(--color-brand-10)] text-[var(--color-brand-900)]' : 'text-neutral-600'}`}
+          onClick={() => setMainTab('history')}
+        >
+          Return history
+        </button>
+      </div>
+
+      {mainTab === 'history' ? <ReturnHistoryPanel /> : null}
+
+      {mainTab === 'new' ? (
+        <>
       <nav className="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-500" aria-label="Return steps">
         {(['Find sale', 'Select items', 'Confirm', 'Done'] as const).map((label, i) => {
           const n = (i + 1) as Step
@@ -499,6 +524,74 @@ export function ReturnsPage() {
         title="Send return receipt"
         onClose={() => setDeliveryOpen(false)}
       />
+        </>
+      ) : null}
     </div>
+  )
+}
+
+function ReturnHistoryPanel() {
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+  const [rows, setRows] = useState<ReturnHistoryRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setLoading(true)
+    setError(null)
+    void listPosReturns({
+      fromDate: fromDate || undefined,
+      toDate: toDate || undefined,
+      size: 100,
+    })
+      .then((page) => setRows(page.content ?? []))
+      .catch((err) => setError(normalizeApiError(err).message))
+      .finally(() => setLoading(false))
+  }, [fromDate, toDate])
+
+  return (
+    <section className="surface-card space-y-4">
+      <h2 className="m-0 text-lg font-semibold">Return history</h2>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="text-sm">
+          From date
+          <input type="date" className="ui-input mt-1" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+        </label>
+        <label className="text-sm">
+          To date
+          <input type="date" className="ui-input mt-1" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+        </label>
+      </div>
+      {error ? <p className="text-sm text-red-700">{error}</p> : null}
+      {loading ? <p className="text-sm text-neutral-500">Loading…</p> : null}
+      <div className="overflow-x-auto">
+        <table className="table-scroll w-full text-left text-sm">
+          <thead>
+            <tr className="border-b text-xs uppercase text-neutral-500">
+              <th className="py-2 pr-3">Date</th>
+              <th className="py-2 pr-3">Customer</th>
+              <th className="py-2 pr-3">Products</th>
+              <th className="py-2 pr-3 text-right">Amount</th>
+              <th className="py-2 pr-3">Tender</th>
+              <th className="py-2">Processed by</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.id} className="border-b border-neutral-100">
+                <td className="py-2 pr-3 whitespace-nowrap">{row.returnDate}</td>
+                <td className="py-2 pr-3">{row.customerName || 'Walk-in'}</td>
+                <td className="py-2 pr-3 max-w-xs truncate">{row.products || '—'}</td>
+                <td className="py-2 pr-3 text-right tabular-nums">{formatRwf(Number(row.totalRefundAmount))}</td>
+                <td className="py-2 pr-3">{formatTenderType(row.refundMethod)}</td>
+                <td className="py-2">{row.processedBy}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!loading && rows.length === 0 ? <p className="py-4 text-sm text-neutral-500">No returns in this range.</p> : null}
+      </div>
+    </section>
   )
 }

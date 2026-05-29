@@ -110,10 +110,12 @@ public class FixedAssetRegisterService {
             ? asset.getNetBookValue()
             : effectiveCost(asset).subtract(nullToZero(asset.getAccumulatedDepreciation()));
         BigDecimal gainLoss = request.disposalProceeds().subtract(nbv);
+        String noteSuffix = request.notes() != null && !request.notes().isBlank()
+            ? " — " + request.notes().trim() : "";
 
         financeService.createJournalEntry(new CreateJournalEntryRequest(
             request.disposedDate(),
-            "Asset disposal: " + asset.getAssetName(),
+            "Asset disposal: " + asset.getAssetName() + noteSuffix,
             gainLoss.signum() >= 0 ? "CASH" : "LOSS_ON_DISPOSAL",
             gainLoss.signum() >= 0 ? "GAIN_ON_DISPOSAL" : "FIXED_ASSET",
             request.disposalProceeds().abs().max(nbv),
@@ -125,6 +127,34 @@ public class FixedAssetRegisterService {
         asset.setDisposalGainLoss(gainLoss);
         asset.setStatus("DISPOSED");
         asset.setNetBookValue(BigDecimal.ZERO);
+        return fixedAssetRegisterRepository.save(asset);
+    }
+
+    public FixedAssetRegister depreciateAsset(UUID assetId) {
+        FixedAssetRegister asset = getAsset(assetId);
+        if (!"ACTIVE".equals(asset.getStatus())) {
+            throw new IllegalArgumentException("Only active assets can be depreciated");
+        }
+        BigDecimal monthly = calculateMonthlyDepreciation(asset);
+        if (monthly.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("No depreciation due for this asset");
+        }
+        financeService.createJournalEntry(new CreateJournalEntryRequest(
+            LocalDate.now(),
+            "Depreciation: " + asset.getAssetName(),
+            "DEPRECIATION_EXPENSE",
+            "ACCUMULATED_DEPRECIATION",
+            monthly,
+            asset.getCurrencyCode()
+        ));
+        BigDecimal accumulated = nullToZero(asset.getAccumulatedDepreciation()).add(monthly);
+        asset.setAccumulatedDepreciation(accumulated);
+        BigDecimal nbv = effectiveCost(asset).subtract(accumulated);
+        asset.setNetBookValue(nbv);
+        if (nbv.compareTo(effectiveSalvage(asset)) <= 0) {
+            asset.setStatus("FULLY_DEPRECIATED");
+            asset.setNetBookValue(effectiveSalvage(asset));
+        }
         return fixedAssetRegisterRepository.save(asset);
     }
 

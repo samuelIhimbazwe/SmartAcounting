@@ -257,3 +257,57 @@ export async function postPayrollRun(runId: string) {
   const { data } = await apiClient.post<PayrollRun>(`/api/v1/hr/payroll/runs/${runId}/post`)
   return data
 }
+
+export interface PayrollLineRow {
+  id: string
+  employeeId: string
+  employeeName: string
+  department: string
+  grossSalary: number
+  netPay: number
+  paye: number
+}
+
+export async function getPayrollRun(runId: string): Promise<PayrollRun> {
+  const { data } = await apiClient.get<PayrollRun>(`/api/v1/hr/payroll/runs/${runId}`)
+  return data
+}
+
+export async function getPayrollRunLines(runId: string): Promise<PayrollLineRow[]> {
+  const { data } = await apiClient.get<PayrollLineRow[]>(`/api/v1/hr/payroll/runs/${runId}/lines`)
+  return data
+}
+
+export async function exportPayeCsvForRun(runId: string): Promise<Blob> {
+  const { data } = await apiClient.get<Blob>(`/api/v1/hr/payroll/runs/${runId}/paye-export`, {
+    responseType: 'blob',
+  })
+  return data
+}
+
+export async function downloadPayrollPayslip(runId: string, employeeId: string): Promise<Blob> {
+  const { data } = await apiClient.get<Blob>(`/api/v1/hr/payroll/runs/${runId}/payslip/${employeeId}`, {
+    responseType: 'blob',
+  })
+  return data
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+export async function downloadPayeExportFile(runId: string, period: string) {
+  const blob = await exportPayeCsvForRun(runId)
+  downloadBlob(blob, `paye-${period || runId}.csv`)
+}
+
+export async function downloadEmployeePayslipFile(runId: string, employeeId: string, employeeName: string) {
+  const blob = await downloadPayrollPayslip(runId, employeeId)
+  const safe = employeeName.replace(/\s+/g, '-').toLowerCase()
+  downloadBlob(blob, `payslip-${safe}.pdf`)
+}

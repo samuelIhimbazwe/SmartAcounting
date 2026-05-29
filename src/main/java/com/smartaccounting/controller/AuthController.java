@@ -23,6 +23,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -180,7 +181,28 @@ public class AuthController {
     @PostMapping("/logout")
     public void logout(@RequestBody @Valid RefreshRequest request,
                        @RequestHeader(value = "Authorization", required = false) String authorization) {
-        refreshTokenService.revoke(request.refreshToken());
+        revokeSession(request.refreshToken(), authorization);
+    }
+
+    @DeleteMapping("/logout")
+    public void logoutDelete(@RequestBody(required = false) RefreshRequest request,
+                             @RequestHeader(value = "Authorization", required = false) String authorization) {
+        if (request != null && request.refreshToken() != null) {
+            revokeSession(request.refreshToken(), authorization);
+        } else if (authorization != null && authorization.startsWith("Bearer ")) {
+            try {
+                var claims = jwtService.parse(authorization.substring(7).trim());
+                jwtRevocationService.revoke(claims.getId(), claims.getExpiration());
+            } catch (RuntimeException ignored) {
+                // access token already invalid
+            }
+        }
+    }
+
+    private void revokeSession(String refreshToken, String authorization) {
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            refreshTokenService.revoke(refreshToken);
+        }
         if (authorization != null && authorization.startsWith("Bearer ")) {
             try {
                 var claims = jwtService.parse(authorization.substring(7).trim());

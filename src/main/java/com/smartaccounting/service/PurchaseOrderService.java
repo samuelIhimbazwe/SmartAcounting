@@ -235,7 +235,7 @@ public class PurchaseOrderService {
         grn.setPurchaseOrderId(poId);
         grn.setSupplierId(po.getSupplierId());
         grn.setSupplierName(po.getSupplierName());
-        grn.setReceivedDate(LocalDate.now());
+        grn.setReceivedDate(request.receivedDate() != null ? request.receivedDate() : LocalDate.now());
         grn.setReceivedBy(receivedBy);
         grn.setStatus("DRAFT");
         grn.setNotes(request.notes());
@@ -335,6 +335,21 @@ public class PurchaseOrderService {
             variance.abs().compareTo(new BigDecimal("0.01")) <= 0,
             variancePct.abs().compareTo(new BigDecimal("0.05")) > 0
         );
+    }
+
+    @Transactional(readOnly = true)
+    public List<GoodsReceivedNote> listGrnsForPo(UUID poId) {
+        UUID tid = requireTenant();
+        loadPo(poId);
+        return grnRepository.findByTenantIdAndPurchaseOrderIdOrderByCreatedAtDesc(tid, poId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<GrnLine> listGrnLines(UUID grnId) {
+        UUID tid = requireTenant();
+        grnRepository.findByIdAndTenantId(grnId, tid)
+            .orElseThrow(() -> new IllegalArgumentException("GRN not found"));
+        return grnLineRepository.findByTenantIdAndGrnId(tid, grnId);
     }
 
     private BigDecimal getGrnTotal(UUID tenantId, UUID purchaseOrderId) {

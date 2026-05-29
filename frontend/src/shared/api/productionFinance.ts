@@ -59,6 +59,36 @@ export async function completeCloseTask(period: string, taskKey: string): Promis
   await apiClient.post(`/api/v1/accounting/close/tasks/${period}/${taskKey}/complete`)
 }
 
+export async function createCloseTask(body: {
+  period: string
+  taskKey: string
+  ownerRole: string
+  dependsOn?: string[]
+  riskScore?: number
+}): Promise<{ taskId: string }> {
+  const { data } = await apiClient.post<{ taskId: string }>('/api/v1/accounting/close/tasks', {
+    period: body.period,
+    taskKey: body.taskKey,
+    ownerRole: body.ownerRole,
+    dependsOn: body.dependsOn ?? [],
+    riskScore: body.riskScore ?? 1,
+  })
+  return data
+}
+
+export async function depreciateFixedAsset(assetId: string): Promise<FixedAsset> {
+  const { data } = await apiClient.post<FixedAsset>(`/api/v1/finance/fixed-assets/${assetId}/depreciate`)
+  return data
+}
+
+export async function disposeFixedAsset(
+  assetId: string,
+  body: { disposedDate: string; disposalProceeds: number; notes?: string },
+): Promise<FixedAsset> {
+  const { data } = await apiClient.post<FixedAsset>(`/api/v1/finance/fixed-assets/${assetId}/dispose`, body)
+  return data
+}
+
 export type WorkflowRule = {
   id: string
   name: string

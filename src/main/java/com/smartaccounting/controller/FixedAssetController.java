@@ -52,6 +52,12 @@ public class FixedAssetController {
         return ResponseEntity.ok(fixedAssetRegisterService.depreciationSchedule(assetId));
     }
 
+    @PostMapping("/{assetId}/depreciate")
+    @PreAuthorize(PermissionExpressions.ASSETS_MANAGE)
+    public ResponseEntity<FixedAssetRegister> depreciateAsset(@PathVariable UUID assetId) {
+        return ResponseEntity.ok(fixedAssetRegisterService.depreciateAsset(assetId));
+    }
+
     @PostMapping("/{assetId}/dispose")
     @PreAuthorize(PermissionExpressions.ASSETS_MANAGE)
     public ResponseEntity<FixedAssetRegister> disposeAsset(
