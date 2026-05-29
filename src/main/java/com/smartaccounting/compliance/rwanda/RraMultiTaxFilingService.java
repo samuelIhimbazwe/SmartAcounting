@@ -1,6 +1,7 @@
 package com.smartaccounting.compliance.rwanda;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.smartaccounting.compliance.VatFilingCalendarService;
 import com.smartaccounting.entity.Invoice;
 import com.smartaccounting.entity.RraRwandaSettings;
 import com.smartaccounting.entity.RraTaxFiling;
@@ -45,6 +46,7 @@ public class RraMultiTaxFilingService {
     private final RwandaComplianceProperties properties;
     private final ObjectMapper objectMapper;
     private final RwandaTaxCalendarService taxCalendarService;
+    private final VatFilingCalendarService vatFilingCalendarService;
 
     public RraMultiTaxFilingService(InvoiceRepository invoiceRepository,
                                     SupplierBillRepository supplierBillRepository,
@@ -53,7 +55,8 @@ public class RraMultiTaxFilingService {
                                     RraHttpGateway httpGateway,
                                     RwandaComplianceProperties properties,
                                     ObjectMapper objectMapper,
-                                    RwandaTaxCalendarService taxCalendarService) {
+                                    RwandaTaxCalendarService taxCalendarService,
+                                    VatFilingCalendarService vatFilingCalendarService) {
         this.invoiceRepository = invoiceRepository;
         this.supplierBillRepository = supplierBillRepository;
         this.settingsRepository = settingsRepository;
@@ -62,6 +65,7 @@ public class RraMultiTaxFilingService {
         this.properties = properties;
         this.objectMapper = objectMapper;
         this.taxCalendarService = taxCalendarService;
+        this.vatFilingCalendarService = vatFilingCalendarService;
     }
 
     @Transactional
@@ -173,6 +177,9 @@ public class RraMultiTaxFilingService {
             filing.setLastError(String.valueOf(resp.get("error")));
         }
         filingRepository.save(filing);
+        if ("SUBMITTED".equals(filing.getStatus())) {
+            vatFilingCalendarService.markSubmitted(tenant, period, filing.getRraAckReference());
+        }
         return filing;
     }
 

@@ -1,5 +1,7 @@
 package com.smartaccounting.controller;
 
+import com.smartaccounting.dto.PayeExportRequest;
+import com.smartaccounting.dto.PayeFilingLogItem;
 import com.smartaccounting.dto.PayrollRunDetail;
 import com.smartaccounting.entity.PayrollLine;
 import com.smartaccounting.entity.PayrollRun;
@@ -108,11 +110,28 @@ public class PayrollController {
     }
 
     @GetMapping("/runs/{runId}/paye-export")
-    @PreAuthorize(PermissionExpressions.PAYROLL_READ)
+    @PreAuthorize(PermissionExpressions.PAYE_FILING_EXPORT)
     public ResponseEntity<byte[]> payeExport(@PathVariable UUID runId) {
-        byte[] csv = payrollFilingService.exportPayeCsv(runId);
+        return payeExportResponse(payrollFilingService.exportPayeCsv(runId), runId.toString());
+    }
+
+    @PostMapping("/paye-export")
+    @PreAuthorize(PermissionExpressions.PAYE_FILING_EXPORT)
+    public ResponseEntity<byte[]> payeExportPost(@RequestBody PayeExportRequest body) {
+        byte[] csv = payrollFilingService.exportPayeCsv(body.runId(), body.period());
+        String name = body.runId() != null ? body.runId().toString() : (body.period() != null ? body.period() : "export");
+        return payeExportResponse(csv, name);
+    }
+
+    @GetMapping("/paye-filing-log")
+    @PreAuthorize(PermissionExpressions.PAYE_FILING_EXPORT)
+    public ResponseEntity<List<PayeFilingLogItem>> payeFilingLog() {
+        return ResponseEntity.ok(payrollFilingService.listFilingLogs());
+    }
+
+    private static ResponseEntity<byte[]> payeExportResponse(byte[] csv, String name) {
         return ResponseEntity.ok()
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=paye-" + runId + ".csv")
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=paye-" + name + ".csv")
             .contentType(MediaType.parseMediaType("text/csv"))
             .body(csv);
     }

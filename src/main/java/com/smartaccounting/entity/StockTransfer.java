@@ -18,6 +18,7 @@ public class StockTransfer {
     private UUID createdBy;
     private Instant createdAt;
     private Instant receivedAt;
+    private String notes;
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
@@ -35,4 +36,6 @@ public class StockTransfer {
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
     public Instant getReceivedAt() { return receivedAt; }
     public void setReceivedAt(Instant receivedAt) { this.receivedAt = receivedAt; }
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
 }

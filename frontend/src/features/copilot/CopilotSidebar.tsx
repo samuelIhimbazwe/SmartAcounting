@@ -1,6 +1,7 @@
 import { AlertTriangle, Bot, Check, RotateCcw, Send, ShieldCheck, Sparkles, Square, Trash2, X } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { useCopilot } from './useCopilot'
 import { useCopilotContext } from './useCopilotContext'
 import { CopilotEmptyState } from './CopilotEmptyState'
@@ -67,6 +68,7 @@ export function CopilotSidebar() {
           : 'bg-[var(--status-neutral-bg)] text-[var(--status-neutral-text)]'
 
   const placeholder = useMemo(() => `Ask AI Copilot about ${context.sectionLabel.toLowerCase()}...`, [context.sectionLabel])
+  const pendingApprovalCount = approvals.filter((item) => item.status === 'PENDING').length
 
   if (typeof document === 'undefined') {
     return null
@@ -163,6 +165,14 @@ export function CopilotSidebar() {
                     Expire stale
                   </button>
                 </div>
+                {pendingApprovalCount > 0 ? (
+                  <p className="copilot-muted m-0 mb-2 text-sm">
+                    You have {pendingApprovalCount} pending approval{pendingApprovalCount === 1 ? '' : 's'} →{' '}
+                    <Link to="/actions" className="font-medium text-[var(--color-primary)] underline" onClick={() => setOpen(false)}>
+                      View all
+                    </Link>
+                  </p>
+                ) : null}
                 <div className="copilot-card-list">
                   {approvals.length === 0 ? <p className="copilot-muted">No pending approval requests.</p> : null}
                   {approvals.map((approval) => (

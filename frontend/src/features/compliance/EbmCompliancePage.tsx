@@ -12,6 +12,7 @@ import {
   type EbmReceipt,
 } from '../../shared/api/ebm'
 import { normalizeApiError } from '../../shared/api/errors'
+import { ComplianceSubNav } from './ComplianceSubNav'
 
 function currentPeriod() {
   const d = new Date()
@@ -77,6 +78,7 @@ export function EbmCompliancePage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
+      <ComplianceSubNav />
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <ShieldCheck className="h-8 w-8 text-[var(--color-brand-700)]" aria-hidden />

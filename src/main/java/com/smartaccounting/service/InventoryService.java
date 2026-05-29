@@ -559,6 +559,22 @@ public class InventoryService {
         inventoryBalanceRepository.save(to);
     }
 
+    @Transactional(readOnly = true)
+    public BigDecimal resolveLatestUnitCost(UUID productId, String locationCode) {
+        if (productId == null) {
+            return BigDecimal.ZERO;
+        }
+        UUID tenant = requireTenant();
+        String loc = locationCode != null && !locationCode.isBlank() ? locationCode.trim() : "SHOP";
+        return inventoryBatchRepository
+            .findByTenantIdAndProductIdAndLocationCodeOrderByExpiryDateAscCreatedAtAsc(tenant, productId, loc)
+            .stream()
+            .map(com.smartaccounting.entity.InventoryBatch::getCostPrice)
+            .filter(price -> price != null && price.signum() > 0)
+            .findFirst()
+            .orElse(BigDecimal.ZERO);
+    }
+
     /**
      * Writes off stock from the default retail location to the sale sink (shrinkage, damage, expiry).
      */

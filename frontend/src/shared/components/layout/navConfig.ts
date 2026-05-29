@@ -30,6 +30,7 @@ export type NavGroupKey =
   | 'nav.groupOverview'
   | 'nav.groupOperations'
   | 'nav.groupFinance'
+  | 'nav.groupCompliance'
   | 'nav.groupAdmin'
 
 export interface NavItem {
@@ -342,9 +343,45 @@ export const NAV_ITEMS: NavItem[] = [
     id: 'ebm-compliance',
     to: '/compliance/ebm',
     labelKey: 'nav.ebmCompliance',
-    searchLabel: 'EBM compliance',
-    group: 'nav.groupFinance',
+    searchLabel: 'EBM Compliance',
+    group: 'nav.groupCompliance',
     icon: ShieldCheck,
+    requiredPermission: 'EBM_AUDIT',
+  },
+  {
+    id: 'rra-settings',
+    to: '/compliance/rra-settings',
+    labelKey: 'nav.rraSettings',
+    searchLabel: 'RRA Settings',
+    group: 'nav.groupCompliance',
+    icon: Settings,
+    requiredPermission: 'EBM_CONFIG',
+  },
+  {
+    id: 'compliance-vat',
+    to: '/compliance/vat',
+    labelKey: 'nav.vatReturns',
+    searchLabel: 'VAT Returns',
+    group: 'nav.groupCompliance',
+    icon: ScrollText,
+    requiredPermission: 'EBM_AUDIT',
+  },
+  {
+    id: 'compliance-paye',
+    to: '/compliance/paye',
+    labelKey: 'nav.payeFiling',
+    searchLabel: 'PAYE Filing',
+    group: 'nav.groupCompliance',
+    icon: Users,
+    requiredPermission: 'EBM_AUDIT',
+  },
+  {
+    id: 'compliance-audit-log',
+    to: '/compliance/audit-log',
+    labelKey: 'nav.complianceAuditLog',
+    searchLabel: 'Audit Log',
+    group: 'nav.groupCompliance',
+    icon: ScrollText,
     requiredPermission: 'EBM_AUDIT',
   },
   {
@@ -380,6 +417,7 @@ export const NAV_GROUP_ORDER: NavGroupKey[] = [
   'nav.groupOverview',
   'nav.groupOperations',
   'nav.groupFinance',
+  'nav.groupCompliance',
   'nav.groupAdmin',
 ]
 

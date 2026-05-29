@@ -1,13 +1,2 @@
-import { useAuthStore } from '../../shared/stores/authStore'
-import { AppShell } from '../../shared/components/layout/AppShell'
-import { EbmCompliancePage } from './EbmCompliancePage'
-
-export function EbmComplianceRoute() {
-  const sessionRole = useAuthStore((s) => s.role)!
-
-  return (
-    <AppShell role={sessionRole}>
-      <EbmCompliancePage />
-    </AppShell>
-  )
-}
+/** @deprecated Import from {@link ./ComplianceRoutes} instead. */
+export { EbmComplianceRoute } from './ComplianceRoutes'

@@ -17,6 +17,11 @@ public class EbmAuditLog {
     private UUID tenantId;
     @Column(name = "receipt_id")
     private UUID receiptId;
+    @Column(name = "user_id")
+    private UUID userId;
+    private String action;
+    @Column(name = "document_ref")
+    private String documentRef;
     @Column(name = "request_payload", columnDefinition = "TEXT")
     private String requestPayload;
     @Column(name = "response_payload", columnDefinition = "TEXT")
@@ -37,6 +42,12 @@ public class EbmAuditLog {
     public void setTenantId(UUID tenantId) { this.tenantId = tenantId; }
     public UUID getReceiptId() { return receiptId; }
     public void setReceiptId(UUID receiptId) { this.receiptId = receiptId; }
+    public UUID getUserId() { return userId; }
+    public void setUserId(UUID userId) { this.userId = userId; }
+    public String getAction() { return action; }
+    public void setAction(String action) { this.action = action; }
+    public String getDocumentRef() { return documentRef; }
+    public void setDocumentRef(String documentRef) { this.documentRef = documentRef; }
     public String getRequestPayload() { return requestPayload; }
     public void setRequestPayload(String requestPayload) { this.requestPayload = requestPayload; }
     public String getResponsePayload() { return responsePayload; }

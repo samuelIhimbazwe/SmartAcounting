@@ -47,6 +47,21 @@ public class VatFilingCalendarService {
         return out;
     }
 
+    @Transactional
+    public void markSubmitted(UUID tenantId, String monthlyPeriod, String referenceNumber) {
+        YearMonth ym = YearMonth.parse(monthlyPeriod);
+        int quarter = ((ym.getMonthValue() - 1) / 3) + 1;
+        String calPeriod = ym.getYear() + "-Q" + quarter;
+        repository.findByTenantIdAndPeriod(tenantId, calPeriod).ifPresent(row -> {
+            row.setStatus("SUBMITTED");
+            row.setSubmittedAt(java.time.Instant.now());
+            if (referenceNumber != null && !referenceNumber.isBlank()) {
+                row.setReferenceNumber(referenceNumber);
+            }
+            repository.save(row);
+        });
+    }
+
     @Scheduled(cron = "0 0 8 * * *")
     @Transactional
     public void seedUpcomingPeriods() {

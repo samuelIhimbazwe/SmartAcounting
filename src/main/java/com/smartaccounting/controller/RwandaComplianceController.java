@@ -8,6 +8,7 @@ import com.smartaccounting.dto.UpdateRraRwandaSettingsRequest;
 import com.smartaccounting.entity.RraEisSubmission;
 import com.smartaccounting.entity.RraRwandaSettings;
 import com.smartaccounting.entity.RraTaxFiling;
+import com.smartaccounting.security.PermissionExpressions;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -39,49 +40,49 @@ public class RwandaComplianceController {
     }
 
     @GetMapping("/settings")
-    @PreAuthorize("@permissionGuard.has(authentication, 'FINANCE_READ')")
+    @PreAuthorize(PermissionExpressions.EBM_COMPLIANCE_READ)
     public ResponseEntity<RraRwandaSettings> getSettings() {
         return settingsService.current().map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
     }
 
     @PutMapping("/settings")
-    @PreAuthorize("@permissionGuard.has(authentication, 'FINANCE_WRITE')")
+    @PreAuthorize(PermissionExpressions.EBM_COMPLIANCE_WRITE)
     public RraRwandaSettings putSettings(@RequestBody @Valid UpdateRraRwandaSettingsRequest body) {
         return settingsService.upsert(body);
     }
 
     @GetMapping("/hints")
-    @PreAuthorize("@permissionGuard.has(authentication, 'FINANCE_READ')")
+    @PreAuthorize(PermissionExpressions.EBM_COMPLIANCE_READ)
     public Map<String, Object> hints() {
         return settingsService.complianceHints();
     }
 
     @PostMapping("/eis/invoices/{invoiceId}/submit")
-    @PreAuthorize("@permissionGuard.has(authentication, 'FINANCE_WRITE')")
+    @PreAuthorize(PermissionExpressions.EBM_COMPLIANCE_WRITE)
     public RraEisSubmission submitInvoice(@PathVariable UUID invoiceId) throws Exception {
         return eisInvoiceService.submit(invoiceId);
     }
 
     @PostMapping("/vat/returns/{period}/refresh")
-    @PreAuthorize("@permissionGuard.has(authentication, 'FINANCE_WRITE')")
+    @PreAuthorize(PermissionExpressions.EBM_COMPLIANCE_WRITE)
     public List<RraTaxFiling> refreshVat(@PathVariable String period) throws Exception {
         return filingService.refreshDrafts(period);
     }
 
     @PostMapping("/vat/returns/{period}/submit")
-    @PreAuthorize("@permissionGuard.has(authentication, 'FINANCE_WRITE')")
+    @PreAuthorize(PermissionExpressions.EBM_COMPLIANCE_WRITE)
     public RraTaxFiling submitVat(@PathVariable String period) throws Exception {
         return filingService.submitVatReturn(period);
     }
 
     @GetMapping("/filings")
-    @PreAuthorize("@permissionGuard.has(authentication, 'FINANCE_READ')")
+    @PreAuthorize(PermissionExpressions.EBM_COMPLIANCE_READ)
     public List<RraTaxFiling> filings(@RequestParam String period) {
         return filingService.list(period);
     }
 
     @PostMapping("/close/{period}/seed-tax-tasks")
-    @PreAuthorize("@permissionGuard.has(authentication, 'FINANCE_WRITE')")
+    @PreAuthorize(PermissionExpressions.EBM_COMPLIANCE_WRITE)
     public Map<String, Object> seedCloseTax(@PathVariable String period) {
         return closeTaxTaskSeeder.seedTaxTasks(period);
     }

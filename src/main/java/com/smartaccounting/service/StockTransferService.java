@@ -61,6 +61,9 @@ public class StockTransferService {
         transfer.setStatus(requestOnly ? "PENDING" : "IN_TRANSIT");
         transfer.setCreatedBy(requireUser());
         transfer.setCreatedAt(Instant.now());
+        if (req.notes() != null && !req.notes().isBlank()) {
+            transfer.setNotes(req.notes().trim());
+        }
         transferRepository.save(transfer);
 
         for (CreateStockTransferRequest.Line line : req.lines()) {
@@ -244,6 +247,7 @@ public class StockTransferService {
         m.put("createdBy", t.getCreatedBy());
         m.put("createdAt", t.getCreatedAt());
         m.put("receivedAt", t.getReceivedAt());
+        m.put("notes", t.getNotes());
         m.put("lines", lines.stream().map(l -> Map.of(
             "id", l.getId(),
             "productId", l.getProductId(),

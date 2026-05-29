@@ -76,6 +76,13 @@ class RbacEndpointAccessIT extends AbstractPostgresSpringBootIntegrationTest {
     }
 
     @Test
+    void accountingUserCanAccessComplianceVatCalendar() throws Exception {
+        mockMvc.perform(get("/api/v1/compliance/vat/calendar")
+                .header("Authorization", "Bearer " + tokenFor("accounting")))
+            .andExpect(status().isOk());
+    }
+
+    @Test
     void opsUserCanAccessInventoryBalances() throws Exception {
         mockMvc.perform(get("/api/v1/inventory/balances")
                 .header("Authorization", "Bearer " + tokenFor("ops")))

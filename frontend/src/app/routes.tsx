@@ -80,7 +80,11 @@ const EmployeesRoute = lazyNamedRoute(() => import('../features/hr/HrRoutes'), '
 const EmployeeDetailRoute = lazyNamedRoute(() => import('../features/hr/HrRoutes'), 'EmployeeDetailRoute')
 const LeaveRoute = lazyNamedRoute(() => import('../features/hr/HrRoutes'), 'LeaveRoute')
 const ShiftsRoute = lazyNamedRoute(() => import('../features/hr/HrRoutes'), 'ShiftsRoute')
-const EbmComplianceRoute = lazyNamedRoute(() => import('../features/compliance/EbmComplianceRoute'), 'EbmComplianceRoute')
+const EbmComplianceRoute = lazyNamedRoute(() => import('../features/compliance/ComplianceRoutes'), 'EbmComplianceRoute')
+const RraSettingsRoute = lazyNamedRoute(() => import('../features/compliance/ComplianceRoutes'), 'RraSettingsRoute')
+const VatComplianceRoute = lazyNamedRoute(() => import('../features/compliance/ComplianceRoutes'), 'VatComplianceRoute')
+const PayeComplianceRoute = lazyNamedRoute(() => import('../features/compliance/ComplianceRoutes'), 'PayeComplianceRoute')
+const AuditLogRoute = lazyNamedRoute(() => import('../features/compliance/ComplianceRoutes'), 'AuditLogRoute')
 const SettingsRoute = lazyNamedRoute(() => import('../features/settings/SettingsRoute'), 'SettingsRoute')
 const MyTeamRoute = lazyNamedRoute(() => import('../features/settings/MyTeamRoute'), 'MyTeamRoute')
 const PaymentRunsRoute = lazyNamedRoute(() => import('../features/production/ProductionRoutes'), 'PaymentRunsRoute')
@@ -150,6 +154,10 @@ export const appRoutes: RouteObject[] = [
       { path: '/marketing/campaigns', element: guard('ANALYTICS_ALL', lazyElement(MarketingCampaignsRoute)) },
       { path: '/marketing/promotions', element: guard('ANALYTICS_ALL', lazyElement(PromotionsRoute)) },
       { path: '/compliance/ebm', element: guard('EBM_AUDIT', lazyElement(EbmComplianceRoute)) },
+      { path: '/compliance/rra-settings', element: guard('EBM_CONFIG', lazyElement(RraSettingsRoute)) },
+      { path: '/compliance/vat', element: guard('EBM_AUDIT', lazyElement(VatComplianceRoute)) },
+      { path: '/compliance/paye', element: guard('EBM_AUDIT', lazyElement(PayeComplianceRoute)) },
+      { path: '/compliance/audit-log', element: guard('EBM_AUDIT', lazyElement(AuditLogRoute)) },
       { path: '/settings', element: guard(undefined, lazyElement(SettingsRoute)) },
       { path: '/settings/roles', element: guard('ROLE_MANAGE', lazyElement(MyTeamRoute)) },
       { path: '/unauthorized', element: <UnauthorizedPage /> },

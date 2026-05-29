@@ -1,7 +1,9 @@
 package com.smartaccounting.controller;
 
 import com.smartaccounting.dto.EnqueueActionRequest;
+import com.smartaccounting.dto.ProcessActionRequest;
 import com.smartaccounting.entity.ActionQueueItem;
+import com.smartaccounting.service.ActionHubService;
 import com.smartaccounting.service.ActionQueueService;
 import jakarta.validation.Valid;
 import com.smartaccounting.security.PermissionExpressions;
@@ -16,9 +18,25 @@ import java.util.UUID;
 @RequestMapping("/api/v1/actions")
 public class ActionQueueController {
     private final ActionQueueService service;
+    private final ActionHubService actionHubService;
 
-    public ActionQueueController(ActionQueueService service) {
+    public ActionQueueController(ActionQueueService service, ActionHubService actionHubService) {
         this.service = service;
+        this.actionHubService = actionHubService;
+    }
+
+    @GetMapping
+    @PreAuthorize(PermissionExpressions.ANALYTICS_ANY)
+    public Map<String, Object> listActions(@RequestParam(defaultValue = "cfo") String role) {
+        return actionHubService.listHub(role);
+    }
+
+    @PostMapping("/{id}/process")
+    @PreAuthorize(PermissionExpressions.ANALYTICS_ANY)
+    public Map<String, Object> processAction(@PathVariable String id,
+                                             @RequestBody @Valid ProcessActionRequest body,
+                                             @RequestParam(defaultValue = "cfo") String role) {
+        return actionHubService.processAny(id, body, role);
     }
 
     @PostMapping("/queue")

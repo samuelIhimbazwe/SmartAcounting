@@ -57,3 +57,14 @@ export async function retryEbmReceipt(receiptId: string) {
   const { data } = await apiClient.post<EbmReceipt>(`/api/v1/compliance/ebm/receipts/${receiptId}/retry`)
   return data
 }
+
+export async function testEbmIntegration() {
+  const { data } = await apiClient.get<{
+    configured: boolean
+    active: boolean
+    mode: string
+    tin?: string
+    message?: string
+  }>('/api/v1/compliance/ebm/test')
+  return data
+}

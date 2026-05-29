@@ -51,8 +51,12 @@ public class ShrinkageService {
     }
 
     private ShrinkageRecord recordShrinkageInternal(UUID tid, ShrinkageRequest request, UUID recordedBy) {
-        BigDecimal totalCost = request.unitCost().multiply(request.quantity());
         String location = request.location() != null ? request.location() : "SHOP";
+        BigDecimal unitCost = request.unitCost();
+        if (unitCost == null || unitCost.signum() <= 0) {
+            unitCost = inventoryService.resolveLatestUnitCost(request.productId(), location);
+        }
+        BigDecimal totalCost = unitCost.multiply(request.quantity());
         inventoryService.writeOffStock(request.productId(), request.quantity(), request.reason());
 
         UUID journalId = ledgerFlowService.postStockWriteOff(new LedgerFlowRequest(
@@ -68,7 +72,7 @@ public class ShrinkageService {
         record.setSku(request.sku());
         record.setProductName(request.productName());
         record.setQuantity(request.quantity());
-        record.setUnitCost(request.unitCost());
+        record.setUnitCost(unitCost);
         record.setTotalCost(totalCost);
         record.setReason(request.reason());
         record.setRecordedBy(recordedBy != null ? recordedBy : UUID.randomUUID());
