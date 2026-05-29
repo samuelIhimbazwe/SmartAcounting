@@ -42,4 +42,9 @@ public interface FinanceCustomerRepository extends JpaRepository<FinanceCustomer
         ORDER BY c.customerName
         """)
     List<FinanceCustomer> search(@Param("tenantId") UUID tenantId, @Param("q") String q);
+
+    long countByTenantIdAndPriceListIdAndDeletedAtIsNull(UUID tenantId, UUID priceListId);
+
+    List<FinanceCustomer> findByTenantIdAndPriceListIdAndDeletedAtIsNullOrderByCustomerNameAsc(
+        UUID tenantId, UUID priceListId);
 }

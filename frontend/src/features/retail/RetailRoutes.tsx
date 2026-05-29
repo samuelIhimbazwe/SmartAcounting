@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { useAuthStore } from '../../shared/stores/authStore'
 import { AppShell } from '../../shared/components/layout/AppShell'
+import { PriceListDetailPage } from './PriceListDetailPage'
+import { PriceListsPage } from './PriceListsPage'
 import { RetailOpsPage } from './RetailOpsPage'
 import { ShrinkagePage } from './ShrinkagePage'
 import { StockTransfersPage } from './StockTransfersPage'
@@ -30,6 +32,22 @@ export function ShrinkageRoute() {
   return (
     <Shell>
       <ShrinkagePage />
+    </Shell>
+  )
+}
+
+export function PriceListsRoute() {
+  return (
+    <Shell>
+      <PriceListsPage />
+    </Shell>
+  )
+}
+
+export function PriceListDetailRoute() {
+  return (
+    <Shell>
+      <PriceListDetailPage />
     </Shell>
   )
 }

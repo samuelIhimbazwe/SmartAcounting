@@ -21,6 +21,7 @@ import {
   ShoppingCart,
   Users,
   ArrowLeftRight,
+  Tags,
 } from 'lucide-react'
 import type { Role } from '../../types/roles'
 import type { RoleProfile } from '../../types/roleProfiles'
@@ -121,6 +122,15 @@ export const NAV_ITEMS: NavItem[] = [
     searchLabel: 'Sales Order',
     group: 'nav.groupOperations',
     icon: BarChart3,
+    requiredPermission: 'POS_ACCESS',
+  },
+  {
+    id: 'price-lists',
+    to: '/retail/price-lists',
+    labelKey: 'nav.priceLists',
+    searchLabel: 'Price lists',
+    group: 'nav.groupOperations',
+    icon: Tags,
     requiredPermission: 'POS_ACCESS',
   },
   {

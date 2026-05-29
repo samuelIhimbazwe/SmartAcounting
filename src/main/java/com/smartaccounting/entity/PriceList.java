@@ -23,6 +23,9 @@ public class PriceList {
     private Instant deletedAt;
     private UUID locationId;
     private String scope;
+    private String listType;
+    private Integer minOrderQty;
+    private Boolean active;
 
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
@@ -48,4 +51,10 @@ public class PriceList {
     public void setLocationId(UUID locationId) { this.locationId = locationId; }
     public String getScope() { return scope; }
     public void setScope(String scope) { this.scope = scope; }
+    public String getListType() { return listType; }
+    public void setListType(String listType) { this.listType = listType; }
+    public Integer getMinOrderQty() { return minOrderQty; }
+    public void setMinOrderQty(Integer minOrderQty) { this.minOrderQty = minOrderQty; }
+    public Boolean getActive() { return active; }
+    public void setActive(Boolean active) { this.active = active; }
 }

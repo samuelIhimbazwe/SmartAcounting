@@ -61,6 +61,8 @@ const TillRoute = lazyNamedRoute(() => import('../features/till/TillRoute'), 'Ti
 const RetailOpsRoute = lazyNamedRoute(() => import('../features/retail/RetailRoutes'), 'RetailOpsRoute')
 const StockTransfersRoute = lazyNamedRoute(() => import('../features/retail/RetailRoutes'), 'StockTransfersRoute')
 const ShrinkageRoute = lazyNamedRoute(() => import('../features/retail/RetailRoutes'), 'ShrinkageRoute')
+const PriceListsRoute = lazyNamedRoute(() => import('../features/retail/RetailRoutes'), 'PriceListsRoute')
+const PriceListDetailRoute = lazyNamedRoute(() => import('../features/retail/RetailRoutes'), 'PriceListDetailRoute')
 const FxRatesRoute = lazyNamedRoute(() => import('../features/finance/FxRatesRoute'), 'FxRatesRoute')
 const CreditLedgerRoute = lazyNamedRoute(() => import('../features/finance/CreditLedgerRoute'), 'CreditLedgerRoute')
 const SupplierBillsRoute = lazyNamedRoute(() => import('../features/finance/SupplierBillsRoute'), 'SupplierBillsRoute')
@@ -132,6 +134,8 @@ export const appRoutes: RouteObject[] = [
       { path: '/retail', element: guard('INVENTORY_READ', lazyElement(RetailOpsRoute)) },
       { path: '/retail/transfers', element: guard('INVENTORY_WRITE', lazyElement(StockTransfersRoute)) },
       { path: '/retail/shrinkage', element: guard('INVENTORY_WRITE', lazyElement(ShrinkageRoute)) },
+      { path: '/retail/price-lists', element: guard('POS_ACCESS', lazyElement(PriceListsRoute)) },
+      { path: '/retail/price-lists/:id', element: guard('POS_ACCESS', lazyElement(PriceListDetailRoute)) },
       { path: '/finance/fx-rates', element: guard('FINANCE_READ', lazyElement(FxRatesRoute)) },
       { path: '/finance/credit-ledger', element: guard('FINANCE_READ', lazyElement(CreditLedgerRoute)) },
       { path: '/finance/supplier-bills', element: guard('FINANCE_READ', lazyElement(SupplierBillsRoute)) },

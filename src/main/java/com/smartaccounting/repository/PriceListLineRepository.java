@@ -15,4 +15,6 @@ public interface PriceListLineRepository extends JpaRepository<PriceListLine, UU
 
     Optional<PriceListLine> findFirstByPriceListIdAndProductIdAndVariantIdIsNull(
         UUID priceListId, UUID productId);
+
+    long countByPriceListId(UUID priceListId);
 }

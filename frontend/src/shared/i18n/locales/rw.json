@@ -216,6 +216,7 @@
     "invoice": "Invoice",
     "purchaseOrder": "Purchase Order",
     "salesOrder": "Sales Order",
+    "priceLists": "Price lists",
     "pos": "Checkout",
     "posHistory": "Amateka y'ubucuruzi",
     "returns": "Process return / refund",
