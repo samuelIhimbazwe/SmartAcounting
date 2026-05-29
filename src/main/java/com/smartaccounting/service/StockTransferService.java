@@ -43,18 +43,22 @@ public class StockTransferService {
 
     public Map<String, Object> create(CreateStockTransferRequest req) {
         UUID tenantId = requireTenant();
-        UUID fromLocationId = locationService.resolveContextLocationId();
+        UUID fromLocationId = req.fromLocationId() != null
+            ? req.fromLocationId()
+            : locationService.resolveContextLocationId();
         if (fromLocationId.equals(req.toLocationId())) {
             throw new BusinessException("Cannot transfer to the same location");
         }
+        locationService.requireLocationAccess(fromLocationId);
         locationService.requireLocationAccess(req.toLocationId());
 
+        boolean requestOnly = Boolean.TRUE.equals(req.requestOnly());
         StockTransfer transfer = new StockTransfer();
         transfer.setId(UUID.randomUUID());
         transfer.setTenantId(tenantId);
         transfer.setFromLocationId(fromLocationId);
         transfer.setToLocationId(req.toLocationId());
-        transfer.setStatus("IN_TRANSIT");
+        transfer.setStatus(requestOnly ? "PENDING" : "IN_TRANSIT");
         transfer.setCreatedBy(requireUser());
         transfer.setCreatedAt(Instant.now());
         transferRepository.save(transfer);
@@ -64,7 +68,9 @@ public class StockTransferService {
             if (qty.signum() <= 0) {
                 throw new BusinessException("Quantity must be positive");
             }
-            adjustStock(tenantId, fromLocationId, line.productId(), line.variantId(), qty.negate());
+            if (!requestOnly) {
+                adjustStock(tenantId, fromLocationId, line.productId(), line.variantId(), qty.negate());
+            }
 
             StockTransferLine row = new StockTransferLine();
             row.setId(UUID.randomUUID());
@@ -75,6 +81,70 @@ public class StockTransferService {
             lineRepository.save(row);
         }
         return toMap(transfer, lineRepository.findByTransferId(transfer.getId()));
+    }
+
+    public List<Map<String, Object>> list(String status, UUID locationId, UUID productId) {
+        UUID tenantId = requireTenant();
+        return transferRepository.findByTenantIdOrderByCreatedAtDesc(tenantId).stream()
+            .filter(t -> status == null || status.isBlank() || status.equalsIgnoreCase(t.getStatus()))
+            .filter(t -> locationId == null
+                || locationId.equals(t.getFromLocationId())
+                || locationId.equals(t.getToLocationId()))
+            .filter(t -> {
+                if (productId == null) {
+                    return true;
+                }
+                return lineRepository.findByTransferId(t.getId()).stream()
+                    .anyMatch(line -> productId.equals(line.getProductId()));
+            })
+            .map(t -> toMap(t, lineRepository.findByTransferId(t.getId())))
+            .toList();
+    }
+
+    public Map<String, Object> approve(UUID transferId) {
+        StockTransfer transfer = requireTransfer(transferId);
+        if (!"PENDING".equals(transfer.getStatus())) {
+            throw new BusinessException("Only pending transfers can be approved");
+        }
+        UUID locationId = locationService.resolveContextLocationId();
+        if (!transfer.getFromLocationId().equals(locationId)) {
+            throw new BusinessException("Approve from the source location");
+        }
+        dispatchStock(transfer);
+        transfer.setStatus("IN_TRANSIT");
+        transferRepository.save(transfer);
+        return toMap(transfer, lineRepository.findByTransferId(transferId));
+    }
+
+    public Map<String, Object> dispatch(UUID transferId) {
+        StockTransfer transfer = requireTransfer(transferId);
+        if ("IN_TRANSIT".equals(transfer.getStatus()) || "RECEIVED".equals(transfer.getStatus())) {
+            throw new BusinessException("Transfer is already dispatched");
+        }
+        if ("PENDING".equals(transfer.getStatus())) {
+            return approve(transferId);
+        }
+        if ("APPROVED".equals(transfer.getStatus())) {
+            dispatchStock(transfer);
+            transfer.setStatus("IN_TRANSIT");
+            transferRepository.save(transfer);
+            return toMap(transfer, lineRepository.findByTransferId(transferId));
+        }
+        throw new BusinessException("Transfer cannot be dispatched");
+    }
+
+    public Map<String, Object> reject(UUID transferId) {
+        StockTransfer transfer = requireTransfer(transferId);
+        if (!"PENDING".equals(transfer.getStatus())) {
+            throw new BusinessException("Only pending transfers can be rejected");
+        }
+        UUID locationId = locationService.resolveContextLocationId();
+        if (!transfer.getFromLocationId().equals(locationId)) {
+            throw new BusinessException("Reject from the source location");
+        }
+        transfer.setStatus("REJECTED");
+        transferRepository.save(transfer);
+        return toMap(transfer, lineRepository.findByTransferId(transferId));
     }
 
     public Map<String, Object> receive(UUID transferId, ReceiveStockTransferRequest req) {
@@ -105,6 +175,23 @@ public class StockTransferService {
         transfer.setReceivedAt(Instant.now());
         transferRepository.save(transfer);
         return toMap(transfer, lineRepository.findByTransferId(transferId));
+    }
+
+    private void dispatchStock(StockTransfer transfer) {
+        UUID tenantId = requireTenant();
+        for (StockTransferLine line : lineRepository.findByTransferId(transfer.getId())) {
+            adjustStock(
+                tenantId,
+                transfer.getFromLocationId(),
+                line.getProductId(),
+                line.getVariantId(),
+                line.getQty().negate());
+        }
+    }
+
+    private StockTransfer requireTransfer(UUID transferId) {
+        return transferRepository.findByIdAndTenantId(transferId, requireTenant())
+            .orElseThrow(() -> new BusinessException("Transfer not found"));
     }
 
     public List<Map<String, Object>> listIncoming() {

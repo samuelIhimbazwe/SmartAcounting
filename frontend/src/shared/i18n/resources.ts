@@ -234,6 +234,7 @@ export const resources = {
       },
       nav: {
         dashboardSuite: 'Dashboard Intelligence Suite',
+        actionsQueue: 'Approvals & Actions',
         transactions: 'Transactions',
         invoice: 'Invoice',
         purchaseOrder: 'Purchase Order',
@@ -244,6 +245,8 @@ export const resources = {
         returns: 'Returns',
         till: 'Till session',
         retail: 'Retail & stock',
+        stockTransfers: 'Stock transfers',
+        shrinkage: 'Shrinkage',
         fxRates: 'FX rates',
         smsLogs: 'SMS deliveries',
         creditLedger: 'Credit ledger',
@@ -1016,6 +1019,7 @@ export const resources = {
       },
       nav: {
         dashboardSuite: "Suite d'intelligence tableau de bord",
+        actionsQueue: 'Approbations et actions',
         transactions: 'Transactions',
         invoice: 'Facture',
         purchaseOrder: "Bon de commande",
@@ -1026,6 +1030,8 @@ export const resources = {
         returns: 'Retours',
         till: 'Session de caisse',
         retail: 'Magasin et stock',
+        stockTransfers: 'Transferts de stock',
+        shrinkage: 'Pertes de stock',
         fxRates: 'Taux de change',
         smsLogs: 'Livraisons SMS',
         creditLedger: 'Grand livre credit client',

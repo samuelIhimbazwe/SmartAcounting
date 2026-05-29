@@ -15,4 +15,6 @@ public interface StockTransferRepository extends JpaRepository<StockTransfer, UU
 
     List<StockTransfer> findByTenantIdAndFromLocationIdOrderByCreatedAtDesc(
         UUID tenantId, UUID fromLocationId);
+
+    List<StockTransfer> findByTenantIdOrderByCreatedAtDesc(UUID tenantId);
 }

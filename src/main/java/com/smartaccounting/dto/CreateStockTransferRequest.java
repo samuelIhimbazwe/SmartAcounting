@@ -10,7 +10,10 @@ import java.util.UUID;
 
 public record CreateStockTransferRequest(
     @NotNull UUID toLocationId,
-    @NotEmpty @Valid List<Line> lines
+    UUID fromLocationId,
+    @NotEmpty @Valid List<Line> lines,
+    Boolean requestOnly,
+    String notes
 ) {
     public record Line(
         @NotNull UUID productId,

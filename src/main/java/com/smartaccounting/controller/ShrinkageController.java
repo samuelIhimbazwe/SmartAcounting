@@ -31,14 +31,14 @@ public class ShrinkageController {
     }
 
     @PostMapping
-    @PreAuthorize(PermissionExpressions.INVENTORY_SHRINKAGE)
+    @PreAuthorize(PermissionExpressions.INVENTORY_WRITE_OR_SHRINKAGE)
     public ResponseEntity<ShrinkageRecord> recordShrinkage(@RequestBody @Valid ShrinkageRequest request) {
         UUID recordedBy = TenantContext.userId() != null ? TenantContext.userId() : UUID.randomUUID();
         return ResponseEntity.ok(shrinkageService.recordShrinkage(request, recordedBy));
     }
 
     @GetMapping
-    @PreAuthorize(PermissionExpressions.INVENTORY_SHRINKAGE)
+    @PreAuthorize(PermissionExpressions.INVENTORY_WRITE_OR_SHRINKAGE)
     public ResponseEntity<Page<ShrinkageRecord>> listShrinkage(
         @RequestParam(required = false) String from,
         @RequestParam(required = false) String to,
@@ -50,7 +50,7 @@ public class ShrinkageController {
     }
 
     @GetMapping("/summary")
-    @PreAuthorize(PermissionExpressions.INVENTORY_READ)
+    @PreAuthorize(PermissionExpressions.INVENTORY_WRITE_OR_SHRINKAGE)
     public ResponseEntity<ShrinkageSummary> getSummary(
         @RequestParam String from,
         @RequestParam String to) {

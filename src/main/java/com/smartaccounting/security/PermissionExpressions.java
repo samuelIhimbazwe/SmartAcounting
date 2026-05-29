@@ -32,6 +32,9 @@ public final class PermissionExpressions {
         "@permissionGuard.has(authentication, 'INVENTORY_WRITE')";
     public static final String INVENTORY_SHRINKAGE =
         "@permissionGuard.has(authentication, 'INVENTORY_SHRINKAGE')";
+    /** Record/list shrinkage — inventory write or legacy shrinkage permission. */
+    public static final String INVENTORY_WRITE_OR_SHRINKAGE =
+        "@permissionGuard.hasAny(authentication, 'INVENTORY_WRITE', 'INVENTORY_SHRINKAGE')";
 
     public static final String PROCUREMENT_READ =
         "@permissionGuard.has(authentication, 'PROCUREMENT_READ')";
@@ -58,6 +61,18 @@ public final class PermissionExpressions {
         "@permissionGuard.has(authentication, 'EBM_AUDIT')";
     public static final String EBM_CONFIG =
         "@permissionGuard.has(authentication, 'EBM_CONFIG')";
+
+    /** Compliance hub read (EBM audit, VAT calendar, Rwanda filings, PAYE history). */
+    public static final String EBM_COMPLIANCE_READ =
+        "@permissionGuard.hasAny(authentication, 'EBM_AUDIT', 'EBM_CONFIG', 'FINANCE_READ')";
+
+    /** Compliance hub write (VAT refresh/submit, EIS hooks). */
+    public static final String EBM_COMPLIANCE_WRITE =
+        "@permissionGuard.hasAny(authentication, 'EBM_AUDIT', 'FINANCE_WRITE')";
+
+    /** PAYE export from compliance or payroll roles. */
+    public static final String PAYE_FILING_EXPORT =
+        "@permissionGuard.hasAny(authentication, 'EBM_AUDIT', 'PAYROLL_READ', 'PAYROLL_WRITE')";
 
     public static final String ANALYTICS_OWN =
         "@permissionGuard.has(authentication, 'ANALYTICS_OWN')";

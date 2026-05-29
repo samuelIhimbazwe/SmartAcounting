@@ -11,7 +11,7 @@ import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage'
 import { ResetPasswordPage } from '../features/auth/ResetPasswordPage'
 import { UnauthorizedPage } from '../features/common/UnauthorizedPage'
 import { DashboardIndexRedirect } from '../features/common/DashboardIndexRedirect'
-import { CUSTOMER_ACCESS_ANY } from '../shared/security/permissions'
+import { ANALYTICS_ANY, CUSTOMER_ACCESS_ANY } from '../shared/security/permissions'
 
 function guard(permission: string | readonly string[] | undefined, element: ReactNode) {
   return <ProtectedRoute permission={permission}>{element}</ProtectedRoute>
@@ -58,7 +58,9 @@ const PosReceiptPrintRoute = lazyNamedRoute(
   'PosReceiptPrintRoute',
 )
 const TillRoute = lazyNamedRoute(() => import('../features/till/TillRoute'), 'TillRoute')
-const RetailOpsRoute = lazyNamedRoute(() => import('../features/retail/RetailOpsRoute'), 'RetailOpsRoute')
+const RetailOpsRoute = lazyNamedRoute(() => import('../features/retail/RetailRoutes'), 'RetailOpsRoute')
+const StockTransfersRoute = lazyNamedRoute(() => import('../features/retail/RetailRoutes'), 'StockTransfersRoute')
+const ShrinkageRoute = lazyNamedRoute(() => import('../features/retail/RetailRoutes'), 'ShrinkageRoute')
 const FxRatesRoute = lazyNamedRoute(() => import('../features/finance/FxRatesRoute'), 'FxRatesRoute')
 const CreditLedgerRoute = lazyNamedRoute(() => import('../features/finance/CreditLedgerRoute'), 'CreditLedgerRoute')
 const SupplierBillsRoute = lazyNamedRoute(() => import('../features/finance/SupplierBillsRoute'), 'SupplierBillsRoute')
@@ -94,6 +96,7 @@ const MarketingCampaignsRoute = lazyNamedRoute(
 const PromotionsRoute = lazyNamedRoute(() => import('../features/production/ProductionRoutes'), 'PromotionsRoute')
 const CustomersRoute = lazyNamedRoute(() => import('../features/customers/CustomersRoute'), 'CustomersRoute')
 const CustomerDetailRoute = lazyNamedRoute(() => import('../features/customers/CustomersRoute'), 'CustomerDetailRoute')
+const ActionsRoute = lazyNamedRoute(() => import('../features/actions/ActionsRoute'), 'ActionsRoute')
 
 export const appRoutes: RouteObject[] = [
   {
@@ -111,6 +114,7 @@ export const appRoutes: RouteObject[] = [
       { path: '/anomalies/:anomalyId', element: guard(undefined, lazyElement(AnomalyDetailsRoute)) },
       { path: '/dashboard', element: guard(undefined, <DashboardIndexRedirect />) },
       { path: '/dashboard/:role', element: guard(undefined, lazyElement(DashboardRoute)) },
+      { path: '/actions', element: guard(ANALYTICS_ANY, lazyElement(ActionsRoute)) },
       { path: '/transactions/:type', element: guard(undefined, lazyElement(TransactionFormsRoute)) },
       { path: '/admin/users-tenants', element: guard('USER_MANAGE', lazyElement(UserTenantManagementRoute)) },
       { path: '/admin/roles', element: guard('ROLE_MANAGE', lazyElement(RoleManagementRoute)) },
@@ -122,6 +126,8 @@ export const appRoutes: RouteObject[] = [
       { path: '/pos/receipts/:receiptId/print', element: guard('POS_ACCESS', lazyElement(PosReceiptPrintRoute)) },
       { path: '/till', element: guard('POS_ACCESS', lazyElement(TillRoute)) },
       { path: '/retail', element: guard('INVENTORY_READ', lazyElement(RetailOpsRoute)) },
+      { path: '/retail/transfers', element: guard('INVENTORY_WRITE', lazyElement(StockTransfersRoute)) },
+      { path: '/retail/shrinkage', element: guard('INVENTORY_WRITE', lazyElement(ShrinkageRoute)) },
       { path: '/finance/fx-rates', element: guard('FINANCE_READ', lazyElement(FxRatesRoute)) },
       { path: '/finance/credit-ledger', element: guard('FINANCE_READ', lazyElement(CreditLedgerRoute)) },
       { path: '/finance/supplier-bills', element: guard('FINANCE_READ', lazyElement(SupplierBillsRoute)) },

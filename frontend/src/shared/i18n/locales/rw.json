@@ -211,6 +211,7 @@
   },
   "nav": {
     "dashboardSuite": "Dashboard Intelligence Suite",
+    "actionsQueue": "Approvals & Actions",
     "transactions": "Transactions",
     "invoice": "Invoice",
     "purchaseOrder": "Purchase Order",
@@ -220,6 +221,8 @@
     "returns": "Process return / refund",
     "till": "Till session",
     "retail": "Retail & stock",
+    "stockTransfers": "Stock transfers",
+    "shrinkage": "Shrinkage",
     "fxRates": "FX rates",
     "smsLogs": "SMS deliveries",
     "creditLedger": "Credit ledger",

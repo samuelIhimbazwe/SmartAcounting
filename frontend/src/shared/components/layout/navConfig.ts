@@ -10,14 +10,17 @@ import {
   FileText,
   MessageSquare,
   Package,
+  PackageMinus,
   RotateCcw,
   ScanBarcode,
+  ClipboardList,
   ScrollText,
   Settings,
   Landmark,
   ShieldCheck,
   ShoppingCart,
   Users,
+  ArrowLeftRight,
 } from 'lucide-react'
 import type { Role } from '../../types/roles'
 import type { RoleProfile } from '../../types/roleProfiles'
@@ -83,6 +86,15 @@ export function roleDashboardPath(role: Role): string {
  * The dashboard list is built dynamically via `canAccessRoleDashboard`.
  */
 export const NAV_ITEMS: NavItem[] = [
+  {
+    id: 'actions-queue',
+    to: '/actions',
+    labelKey: 'nav.actionsQueue',
+    searchLabel: 'Approvals and actions',
+    group: 'nav.groupOverview',
+    icon: ClipboardList,
+    requiredAnyPermissions: ['ANALYTICS_OWN', 'ANALYTICS_ALL'],
+  },
   {
     id: 'invoice',
     to: '/transactions/invoice',
@@ -163,6 +175,24 @@ export const NAV_ITEMS: NavItem[] = [
     group: 'nav.groupOperations',
     icon: Package,
     requiredPermission: 'INVENTORY_READ',
+  },
+  {
+    id: 'stock-transfers',
+    to: '/retail/transfers',
+    labelKey: 'nav.stockTransfers',
+    searchLabel: 'Stock transfers',
+    group: 'nav.groupOperations',
+    icon: ArrowLeftRight,
+    requiredPermission: 'INVENTORY_WRITE',
+  },
+  {
+    id: 'shrinkage',
+    to: '/retail/shrinkage',
+    labelKey: 'nav.shrinkage',
+    searchLabel: 'Shrinkage',
+    group: 'nav.groupOperations',
+    icon: PackageMinus,
+    requiredPermission: 'INVENTORY_WRITE',
   },
   {
     id: 'fx-rates',

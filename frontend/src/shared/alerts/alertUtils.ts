@@ -3,7 +3,7 @@ import type { AlertEvent } from '../types/dashboard'
 const LEGACY_ROUTE_ALIASES: Record<string, string> = {
   '/accounting/close': '/finance/close',
   '/inventory/low-stock': '/retail',
-  '/inventory/shrinkage': '/retail',
+  '/inventory/shrinkage': '/retail/shrinkage',
   '/retail/till': '/till',
   '/finance/reconciliation': '/finance/bank-accounts',
   '/finance/journal-entries': '/finance/close',
