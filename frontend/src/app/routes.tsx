@@ -104,6 +104,7 @@ const PromotionsRoute = lazyNamedRoute(() => import('../features/production/Prod
 const CustomersRoute = lazyNamedRoute(() => import('../features/customers/CustomersRoute'), 'CustomersRoute')
 const CustomerDetailRoute = lazyNamedRoute(() => import('../features/customers/CustomersRoute'), 'CustomerDetailRoute')
 const ActionsRoute = lazyNamedRoute(() => import('../features/actions/ActionsRoute'), 'ActionsRoute')
+const ComingSoonRoute = lazyNamedRoute(() => import('../features/common/ComingSoonRoute'), 'ComingSoonRoute')
 
 export const appRoutes: RouteObject[] = [
   {
@@ -166,6 +167,16 @@ export const appRoutes: RouteObject[] = [
       { path: '/compliance/audit-log', element: guard('EBM_AUDIT', lazyElement(AuditLogRoute)) },
       { path: '/settings', element: guard(undefined, lazyElement(SettingsRoute)) },
       { path: '/settings/roles', element: guard('ROLE_MANAGE', lazyElement(MyTeamRoute)) },
+      { path: '/marketplace', element: guard(undefined, lazyElement(ComingSoonRoute)) },
+      { path: '/marketplace/*', element: guard(undefined, lazyElement(ComingSoonRoute)) },
+      { path: '/plugins', element: guard(undefined, lazyElement(ComingSoonRoute)) },
+      { path: '/plugins/*', element: guard(undefined, lazyElement(ComingSoonRoute)) },
+      { path: '/iot', element: guard(undefined, lazyElement(ComingSoonRoute)) },
+      { path: '/iot/*', element: guard(undefined, lazyElement(ComingSoonRoute)) },
+      { path: '/devices', element: guard(undefined, lazyElement(ComingSoonRoute)) },
+      { path: '/devices/*', element: guard(undefined, lazyElement(ComingSoonRoute)) },
+      { path: '/admin/devices', element: guard(undefined, lazyElement(ComingSoonRoute)) },
+      { path: '/admin/plugins', element: guard(undefined, lazyElement(ComingSoonRoute)) },
       { path: '/unauthorized', element: <UnauthorizedPage /> },
       { path: '*', element: <Navigate to="/login" replace /> },
     ],

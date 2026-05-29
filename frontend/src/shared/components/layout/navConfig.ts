@@ -34,6 +34,16 @@ export type NavGroupKey =
   | 'nav.groupCompliance'
   | 'nav.groupAdmin'
 
+/** Retired nav ids — filtered even if a role profile still references them. */
+export const EXCLUDED_NAV_ITEM_IDS = new Set([
+  'marketplace',
+  'plugin-store',
+  'plugins',
+  'iot',
+  'iot-devices',
+  'device-management',
+])
+
 export interface NavItem {
   /** Stable id for keys + search. */
   id: string
@@ -443,6 +453,9 @@ export const NAV_GROUP_ORDER: NavGroupKey[] = [
 export function filterNavItems(hasPermission: (code: string) => boolean, allowedItemIds?: string[] | null): NavItem[] {
   const allowed = allowedItemIds && allowedItemIds.length > 0 ? new Set(allowedItemIds) : null
   return NAV_ITEMS.filter((item) => {
+    if (EXCLUDED_NAV_ITEM_IDS.has(item.id)) {
+      return false
+    }
     if (allowed && !allowed.has(item.id)) {
       return false
     }

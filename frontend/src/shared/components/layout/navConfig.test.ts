@@ -1,8 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { filterNavItems } from './navConfig'
+import { EXCLUDED_NAV_ITEM_IDS, filterNavItems, NAV_ITEMS } from './navConfig'
 
 describe('filterNavItems', () => {
   const has = (codes: string[]) => (code: string) => codes.includes(code)
+
+  it('does not expose marketplace, plugin store, or IoT nav items', () => {
+    expect(NAV_ITEMS.some((item) => EXCLUDED_NAV_ITEM_IDS.has(item.id))).toBe(false)
+    expect(NAV_ITEMS.some((item) => /marketplace|plugin|iot|device/i.test(item.searchLabel))).toBe(false)
+  })
+
+  it('filters retired nav ids from role profile allow lists', () => {
+    const items = filterNavItems(has(['POS_ACCESS', 'INVENTORY_READ', 'FINANCE_READ']), [
+      'marketplace',
+      'iot',
+      'pos',
+    ])
+    expect(items.map((item) => item.id)).toEqual(['pos'])
+  })
 
   it('shows POS when user has POS_ACCESS permission', () => {
     const items = filterNavItems(has(['POS_ACCESS']))
