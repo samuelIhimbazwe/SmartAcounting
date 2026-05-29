@@ -14,6 +14,7 @@ public interface InventoryBatchRepository extends JpaRepository<InventoryBatch, 
     Optional<InventoryBatch> findByTenantIdAndProductIdAndLocationCodeAndLotCode(UUID tenantId, UUID productId, String locationCode, String lotCode);
     List<InventoryBatch> findByTenantIdAndLocationCodeOrderByProductIdAscExpiryDateAscCreatedAtAsc(UUID tenantId, String locationCode);
     List<InventoryBatch> findByTenantIdAndProductIdAndLocationCodeOrderByExpiryDateAscCreatedAtAsc(UUID tenantId, UUID productId, String locationCode);
+    List<InventoryBatch> findByTenantIdAndProductIdOrderByCreatedAtDesc(UUID tenantId, UUID productId);
     Optional<InventoryBatch> findFirstByTenantIdAndProductIdAndExpiryDateIsNotNullOrderByExpiryDateAscCreatedAtAsc(UUID tenantId, UUID productId);
     List<InventoryBatch> findByTenantIdAndLocationCodeAndExpiryDateIsNotNullAndExpiryDateLessThanEqualOrderByExpiryDateAscCreatedAtAsc(
         UUID tenantId, String locationCode, LocalDate expiryDate);

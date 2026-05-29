@@ -3,6 +3,7 @@ package com.smartaccounting.controller;
 import com.smartaccounting.dto.ShrinkageRequest;
 import com.smartaccounting.dto.ShrinkageSummary;
 import com.smartaccounting.entity.ShrinkageRecord;
+import com.smartaccounting.service.InventoryService;
 import com.smartaccounting.service.ShrinkageService;
 import com.smartaccounting.tenant.TenantContext;
 import jakarta.validation.Valid;
@@ -18,16 +19,20 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/inventory/shrinkage")
 public class ShrinkageController {
     private final ShrinkageService shrinkageService;
+    private final InventoryService inventoryService;
 
-    public ShrinkageController(ShrinkageService shrinkageService) {
+    public ShrinkageController(ShrinkageService shrinkageService, InventoryService inventoryService) {
         this.shrinkageService = shrinkageService;
+        this.inventoryService = inventoryService;
     }
 
     @PostMapping
@@ -58,5 +63,14 @@ public class ShrinkageController {
             TenantContext.tenantId().toString(),
             LocalDate.parse(from),
             LocalDate.parse(to)));
+    }
+
+    @GetMapping("/unit-cost")
+    @PreAuthorize(PermissionExpressions.INVENTORY_WRITE_OR_SHRINKAGE)
+    public ResponseEntity<Map<String, Object>> unitCost(
+        @RequestParam UUID productId,
+        @RequestParam(required = false) String location) {
+        BigDecimal cost = inventoryService.resolveLatestUnitCost(productId, location);
+        return ResponseEntity.ok(Map.of("productId", productId, "unitCost", cost));
     }
 }

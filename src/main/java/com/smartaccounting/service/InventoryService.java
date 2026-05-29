@@ -566,10 +566,31 @@ public class InventoryService {
         }
         UUID tenant = requireTenant();
         String loc = locationCode != null && !locationCode.isBlank() ? locationCode.trim() : "SHOP";
-        return inventoryBatchRepository
+
+        BigDecimal fromBatch = inventoryBatchRepository
             .findByTenantIdAndProductIdAndLocationCodeOrderByExpiryDateAscCreatedAtAsc(tenant, productId, loc)
             .stream()
-            .map(com.smartaccounting.entity.InventoryBatch::getCostPrice)
+            .map(InventoryBatch::getCostPrice)
+            .filter(price -> price != null && price.signum() > 0)
+            .findFirst()
+            .orElse(null);
+        if (fromBatch != null) {
+            return fromBatch;
+        }
+
+        BigDecimal anyLocation = inventoryBatchRepository
+            .findByTenantIdAndProductIdOrderByCreatedAtDesc(tenant, productId)
+            .stream()
+            .map(InventoryBatch::getCostPrice)
+            .filter(price -> price != null && price.signum() > 0)
+            .findFirst()
+            .orElse(null);
+        if (anyLocation != null) {
+            return anyLocation;
+        }
+
+        return posCatalogItemRepository.findByTenantIdAndProductIdAndActiveTrue(tenant, productId).stream()
+            .map(item -> item.getUnitPrice())
             .filter(price -> price != null && price.signum() > 0)
             .findFirst()
             .orElse(BigDecimal.ZERO);

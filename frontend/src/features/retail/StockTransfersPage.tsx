@@ -3,6 +3,7 @@ import { ArrowLeftRight } from 'lucide-react'
 import {
   approveStockTransfer,
   createStockTransfer,
+  dispatchStockTransfer,
   listStockTransfers,
   receiveStockTransfer,
   rejectStockTransfer,
@@ -16,7 +17,7 @@ import { formatDate } from '../../shared/utils/intl'
 import { Button } from '../../shared/components/ui/Button'
 import { PageSkeleton } from '../../shared/components/ui/LoadingSkeleton'
 
-type TabId = 'pending' | 'in-transit' | 'history'
+type TabId = 'pending' | 'approved' | 'in-transit' | 'history'
 
 function locationLabel(locations: LocationDto[], id: string): string {
   const loc = locations.find(l => l.id === id)
@@ -101,6 +102,16 @@ export function StockTransfersPage() {
     [rows, contextLocationId],
   )
 
+  const approvedRows = useMemo(
+    () =>
+      rows.filter(
+        r =>
+          r.status === 'APPROVED' &&
+          (!contextLocationId || r.fromLocationId === contextLocationId),
+      ),
+    [rows, contextLocationId],
+  )
+
   const inTransitRows = useMemo(
     () =>
       rows.filter(
@@ -126,7 +137,13 @@ export function StockTransfersPage() {
   }, [rows, histFrom, histTo, histLocationId, histProductId])
 
   const visibleRows =
-    tab === 'pending' ? pendingRows : tab === 'in-transit' ? inTransitRows : historyRows
+    tab === 'pending'
+      ? pendingRows
+      : tab === 'approved'
+        ? approvedRows
+        : tab === 'in-transit'
+          ? inTransitRows
+          : historyRows
 
   async function handleCreate(e: FormEvent) {
     e.preventDefault()
@@ -188,6 +205,19 @@ export function StockTransfersPage() {
     }
   }
 
+  async function handleDispatch(id: string) {
+    setBusyId(id)
+    setError(null)
+    try {
+      await dispatchStockTransfer(id, contextLocationId || undefined)
+      await load()
+    } catch (e) {
+      setError(normalizeApiError(e).message)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   async function handleReceive(row: StockTransferRow) {
     setBusyId(row.id)
     setError(null)
@@ -219,7 +249,8 @@ export function StockTransfersPage() {
   }
 
   const tabs: { id: TabId; label: string }[] = [
-    { id: 'pending', label: 'Pending' },
+    { id: 'pending', label: 'Pending approval' },
+    { id: 'approved', label: 'Ready to dispatch' },
     { id: 'in-transit', label: 'In transit' },
     { id: 'history', label: 'History' },
   ]
@@ -344,6 +375,11 @@ export function StockTransfersPage() {
                             Reject
                           </Button>
                         </>
+                      ) : null}
+                      {tab === 'approved' ? (
+                        <Button type="button" disabled={busyId === row.id} onClick={() => void handleDispatch(row.id)}>
+                          Dispatch
+                        </Button>
                       ) : null}
                       {tab === 'in-transit' ? (
                         <Button type="button" disabled={busyId === row.id} onClick={() => void handleReceive(row)}>

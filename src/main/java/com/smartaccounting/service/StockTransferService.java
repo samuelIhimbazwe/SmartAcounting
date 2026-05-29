@@ -113,8 +113,7 @@ public class StockTransferService {
         if (!transfer.getFromLocationId().equals(locationId)) {
             throw new BusinessException("Approve from the source location");
         }
-        dispatchStock(transfer);
-        transfer.setStatus("IN_TRANSIT");
+        transfer.setStatus("APPROVED");
         transferRepository.save(transfer);
         return toMap(transfer, lineRepository.findByTransferId(transferId));
     }
@@ -124,16 +123,17 @@ public class StockTransferService {
         if ("IN_TRANSIT".equals(transfer.getStatus()) || "RECEIVED".equals(transfer.getStatus())) {
             throw new BusinessException("Transfer is already dispatched");
         }
-        if ("PENDING".equals(transfer.getStatus())) {
-            return approve(transferId);
+        if (!"APPROVED".equals(transfer.getStatus())) {
+            throw new BusinessException("Only approved transfers can be dispatched");
         }
-        if ("APPROVED".equals(transfer.getStatus())) {
-            dispatchStock(transfer);
-            transfer.setStatus("IN_TRANSIT");
-            transferRepository.save(transfer);
-            return toMap(transfer, lineRepository.findByTransferId(transferId));
+        UUID locationId = locationService.resolveContextLocationId();
+        if (!transfer.getFromLocationId().equals(locationId)) {
+            throw new BusinessException("Dispatch from the source location");
         }
-        throw new BusinessException("Transfer cannot be dispatched");
+        dispatchStock(transfer);
+        transfer.setStatus("IN_TRANSIT");
+        transferRepository.save(transfer);
+        return toMap(transfer, lineRepository.findByTransferId(transferId));
     }
 
     public Map<String, Object> reject(UUID transferId) {

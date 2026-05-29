@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { PackageMinus } from 'lucide-react'
 import {
   getShrinkageSummary,
+  getShrinkageUnitCost,
   listShrinkage,
   recordShrinkage,
   shrinkageQty,
@@ -68,6 +69,7 @@ export function ShrinkagePage() {
   const [reason, setReason] = useState<string>(SHRINKAGE_REASONS[0].value)
   const [notes, setNotes] = useState('')
   const [incidentDate, setIncidentDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [unitCostPreview, setUnitCostPreview] = useState<number | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -101,6 +103,16 @@ export function ShrinkagePage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (!selectedProductId) {
+      setUnitCostPreview(null)
+      return
+    }
+    void getShrinkageUnitCost(selectedProductId)
+      .then(setUnitCostPreview)
+      .catch(() => setUnitCostPreview(null))
+  }, [selectedProductId])
 
   const productOptions = useMemo(() => {
     const q = productSearch.trim().toLowerCase()
@@ -281,6 +293,11 @@ export function ShrinkagePage() {
                   </option>
                 ))}
               </select>
+              {unitCostPreview != null && unitCostPreview > 0 ? (
+                <span className="mt-1 block text-xs text-neutral-500">
+                  Estimated unit cost: {moneyRwf(unitCostPreview)}
+                </span>
+              ) : null}
             </label>
             <label className="mb-3 block text-sm">
               Quantity lost

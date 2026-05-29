@@ -71,6 +71,14 @@ export function shrinkageQty(row: ShrinkageRecordRow): number {
   return Number.isFinite(n) ? n : 0
 }
 
+export async function getShrinkageUnitCost(productId: string, location?: string): Promise<number> {
+  const { data } = await apiClient.get<{ unitCost: number | string }>('/api/v1/inventory/shrinkage/unit-cost', {
+    params: { productId, location },
+  })
+  const n = typeof data.unitCost === 'number' ? data.unitCost : Number(data.unitCost)
+  return Number.isFinite(n) ? n : 0
+}
+
 export function shrinkageValue(row: ShrinkageRecordRow): number {
   const n = typeof row.totalCost === 'number' ? row.totalCost : Number(row.totalCost)
   return Number.isFinite(n) ? n : 0
