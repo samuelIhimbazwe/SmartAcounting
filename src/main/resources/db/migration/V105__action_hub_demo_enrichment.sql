@@ -1,4 +1,7 @@
 -- Richer action-hub demo cards (PO approval, reorder suggestion, POS void anomaly).
+-- Demo tenant context required: action_queue / anomaly_cases use RLS (see V12, V9).
+
+SELECT set_config('app.tenant_id', '11111111-1111-4111-8111-111111111111', true);
 
 UPDATE action_queue
 SET action_type = 'DRAFT_PURCHASE_ORDER',
