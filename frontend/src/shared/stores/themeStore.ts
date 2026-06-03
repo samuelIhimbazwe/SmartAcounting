@@ -1,6 +1,7 @@
 import { create } from 'zustand'
+import type { Theme } from '../../hooks/useTheme'
 
-export type ResolvedTheme = 'light'
+export type ResolvedTheme = Theme
 
 interface ThemeState {
   resolved: ResolvedTheme

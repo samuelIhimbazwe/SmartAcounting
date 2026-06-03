@@ -1,14 +1,7 @@
-import { useEffect } from 'react'
-import { useThemeStore } from '../shared/stores/themeStore'
+import { useTheme } from '../hooks/useTheme'
 
+/** Syncs theme tokens to the document root and keeps the store in sync. */
 export function ThemeManager() {
-  const setResolved = useThemeStore((state) => state.setResolved)
-
-  useEffect(() => {
-    setResolved('light')
-    document.documentElement.dataset.theme = 'light'
-    document.documentElement.style.colorScheme = 'light'
-  }, [setResolved])
-
+  useTheme()
   return null
 }

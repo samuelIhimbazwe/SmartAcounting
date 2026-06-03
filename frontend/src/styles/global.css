@@ -1,17 +1,54 @@
-/*
- * Cross-cutting status-banner utility classes used by the PWA layer
- * (`OfflineBanner`, `PwaUpdatePrompt`).
- *
- * These intentionally bypass Tailwind utilities so the banners stay aligned
- * with the design-token color system, dark-mode aware via tokens.css.
- */
+@import './tokens.css';
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100vh;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  color: var(--color-text-primary);
+  background: var(--color-bg-page);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition:
+    background-color var(--transition-slow),
+    color var(--transition-slow);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.num-lg {
+  font-family: var(--font-mono);
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* PWA / offline banners */
 .offline-banner {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px 16px;
-  font-size: 0.875rem;
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
   font-weight: 600;
   text-align: center;
   width: 100%;
@@ -19,7 +56,7 @@
 }
 
 .offline-banner.offline {
-  background-color: var(--color-danger);
+  background-color: var(--color-error);
   color: var(--color-text-inverse);
 }
 
@@ -32,23 +69,23 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  padding: 8px 16px;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
   background-color: var(--color-primary);
   color: var(--color-text-inverse);
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
   font-weight: 500;
   width: 100%;
   z-index: 50;
 }
 
 .pwa-update-banner button {
-  padding: 4px 12px;
+  padding: var(--space-1) var(--space-3);
   background-color: var(--color-text-inverse);
   color: var(--color-primary);
   border-radius: var(--radius-full);
   font-weight: 600;
-  font-size: 0.8rem;
+  font-size: var(--text-xs);
   cursor: pointer;
   border: none;
 }
