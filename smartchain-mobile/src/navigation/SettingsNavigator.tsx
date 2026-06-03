@@ -1,6 +1,7 @@
 import React from 'react';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {useTranslation} from 'react-i18next';
+import {defaultStackScreenOptions} from '../theme/navigation';
 import {SettingsHomeScreen} from '../screens/settings/SettingsHomeScreen';
 import {LanguageSettingsScreen} from '../screens/settings/LanguageSettingsScreen';
 import {PrinterSettingsScreen} from '../screens/settings/PrinterSettingsScreen';
@@ -24,7 +25,7 @@ const Stack = createNativeStackNavigator<SettingsStackParamList>();
 export default function SettingsNavigator() {
   const {t} = useTranslation();
   return (
-    <Stack.Navigator>
+    <Stack.Navigator screenOptions={defaultStackScreenOptions}>
       <Stack.Screen
         name="SettingsHome"
         component={SettingsHomeScreen}

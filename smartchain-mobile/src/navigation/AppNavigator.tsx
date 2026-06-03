@@ -1,12 +1,13 @@
 import React from 'react';
-import {Text, View} from 'react-native';
+import {View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {useSelector} from 'react-redux';
 import type {RootState} from '../store';
 import {usePermission} from '../hooks/usePermission';
 import {SyncStatusBar} from '../components/SyncStatusBar';
+import {AppTabBar} from '../components/ui/AppTabBar';
+import {colors} from '../theme/tokens';
 import PosNavigator from './PosNavigator';
 import StockNavigator from './StockNavigator';
 import TillNavigator from './TillNavigator';
@@ -16,10 +17,6 @@ import CopilotScreen from '../screens/copilot/CopilotScreen';
 import CustomerNavigator from './CustomerNavigator';
 
 const Tab = createBottomTabNavigator();
-
-function tabIcon(name: string, color: string, size: number) {
-  return <Icon name={name} color={color} size={Math.max(size, 24)} />;
-}
 
 function resolveInitialRoute(
   canTill: boolean,
@@ -62,60 +59,50 @@ export default function AppNavigator() {
   );
 
   return (
-    <SafeAreaView edges={['top']} style={{flex: 1}}>
+    <SafeAreaView edges={['top']} style={{flex: 1, backgroundColor: colors.bgPage}}>
       <SyncStatusBar />
-      <View style={{flex: 1}}>
+      <View style={{flex: 1, backgroundColor: colors.bgPage}}>
         <Tab.Navigator
           initialRouteName={initialRouteName}
+          tabBar={props => <AppTabBar {...props} />}
           screenOptions={{
-            tabBarStyle: {minHeight: 56},
-            tabBarItemStyle: {minHeight: 48},
             headerShown: false,
+            tabBarActiveTintColor: colors.primary,
+            tabBarInactiveTintColor: colors.gray400,
           }}>
           {canTill ? (
             <Tab.Screen
               name="Till"
               component={TillNavigator}
-              options={{
-                tabBarIcon: p => tabIcon('cash-multiple', p.color, p.size),
-              }}
+              options={{tabBarLabel: 'Till'}}
             />
           ) : null}
           {canPos ? (
             <Tab.Screen
               name="POS"
               component={PosNavigator}
-              options={{
-                tabBarIcon: p => tabIcon('cash-register', p.color, p.size),
-              }}
+              options={{tabBarLabel: 'POS'}}
             />
           ) : null}
           {canStock ? (
             <Tab.Screen
               name="Stock"
               component={StockNavigator}
-              options={{
-                tabBarIcon: p => tabIcon('package-variant', p.color, p.size),
-              }}
+              options={{tabBarLabel: 'Stock'}}
             />
           ) : null}
           {canCustomers ? (
             <Tab.Screen
               name="Customers"
               component={CustomerNavigator}
-              options={{
-                tabBarIcon: p => tabIcon('account-group', p.color, p.size),
-              }}
+              options={{tabBarLabel: 'Customers'}}
             />
           ) : null}
           {canDashboard ? (
             <Tab.Screen
               name="Dashboard"
               component={DashboardNavigator}
-              options={{
-                tabBarIcon: p =>
-                  tabIcon('view-dashboard-outline', p.color, p.size),
-              }}
+              options={{tabBarLabel: 'Dashboard'}}
             />
           ) : null}
           {canCopilot ? (
@@ -123,9 +110,6 @@ export default function AppNavigator() {
               name="Copilot"
               component={CopilotScreen}
               options={{
-                tabBarIcon: p => (
-                  <Text style={{fontSize: 20, color: p.color}}>✨</Text>
-                ),
                 tabBarLabel: 'Copilot',
                 tabBarBadge: copilotBadge > 0 ? copilotBadge : undefined,
               }}
@@ -134,9 +118,7 @@ export default function AppNavigator() {
           <Tab.Screen
             name="Settings"
             component={SettingsNavigator}
-            options={{
-              tabBarIcon: p => tabIcon('cog-outline', p.color, p.size),
-            }}
+            options={{tabBarLabel: 'Settings'}}
           />
         </Tab.Navigator>
       </View>

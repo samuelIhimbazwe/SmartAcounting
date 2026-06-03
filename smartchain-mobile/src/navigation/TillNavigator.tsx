@@ -1,5 +1,6 @@
 import React from 'react';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
+import {defaultStackScreenOptions} from '../theme/navigation';
 import TillOpenScreen from '../screens/till/TillOpenScreen';
 import TillCloseScreen from '../screens/till/TillCloseScreen';
 import ShiftManagementScreen from '../screens/till/ShiftManagementScreen';
@@ -18,7 +19,7 @@ const Stack = createNativeStackNavigator<TillStackParamList>();
 
 export default function TillNavigator() {
   return (
-    <Stack.Navigator initialRouteName="TillOpen">
+    <Stack.Navigator initialRouteName="TillOpen" screenOptions={defaultStackScreenOptions}>
       <Stack.Screen
         name="TillOpen"
         component={TillOpenScreen}

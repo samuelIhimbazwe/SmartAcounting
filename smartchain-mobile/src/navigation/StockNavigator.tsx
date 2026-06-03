@@ -1,5 +1,6 @@
 import React from 'react';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
+import {defaultStackScreenOptions} from '../theme/navigation';
 import StockScreen from '../screens/stock/StockScreen';
 import LowStockScreen from '../screens/stock/LowStockScreen';
 import StockCountScreen from '../screens/stock/StockCountScreen';
@@ -42,7 +43,7 @@ const Stack = createNativeStackNavigator<StockStackParamList>();
 
 export default function StockNavigator() {
   return (
-    <Stack.Navigator>
+    <Stack.Navigator screenOptions={defaultStackScreenOptions}>
       <Stack.Screen
         name="StockList"
         component={StockScreen}

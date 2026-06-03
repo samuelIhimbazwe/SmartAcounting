@@ -1,5 +1,6 @@
 import React from 'react';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
+import {defaultStackScreenOptions} from '../theme/navigation';
 import OwnerDashboardScreen from '../screens/dashboard/OwnerDashboardScreen';
 import AnomalyDetailScreen from '../screens/dashboard/AnomalyDetailScreen';
 import DemandForecastScreen from '../screens/dashboard/DemandForecastScreen';
@@ -16,7 +17,7 @@ const Stack = createNativeStackNavigator<DashboardStackParamList>();
 
 export default function DashboardNavigator() {
   return (
-    <Stack.Navigator>
+    <Stack.Navigator screenOptions={defaultStackScreenOptions}>
       <Stack.Screen
         name="DashboardHome"
         component={OwnerDashboardScreen}

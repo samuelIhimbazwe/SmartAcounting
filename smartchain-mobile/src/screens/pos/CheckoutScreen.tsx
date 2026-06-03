@@ -1,6 +1,10 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
-import {ScrollView, StyleSheet, Text, View} from 'react-native';
-import {Button, Card, TextInput} from 'react-native-paper';
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import Toast from 'react-native-toast-message';
@@ -8,10 +12,8 @@ import {useTranslation} from 'react-i18next';
 import {useDispatch, useSelector} from 'react-redux';
 import type {AppDispatch, RootState} from '../../store';
 import {
-  addTenderLine,
   clearCart,
   removeFromCart,
-  removeTenderLine,
   setBarcodeInput,
   setCustomer,
   setDiscount,
@@ -19,13 +21,10 @@ import {
   setLastReceiptLines,
   setLastCustomerPhone,
   setLastFiscal,
-  setTenderLineReference,
   setPosRegisterCode,
   setProcessing,
   setSessionCurrency,
   updateQuantity,
-  updateTenderLine,
-  setTenderLineType,
   setCartLineSerial,
   setCartLineBatch,
   setPromotionResult,
@@ -56,13 +55,10 @@ import {
   minLayawayDeposit,
 } from '../../customers/layawayRepository';
 import {formatMoney} from '../../utils/currency';
-import type {AppRole} from '../../utils/roles';
-import {canUseOnAccountTender} from '../../utils/roles';
 import {
   cartTotal,
   sumTenderLines,
   validateTendersForTotal,
-  type TenderType,
 } from '../../utils/tenderValidation';
 import {testIds} from '../../e2e/testIds';
 import {
@@ -71,11 +67,13 @@ import {
 } from '../../fiscal/vatEngine';
 import {submitSaleToEfd} from '../../services/efd';
 import {recordFiscalAudit} from '../../fiscal/auditLogRepository';
-import {verifyMomoTransaction} from '../../api/payments';
+import {hapticSuccess} from '../../utils/haptics';
+import {Badge, Button, Card, Input} from '../../components/ui';
+import {colors, spacing} from '../../theme/tokens';
+import {textStyles} from '../../theme/typography';
+import {PaymentBottomSheet} from './PaymentBottomSheet';
 
 type Nav = NativeStackNavigationProp<PosStackParamList, 'Checkout'>;
-
-const BASE_TENDERS: TenderType[] = ['CASH', 'MOMO', 'AIRTEL_MONEY', 'CARD'];
 
 export default function CheckoutScreen() {
   useWakeLock();
@@ -97,23 +95,21 @@ export default function CheckoutScreen() {
   const processing = useSelector((s: RootState) => s.pos.isProcessing);
   const tenderLines = useSelector((s: RootState) => s.pos.tenderLines);
   const online = useSelector((s: RootState) => s.network.online);
-  const roles = useSelector((s: RootState) => s.auth.roles) as AppRole[];
-  const canDiscount = usePermission('POS_DISCOUNT');
-  const canReturns = usePermission('POS_RETURNS');
   const userId = useSelector((s: RootState) => s.auth.userId);
   const locationId = useSelector((s: RootState) => s.location.selectedLocationId);
   const scannerMode = loadHardwareConfig().scannerModeEnabled;
+  const canDiscount = usePermission('POS_DISCOUNT');
+  const canReturns = usePermission('POS_RETURNS');
 
   type MomoVerifyState = {
     status: 'idle' | 'pending' | 'ok' | 'fail';
     message?: string;
   };
-  const [momoVerify, setMomoVerify] = useState<Record<number, MomoVerifyState>>(
-    {},
-  );
+  const [momoVerify, setMomoVerify] = useState<Record<number, MomoVerifyState>>({});
   const [ussdSecondsLeft, setUssdSecondsLeft] = useState(90);
+  const [paymentOpen, setPaymentOpen] = useState(false);
 
-  const isMomoTender = (tt: TenderType) =>
+  const isMomoTender = (tt: string) =>
     tt === 'MOMO' || tt === 'AIRTEL_MONEY';
 
   const hasOpenMomoTender = useMemo(
@@ -137,49 +133,6 @@ export default function CheckoutScreen() {
     return () => clearInterval(timer);
   }, [hasOpenMomoTender, ussdSecondsLeft, t]);
 
-  const verifyMomoLine = async (index: number) => {
-    const line = tenderLines[index];
-    if (!line || !isMomoTender(line.tenderType)) {
-      return;
-    }
-    const code = line.reference?.trim();
-    if (!code) {
-      Toast.show({type: 'error', text1: t('payments.ussdCode')});
-      return;
-    }
-    setMomoVerify(v => ({...v, [index]: {status: 'pending'}}));
-    const provider = line.tenderType === 'AIRTEL_MONEY' ? 'AIRTEL_MONEY' : 'MTN';
-    try {
-      const res = await Promise.race([
-        verifyMomoTransaction({
-          transactionCode: code,
-          provider,
-          amount: line.amount || total,
-        }),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('timeout')), 90_000),
-        ),
-      ]);
-      if (res.status === 'CONFIRMED') {
-        setMomoVerify(v => ({
-          ...v,
-          [index]: {status: 'ok', message: t('payments.verified')},
-        }));
-      } else {
-        setMomoVerify(v => ({
-          ...v,
-          [index]: {status: 'fail', message: res.message ?? t('payments.verifyFailed')},
-        }));
-      }
-    } catch (e: unknown) {
-      const msg =
-        e instanceof Error && e.message === 'timeout'
-          ? t('payments.verifyTimeout')
-          : t('payments.verifyFailed');
-      setMomoVerify(v => ({...v, [index]: {status: 'fail', message: msg}}));
-    }
-  };
-
   const onScan = useCallback(
     (code: string) => {
       void lookupAndAddProduct(code);
@@ -199,12 +152,6 @@ export default function CheckoutScreen() {
       void poleDisplayService.welcome(loadHardwareConfig().storeDisplayName);
     }, []),
   );
-
-  const showOnAccount =
-    canUseOnAccountTender(roles) && (selectedCustomer?.creditLimit ?? 0) > 0;
-  const tenderOptions = showOnAccount
-    ? [...BASE_TENDERS, 'ON_ACCOUNT' as TenderType]
-    : BASE_TENDERS;
 
   useEffect(() => {
     void evaluatePromotions(cart).then(r =>
@@ -237,17 +184,6 @@ export default function CheckoutScreen() {
     [cart, taxExempt],
   );
 
-  const tenderLabel = (type: TenderType) => {
-    const map: Record<TenderType, string> = {
-      CASH: t('pos.tenderCash'),
-      MOMO: t('pos.tenderMomo'),
-      AIRTEL_MONEY: t('pos.tenderAirtel'),
-      CARD: t('pos.tenderCard'),
-      ON_ACCOUNT: t('pos.tenderOnAccount'),
-    };
-    return map[type];
-  };
-
   const submitLayaway = async () => {
     if (!selectedCustomer) {
       Toast.show({type: 'error', text1: t('customers.selectForLayaway')});
@@ -277,6 +213,7 @@ export default function CheckoutScreen() {
       });
       Toast.show({type: 'success', text1: t('customers.layawayCreated')});
       dispatch(clearCart());
+      setPaymentOpen(false);
     } catch (e: unknown) {
       Toast.show({
         type: 'error',
@@ -424,16 +361,19 @@ export default function CheckoutScreen() {
         void poleDisplayService.thankYou(
           formatMoney(change, sessionCurrency),
         );
+        hapticSuccess();
         Toast.show({type: 'success', text1: t('pos.saleCompleted')});
         dispatch(setLastReceiptLines([...cart]));
         dispatch(setLastCustomerPhone(selectedCustomer?.phone ?? null));
         dispatch(clearCart());
+        setPaymentOpen(false);
         navigation.navigate('Receipt');
       } else {
         await queueOfflineCheckout(body);
         Toast.show({type: 'info', text1: t('pos.savedOffline')});
         dispatch(setLastReceiptLines([...cart]));
         dispatch(clearCart());
+        setPaymentOpen(false);
       }
     } catch (e: unknown) {
       Toast.show({
@@ -447,416 +387,303 @@ export default function CheckoutScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.wrap}>
-      {canReturns ? (
-        <Button
-          mode="outlined"
-          onPress={() => navigation.navigate('Returns')}
-          style={styles.field}
-          textColor="#DC2626"
-          contentStyle={styles.btnInner}>
-          {t('pos.processReturn')}
-        </Button>
-      ) : null}
-      <Text style={[styles.section, styles.sectionTitle]}>
-        {t('pos.registerTender')}
-      </Text>
-      <TextInput
-        label={t('pos.registerCode')}
-        value={posRegisterCode}
-        onChangeText={v => dispatch(setPosRegisterCode(v))}
-        style={styles.field}
-      />
-      <View style={styles.row}>
-        <Button
-          mode={sessionCurrency === 'FRW' ? 'contained' : 'outlined'}
-          onPress={() => dispatch(setSessionCurrency('FRW'))}
-          style={styles.currencyBtn}
-          contentStyle={styles.btnInner}>
-          FRW
-        </Button>
-        <Button
-          mode={sessionCurrency === 'USD' ? 'contained' : 'outlined'}
-          onPress={() => dispatch(setSessionCurrency('USD'))}
-          style={styles.currencyBtn}
-          contentStyle={styles.btnInner}>
-          USD
-        </Button>
-      </View>
-
-      <Text style={[styles.section, styles.sectionTitle]}>
-        {t('pos.paymentMethod')}
-      </Text>
-      {tenderLines.map((line, index) => (
-        <View key={`${line.tenderType}-${index}`} style={styles.tenderRow}>
-          <View style={styles.tenderChips}>
-            {tenderOptions.map(tt => (
-              <Button
-                key={tt}
-                compact
-                testID={tt === 'CASH' ? testIds.checkoutTenderCash : undefined}
-                mode={line.tenderType === tt ? 'contained' : 'outlined'}
-                onPress={() =>
-                  dispatch(setTenderLineType({index, tenderType: tt}))
-                }
-                style={styles.chipBtn}
-                contentStyle={styles.btnInner}>
-                {tenderLabel(tt)}
-              </Button>
-            ))}
-          </View>
-          <TextInput
-            label={t('pos.tenderAmount')}
-            keyboardType="decimal-pad"
-            value={line.amount ? String(line.amount) : ''}
-            onChangeText={v =>
-              dispatch(
-                updateTenderLine({
-                  index,
-                  amount: parseFloat(v) || 0,
-                }),
-              )
-            }
-            style={styles.field}
-          />
-          {isMomoTender(line.tenderType) && line.amount > 0 ? (
-            <>
-              <Text style={styles.momoHint}>
-                {t('payments.ussdPrompt')}{' '}
-                {ussdSecondsLeft > 0
-                  ? t('payments.ussdCountdown', {seconds: ussdSecondsLeft})
-                  : t('payments.ussdExpired')}
-              </Text>
-              <TextInput
-                label={t('payments.ussdCode')}
-                value={line.reference ?? ''}
-                onChangeText={v => {
-                  dispatch(setTenderLineReference({index, reference: v}));
-                  setMomoVerify(m => ({...m, [index]: {status: 'idle'}}));
-                }}
-                style={styles.field}
-              />
-              <Button
-                mode="contained-tonal"
-                loading={momoVerify[index]?.status === 'pending'}
-                onPress={() => void verifyMomoLine(index)}>
-                {momoVerify[index]?.status === 'pending'
-                  ? t('payments.verifying')
-                  : t('payments.verifyMomo')}
-              </Button>
-              {momoVerify[index]?.message ? (
-                <Text
-                  style={
-                    momoVerify[index]?.status === 'ok'
-                      ? styles.momoOk
-                      : styles.momoFail
-                  }>
-                  {momoVerify[index]?.message}
-                </Text>
-              ) : null}
-            </>
-          ) : null}
-          {tenderLines.length > 1 ? (
-            <Button onPress={() => dispatch(removeTenderLine(index))}>
-              {t('pos.removeTenderLine')}
-            </Button>
-          ) : null}
-        </View>
-      ))}
-      <View style={styles.row}>
-        {tenderOptions.map(tt => {
-          const used = tenderLines.some(l => l.tenderType === tt);
-          if (used) {
-            return null;
-          }
-          return (
-            <Button
-              key={tt}
-              mode="outlined"
-              onPress={() => dispatch(addTenderLine(tt))}
-              style={styles.currencyBtn}
-              contentStyle={styles.btnInner}>
-              + {tenderLabel(tt)}
-            </Button>
-          );
-        })}
-      </View>
-      <Text style={styles.bodyMedium}>
-        {t('pos.tenderTotal')}: {formatMoney(tenderSum, sessionCurrency)} /{' '}
-        {t('pos.saleTotal')}: {formatMoney(total, sessionCurrency)}
-      </Text>
-
-      <Button
-        mode="outlined"
-        onPress={() => navigation.navigate('CustomerLookup', {selectForCheckout: true})}
-        style={styles.field}>
-        {selectedCustomer
-          ? `${t('customers.selected')}: ${selectedCustomer.customerName}`
-          : t('customers.addCustomerAtCheckout')}
-      </Button>
-      {selectedCustomer ? (
-        <Text style={styles.bodySmall}>
-          {t('customers.credit')}: {selectedCustomer.creditBalance} /{' '}
-          {selectedCustomer.creditLimit} · {t('customers.loyaltyPoints')}:{' '}
-          {selectedCustomer.loyaltyPoints}
-        </Text>
-      ) : null}
-      {promotionLines.map(p => (
-        <Text key={p.id} style={styles.promo}>
-          {p.name}: {formatMoney(p.amount, sessionCurrency)}
-        </Text>
-      ))}
-      {selectedCustomer?.loyaltyEnabled ? (
-        <TextInput
-          label={t('customers.redeemPoints')}
-          keyboardType="number-pad"
-          value={loyaltyRedeemPoints ? String(loyaltyRedeemPoints) : ''}
-          onChangeText={v =>
-            dispatch(setLoyaltyRedeemPoints(parseInt(v, 10) || 0))
-          }
-          style={styles.field}
-        />
-      ) : null}
-      {canDiscount ? (
-        <TextInput
-          label={t('pos.discount')}
-          keyboardType="decimal-pad"
-          value={discount ? String(discount) : ''}
-          onChangeText={v => dispatch(setDiscount(parseFloat(v) || 0))}
-          style={styles.field}
-        />
-      ) : null}
-      <Text style={[styles.section, styles.sectionTitle]}>
-        {t('pos.scanBarcode')}
-      </Text>
-      <View style={styles.row}>
-        <TextInput
-          testID={testIds.checkoutBarcode}
-          ref={scannerMode ? scannerInputRef : undefined}
-          label={t('pos.barcode')}
-          value={barcodeInput}
-          onChangeText={v => {
-            dispatch(setBarcodeInput(v));
-            if (scannerMode) {
-              scannerOnChange(v);
-            }
-          }}
-          style={[styles.field, {flex: 1}]}
-          showSoftInputOnFocus={!scannerMode}
-          autoFocus={scannerMode}
-          onSubmitEditing={() => {
-            if (scannerMode) {
-              scannerOnSubmit();
-              return;
-            }
-            if (barcodeInput.trim()) {
-              void lookupAndAddProduct(barcodeInput.trim());
-              dispatch(setBarcodeInput(''));
-            }
-          }}
-        />
-        <Button
-          testID={testIds.checkoutAdd}
-          mode="contained-tonal"
-          onPress={() => {
-            if (barcodeInput.trim()) {
-              void lookupAndAddProduct(barcodeInput.trim());
-              dispatch(setBarcodeInput(''));
-            }
-          }}
-          style={styles.addBtn}
-          contentStyle={styles.btnInner}>
-          {t('common.add')}
-        </Button>
-      </View>
-      <View style={styles.row}>
-        <Button
-          mode="outlined"
-          onPress={() => navigation.navigate('Barcode')}
-          style={[styles.field, {flex: 1}]}
-          contentStyle={styles.btnInner}>
-          {t('pos.openScanner')}
-        </Button>
-        <Button
-          mode="outlined"
-          onPress={() => navigation.navigate('CatalogSearch')}
-          style={[styles.field, {flex: 1}]}
-          contentStyle={styles.btnInner}>
-          {t('pos.searchCatalog', 'Search')}
-        </Button>
-      </View>
-      <Button
-        mode="text"
-        onPress={() => navigation.navigate('SaleHistory')}
-        style={styles.field}>
-        {t('pos.saleHistory', 'Sale history')}
-      </Button>
-
-      <Text style={[styles.section, styles.sectionTitle]}>{t('pos.cart')}</Text>
-      {cart.map(item => {
-        const lineKey = item.variantId ?? item.catalogItemId;
-        return (
-        <Card key={`${lineKey}-${item.serialNumber ?? ''}`} style={styles.card}>
-          <Card.Title
-            title={item.name}
-            subtitle={
-              item.variantLabel
-                ? `${item.variantLabel} · ${item.sku}`
-                : `SKU ${item.sku}`
-            }
-          />
-          <Card.Content>
-            <Text style={styles.bodySmall}>{item.barcode}</Text>
-            {item.uomLabel ? (
-              <Text style={styles.bodySmall}>{t('inventory.uom')}: {item.uomLabel}</Text>
-            ) : null}
-            {item.batchNumber ? (
-              <Text style={styles.bodySmall}>
-                {t('inventory.batch')}: {item.batchNumber}
-                {item.batchExpiry ? ` · ${item.batchExpiry}` : ''}
-              </Text>
-            ) : null}
-            {item.requiresSerial ? (
-              <TextInput
-                label={t('inventory.serialNumber')}
-                value={item.serialNumber ?? ''}
-                onChangeText={v =>
-                  dispatch(setCartLineSerial({lineKey, serialNumber: v}))
-                }
-                style={styles.field}
-              />
-            ) : null}
-            {item.variantId && !item.batchNumber ? (
-              <Button
-                compact
-                onPress={async () => {
-                  const pick = await pickCheckoutBatch(item.variantId!, item.quantity);
-                  if (pick) {
-                    dispatch(
-                      setCartLineBatch({
-                        lineKey,
-                        batchNumber: pick.batchNumber,
-                        batchExpiry: pick.expiryDate,
-                      }),
-                    );
-                  }
-                }}>
-                {t('inventory.applyFefoBatch')}
-              </Button>
-            ) : null}
-            {item.variantId ? (
-              <TextInput
-                label={t('inventory.batchOverride')}
-                value={item.batchNumber ?? ''}
-                onChangeText={v =>
-                  dispatch(
-                    setCartLineBatch({
-                      lineKey,
-                      batchNumber: v,
-                      batchExpiry: item.batchExpiry,
-                    }),
-                  )
-                }
-                style={styles.field}
-              />
-            ) : null}
-            <Text style={styles.bodyMedium}>
-              {formatMoney(item.unitPrice, item.currency)} ×{' '}
-              <TextInput
-                dense
-                keyboardType="decimal-pad"
-                value={String(item.quantity)}
-                onChangeText={v =>
-                  dispatch(
-                    updateQuantity({
-                      catalogItemId: item.catalogItemId,
-                      quantity: Math.max(0.001, parseFloat(v) || 0.001),
-                    }),
-                  )
-                }
-                style={styles.qtyInput}
-              />{' '}
-              = {formatMoney(item.lineTotal, item.currency)}
-            </Text>
-            <Button onPress={() => dispatch(removeFromCart(lineKey))}>
-              {t('common.remove')}
-            </Button>
-          </Card.Content>
-        </Card>
-        );
-      })}
-
-      <View style={styles.footer}>
-        <Text style={styles.bodyMedium}>
-          {t('pos.subtotal')} {formatMoney(subtotal, sessionCurrency)}
-        </Text>
-        <Text style={styles.bodyMedium}>
-          {t('fiscal.subtotalExVat', 'Subtotal (ex VAT)')}{' '}
-          {formatMoney(vatSummary.subtotalExVat, sessionCurrency)}
-        </Text>
-        <Text style={styles.bodyMedium}>
-          {taxExempt
-            ? t('fiscal.vatExempt', 'VAT: exempt')
-            : `${t('fiscal.vat', 'VAT')} ${formatMoney(vatSummary.totalVat, sessionCurrency)}`}
-        </Text>
-        {canDiscount && discount > 0 ? (
-          <Text style={styles.bodyMedium}>
-            {t('pos.discount')} {discount}
-          </Text>
-        ) : null}
-        <Text style={styles.total}>
-          {t('pos.total')} {formatMoney(total, sessionCurrency)}
-        </Text>
-        <Button
-          testID={testIds.checkoutComplete}
-          mode="contained"
-          loading={processing}
-          disabled={processing || tenderSum + 0.001 < total}
-          onPress={() => void submitCheckout()}
-          contentStyle={styles.btnInner}
-          accessibilityLabel={t('pos.completeSale')}>
-          {online ? t('pos.completeSale') : t('pos.queueOfflineSale')}
-        </Button>
-        {selectedCustomer && cart.length > 0 ? (
-          <Button
-            mode="outlined"
-            loading={processing}
-            disabled={processing}
-            onPress={() => void submitLayaway()}
-            contentStyle={styles.btnInner}>
-            {t('customers.createLayaway')}
+    <View style={styles.screen}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled">
+        {canReturns ? (
+          <Button variant="secondary" onPress={() => navigation.navigate('Returns')}>
+            {t('pos.processReturn')}
           </Button>
         ) : null}
+
+        <Card style={styles.section}>
+          <Text style={textStyles.sectionHeader}>{t('pos.registerTender')}</Text>
+          <Input
+            label={t('pos.registerCode')}
+            value={posRegisterCode}
+            onChangeText={v => dispatch(setPosRegisterCode(v))}
+          />
+          <View style={styles.row}>
+            <Button
+              variant={sessionCurrency === 'FRW' ? 'primary' : 'secondary'}
+              onPress={() => dispatch(setSessionCurrency('FRW'))}
+              style={styles.halfBtn}>
+              FRW
+            </Button>
+            <Button
+              variant={sessionCurrency === 'USD' ? 'primary' : 'secondary'}
+              onPress={() => dispatch(setSessionCurrency('USD'))}
+              style={styles.halfBtn}>
+              USD
+            </Button>
+          </View>
+        </Card>
+
+        <Card style={styles.section}>
+          <Text style={textStyles.sectionHeader}>{t('pos.scanBarcode')}</Text>
+          <View style={styles.row}>
+            <Input
+              testID={testIds.checkoutBarcode}
+              ref={scannerMode ? scannerInputRef : undefined}
+              label={t('pos.barcode')}
+              value={barcodeInput}
+              onChangeText={v => {
+                dispatch(setBarcodeInput(v));
+                if (scannerMode) {
+                  scannerOnChange(v);
+                }
+              }}
+              showSoftInputOnFocus={!scannerMode}
+              autoFocus={scannerMode}
+              onSubmitEditing={() => {
+                if (scannerMode) {
+                  scannerOnSubmit();
+                  return;
+                }
+                if (barcodeInput.trim()) {
+                  void lookupAndAddProduct(barcodeInput.trim());
+                  dispatch(setBarcodeInput(''));
+                }
+              }}
+              style={styles.flex}
+            />
+            <Button
+              testID={testIds.checkoutAdd}
+              variant="secondary"
+              onPress={() => {
+                if (barcodeInput.trim()) {
+                  void lookupAndAddProduct(barcodeInput.trim());
+                  dispatch(setBarcodeInput(''));
+                }
+              }}>
+              {t('common.add')}
+            </Button>
+          </View>
+          <View style={styles.row}>
+            <Button
+              variant="secondary"
+              onPress={() => navigation.navigate('Barcode')}
+              style={styles.flex}>
+              {t('pos.openScanner')}
+            </Button>
+            <Button
+              variant="secondary"
+              onPress={() => navigation.navigate('CatalogSearch')}
+              style={styles.flex}>
+              {t('pos.searchCatalog', 'Search')}
+            </Button>
+          </View>
+          <Button variant="ghost" onPress={() => navigation.navigate('SaleHistory')}>
+            {t('pos.saleHistory', 'Sale history')}
+          </Button>
+        </Card>
+
+        <Card style={styles.section}>
+          <Button
+            variant="secondary"
+            fullWidth
+            onPress={() =>
+              navigation.navigate('CustomerLookup', {selectForCheckout: true})
+            }>
+            {selectedCustomer
+              ? `${t('customers.selected')}: ${selectedCustomer.customerName}`
+              : t('customers.addCustomerAtCheckout')}
+          </Button>
+          {selectedCustomer ? (
+            <Text style={textStyles.secondary}>
+              {t('customers.credit')}: {selectedCustomer.creditBalance} /{' '}
+              {selectedCustomer.creditLimit} · {t('customers.loyaltyPoints')}:{' '}
+              {selectedCustomer.loyaltyPoints}
+            </Text>
+          ) : null}
+          {promotionLines.map(p => (
+            <Badge key={p.id} variant="success">
+              {p.name}: {formatMoney(p.amount, sessionCurrency)}
+            </Badge>
+          ))}
+          {selectedCustomer?.loyaltyEnabled ? (
+            <Input
+              label={t('customers.redeemPoints')}
+              keyboardType="number-pad"
+              value={loyaltyRedeemPoints ? String(loyaltyRedeemPoints) : ''}
+              onChangeText={v =>
+                dispatch(setLoyaltyRedeemPoints(parseInt(v, 10) || 0))
+              }
+            />
+          ) : null}
+          {canDiscount ? (
+            <Input
+              label={t('pos.discount')}
+              keyboardType="decimal-pad"
+              value={discount ? String(discount) : ''}
+              onChangeText={v => dispatch(setDiscount(parseFloat(v) || 0))}
+            />
+          ) : null}
+        </Card>
+
+        <Text style={textStyles.sectionHeader}>{t('pos.cart')}</Text>
+        {cart.length === 0 ? (
+          <Card>
+            <Text style={textStyles.secondary}>{t('pos.cartEmpty')}</Text>
+          </Card>
+        ) : null}
+        {cart.map(item => {
+          const lineKey = item.variantId ?? item.catalogItemId;
+          return (
+            <Card key={`${lineKey}-${item.serialNumber ?? ''}`} style={styles.cartCard}>
+              <Text style={textStyles.body}>{item.name}</Text>
+              <Text style={textStyles.secondary}>
+                {item.variantLabel
+                  ? `${item.variantLabel} · ${item.sku}`
+                  : `SKU ${item.sku}`}
+              </Text>
+              <Text style={textStyles.caption}>{item.barcode}</Text>
+              {item.requiresSerial ? (
+                <Input
+                  label={t('inventory.serialNumber')}
+                  value={item.serialNumber ?? ''}
+                  onChangeText={v =>
+                    dispatch(setCartLineSerial({lineKey, serialNumber: v}))
+                  }
+                />
+              ) : null}
+              {item.variantId && !item.batchNumber ? (
+                <Button
+                  variant="ghost"
+                  onPress={async () => {
+                    const pick = await pickCheckoutBatch(item.variantId!, item.quantity);
+                    if (pick) {
+                      dispatch(
+                        setCartLineBatch({
+                          lineKey,
+                          batchNumber: pick.batchNumber,
+                          batchExpiry: pick.expiryDate,
+                        }),
+                      );
+                    }
+                  }}>
+                  {t('inventory.applyFefoBatch')}
+                </Button>
+              ) : null}
+              <View style={styles.qtyRow}>
+                <Text style={textStyles.body}>
+                  {formatMoney(item.unitPrice, item.currency)} ×
+                </Text>
+                <Input
+                  keyboardType="decimal-pad"
+                  value={String(item.quantity)}
+                  onChangeText={v =>
+                    dispatch(
+                      updateQuantity({
+                        catalogItemId: item.catalogItemId,
+                        quantity: Math.max(0.001, parseFloat(v) || 0.001),
+                      }),
+                    )
+                  }
+                  style={styles.qtyInput}
+                />
+                <Text style={textStyles.amount}>
+                  {formatMoney(item.lineTotal, item.currency)}
+                </Text>
+              </View>
+              <Button variant="ghost" onPress={() => dispatch(removeFromCart(lineKey))}>
+                {t('common.remove')}
+              </Button>
+            </Card>
+          );
+        })}
+      </ScrollView>
+
+      <View style={styles.payBar}>
+        <View>
+          <Text style={textStyles.caption}>{t('pos.total')}</Text>
+          <Text style={textStyles.amountLg}>
+            {formatMoney(total, sessionCurrency)}
+          </Text>
+          <Text style={textStyles.caption}>
+            {taxExempt
+              ? t('fiscal.vatExempt', 'VAT: exempt')
+              : `${t('fiscal.vat', 'VAT')} ${formatMoney(vatSummary.totalVat, sessionCurrency)}`}
+          </Text>
+        </View>
+        <Button
+          testID={testIds.checkoutComplete}
+          disabled={cart.length === 0}
+          onPress={() => setPaymentOpen(true)}
+          style={styles.payBtn}>
+          {online ? t('pos.completeSale') : t('pos.queueOfflineSale')}
+        </Button>
       </View>
-    </ScrollView>
+
+      <PaymentBottomSheet
+        visible={paymentOpen}
+        onClose={() => setPaymentOpen(false)}
+        total={total}
+        sessionCurrency={sessionCurrency}
+        processing={processing}
+        onComplete={() => void submitCheckout()}
+        onLayaway={() => void submitLayaway()}
+        showLayaway={Boolean(selectedCustomer && cart.length > 0)}
+        completeLabel={online ? t('pos.completeSale') : t('pos.queueOfflineSale')}
+        momoVerify={momoVerify}
+        setMomoVerify={setMomoVerify}
+        ussdSecondsLeft={ussdSecondsLeft}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: {flex: 1, padding: 12},
-  section: {marginTop: 8, marginBottom: 4},
-  field: {marginBottom: 8},
-  row: {flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap'},
-  currencyBtn: {flex: 1, minWidth: 80},
-  chipBtn: {marginRight: 4, marginBottom: 4},
-  tenderRow: {marginBottom: 12},
-  tenderChips: {flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: 8},
-  addBtn: {justifyContent: 'center'},
-  btnInner: {minHeight: 48},
-  card: {marginBottom: 8},
-  qtyInput: {
-    minHeight: 40,
-    minWidth: 80,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 8,
+  screen: {
+    flex: 1,
+    backgroundColor: colors.bgPage,
   },
-  footer: {paddingVertical: 12, gap: 4},
-  sectionTitle: {fontSize: 18, fontWeight: '600'},
-  bodySmall: {fontSize: 12},
-  promo: {fontSize: 13, color: '#059669'},
-  bodyMedium: {fontSize: 15},
-  total: {fontSize: 22, fontWeight: '700'},
-  momoHint: {fontSize: 13, color: '#475569', marginBottom: 6},
-  momoOk: {color: '#16A34A', marginBottom: 8},
-  momoFail: {color: '#DC2626', marginBottom: 8},
+  scroll: {
+    padding: spacing[3],
+    paddingBottom: spacing[8],
+    gap: spacing[3],
+  },
+  section: {
+    gap: spacing[3],
+  },
+  cartCard: {
+    gap: spacing[2],
+    marginBottom: spacing[2],
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: spacing[2],
+    flexWrap: 'wrap',
+  },
+  flex: {
+    flex: 1,
+    minWidth: 120,
+  },
+  halfBtn: {
+    flex: 1,
+  },
+  qtyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+  },
+  qtyInput: {
+    flex: 0,
+    minWidth: 72,
+  },
+  payBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing[3],
+    padding: spacing[4],
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.gray200,
+    backgroundColor: colors.white,
+  },
+  payBtn: {
+    minWidth: 140,
+  },
 });

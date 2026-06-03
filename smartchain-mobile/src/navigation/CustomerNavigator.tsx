@@ -1,5 +1,6 @@
 import React from 'react';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
+import {defaultStackScreenOptions} from '../theme/navigation';
 import CustomerLookupScreen from '../screens/customers/CustomerLookupScreen';
 import CustomerDetailScreen from '../screens/customers/CustomerDetailScreen';
 import CustomerFormScreen from '../screens/customers/CustomerFormScreen';
@@ -26,7 +27,7 @@ const Stack = createNativeStackNavigator<CustomerStackParamList>();
 
 export default function CustomerNavigator() {
   return (
-    <Stack.Navigator>
+    <Stack.Navigator screenOptions={defaultStackScreenOptions}>
       <Stack.Screen name="CustomerLookup" component={CustomerLookupScreen} options={{title: 'Customers'}} />
       <Stack.Screen name="CustomerDetail" component={CustomerDetailScreen} options={{title: 'Customer'}} />
       <Stack.Screen name="CustomerForm" component={CustomerFormScreen} options={{title: 'Customer'}} />

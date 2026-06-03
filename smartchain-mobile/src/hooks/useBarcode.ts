@@ -17,6 +17,7 @@ import {loadPriceListContext} from '../pricing/priceListContext';
 import {loadHardwareConfig} from '../hardware/printerConfig';
 import {parsePluBarcode} from '../hardware/pluParser';
 import {poleDisplayService} from '../services/printer/PoleDisplayService';
+import {hapticLight} from '../utils/haptics';
 
 function mapCurrency(code: string): 'FRW' | 'USD' {
   const u = code?.toUpperCase() ?? 'FRW';
@@ -66,6 +67,7 @@ export function useBarcode() {
           local.product.name,
           String(price),
         );
+        hapticLight();
         return;
       }
 
@@ -115,6 +117,7 @@ export function useBarcode() {
             serialNumber: opts?.serialNumber,
           }),
         );
+        hapticLight();
       } catch (e) {
         console.error('Product lookup failed for barcode', barcode, e);
         Alert.alert('Not found', `No product for barcode ${trimmed}`);

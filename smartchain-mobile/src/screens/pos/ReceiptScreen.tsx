@@ -1,7 +1,8 @@
 import React, {useEffect, useMemo} from 'react';
 import {Platform, ScrollView, Share, StyleSheet, Text, View} from 'react-native';
-import {Button} from 'react-native-paper';
 import QRCode from 'react-native-qrcode-svg';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import {useNavigation} from '@react-navigation/native';
 import {useTranslation} from 'react-i18next';
 import {useSelector} from 'react-redux';
 import Toast from 'react-native-toast-message';
@@ -15,9 +16,13 @@ import {
   deliverReceipt,
 } from '../../api/receiptDelivery';
 import {loadReceiptDeliveryConfig} from '../../services/receiptDeliveryConfig';
+import {Button, Card} from '../../components/ui';
+import {colors, spacing} from '../../theme/tokens';
+import {textStyles} from '../../theme/typography';
 
 export default function ReceiptScreen() {
   const {t} = useTranslation();
+  const navigation = useNavigation();
   const txId = useSelector((s: RootState) => s.pos.lastTransactionId);
   const receiptLines = useSelector((s: RootState) => s.pos.lastReceiptLines);
   const fiscalSignature = useSelector((s: RootState) => s.pos.lastFiscalSignature);
@@ -112,83 +117,125 @@ export default function ReceiptScreen() {
     !!customerPhone?.trim() && loadReceiptDeliveryConfig().whatsappEnabled;
 
   return (
-    <ScrollView contentContainerStyle={styles.wrap}>
-      <Text style={styles.title}>{t('receipt.title')}</Text>
-      <Text selectable style={styles.mono}>
-        {txId ?? '—'}
-      </Text>
-      <Text style={styles.label}>{t('fiscal.subtotalExVat')}</Text>
-      <Text style={styles.value}>
-        {formatMoney(netAmount, sessionCurrency)}
-      </Text>
-      <Text style={styles.label}>
-        {taxExempt ? t('fiscal.vatExempt') : t('fiscal.vat')}
-      </Text>
-      <Text style={styles.value}>
-        {taxExempt ? '0' : formatMoney(vatAmount, sessionCurrency)}
-      </Text>
-      {fiscalSignature ? (
-        <>
-          <Text style={styles.label}>{t('fiscal.signature')}</Text>
-          <Text selectable style={styles.monoSmall}>
-            {fiscalSignature}
+    <View style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <View style={styles.hero}>
+          <View style={styles.checkCircle}>
+            <Icon name="check" size={40} color={colors.white} />
+          </View>
+          <Text style={textStyles.screenTitle}>{t('pos.saleCompleted')}</Text>
+          <Text style={textStyles.amountLg}>
+            {formatMoney(total, sessionCurrency)}
           </Text>
-        </>
-      ) : null}
-      {fiscalQrData ? (
-        <View style={styles.qrBox}>
-          <Text style={styles.rraLogo}>{t('fiscal.rraLogo')}</Text>
-          <QRCode value={fiscalQrData} size={80} />
+          <Text style={textStyles.secondary}>{t('receipt.title')}</Text>
+          <Text selectable style={[textStyles.caption, styles.mono]}>
+            {txId ?? '—'}
+          </Text>
         </View>
-      ) : null}
-      <Button
-        testID={testIds.receiptPrint}
-        mode="contained"
-        disabled={!txId}
-        onPress={() => void onPrint()}
-        contentStyle={styles.btnInner}
-        accessibilityLabel={
-          Platform.OS === 'ios' ? t('receipt.airPrint') : t('receipt.print')
-        }>
-        {Platform.OS === 'ios' ? t('receipt.airPrint') : t('receipt.print')}
-      </Button>
-      {showWhatsApp ? (
+
+        <Card style={styles.details}>
+          <Text style={textStyles.sectionHeader}>{t('fiscal.subtotalExVat')}</Text>
+          <Text style={textStyles.amount}>
+            {formatMoney(netAmount, sessionCurrency)}
+          </Text>
+          <Text style={textStyles.sectionHeader}>
+            {taxExempt ? t('fiscal.vatExempt') : t('fiscal.vat')}
+          </Text>
+          <Text style={textStyles.amount}>
+            {taxExempt ? '0' : formatMoney(vatAmount, sessionCurrency)}
+          </Text>
+          {fiscalSignature ? (
+            <>
+              <Text style={textStyles.sectionHeader}>{t('fiscal.signature')}</Text>
+              <Text selectable style={[textStyles.caption, styles.mono]}>
+                {fiscalSignature}
+              </Text>
+            </>
+          ) : null}
+          {fiscalQrData ? (
+            <View style={styles.qrBox}>
+              <Text style={textStyles.body}>{t('fiscal.rraLogo')}</Text>
+              <QRCode value={fiscalQrData} size={96} />
+            </View>
+          ) : null}
+        </Card>
+
         <Button
-          mode="outlined"
-          icon="whatsapp"
+          testID={testIds.receiptPrint}
+          fullWidth
           disabled={!txId}
-          onPress={() => void sendWhatsApp()}
-          contentStyle={styles.btnInner}>
-          {t('receiptDelivery.whatsapp')}
+          onPress={() => void onPrint()}
+          accessibilityLabel={
+            Platform.OS === 'ios' ? t('receipt.airPrint') : t('receipt.print')
+          }>
+          {Platform.OS === 'ios' ? t('receipt.airPrint') : t('receipt.print')}
         </Button>
-      ) : null}
-      {Platform.OS === 'ios' ? (
+        {showWhatsApp ? (
+          <Button
+            fullWidth
+            variant="secondary"
+            disabled={!txId}
+            onPress={() => void sendWhatsApp()}>
+            {t('receiptDelivery.whatsapp')}
+          </Button>
+        ) : null}
+        {Platform.OS === 'ios' ? (
+          <Button
+            fullWidth
+            variant="secondary"
+            disabled={!txId}
+            onPress={() => void onShare()}>
+            {t('receipt.shareIos')}
+          </Button>
+        ) : null}
         <Button
-          mode="outlined"
-          disabled={!txId}
-          onPress={() => void onShare()}
-          contentStyle={styles.btnInner}>
-          {t('receipt.shareIos')}
+          fullWidth
+          variant="ghost"
+          onPress={() => navigation.goBack()}>
+          {t('common.done', 'Done')}
         </Button>
-      ) : null}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  title: {fontSize: 18, fontWeight: '600', marginBottom: 8},
-  wrap: {flexGrow: 1, padding: 16, gap: 12},
-  mono: {fontFamily: 'monospace'},
-  monoSmall: {fontFamily: 'monospace', fontSize: 11},
-  label: {fontSize: 13, color: '#6B7280', marginTop: 8},
-  value: {fontSize: 16, fontWeight: '600'},
-  qrBox: {
-    marginTop: 8,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    alignItems: 'center',
+  screen: {
+    flex: 1,
+    backgroundColor: colors.bgPage,
   },
-  rraLogo: {fontWeight: '700', marginBottom: 8},
-  btnInner: {minHeight: 48},
+  scroll: {
+    flexGrow: 1,
+    padding: spacing[4],
+    gap: spacing[3],
+  },
+  hero: {
+    alignItems: 'center',
+    paddingVertical: spacing[6],
+    gap: spacing[2],
+  },
+  checkCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.success,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing[2],
+  },
+  details: {
+    gap: spacing[2],
+  },
+  mono: {
+    fontFamily: Platform.select({ios: 'Menlo', android: 'monospace'}),
+  },
+  qrBox: {
+    marginTop: spacing[2],
+    padding: spacing[3],
+    borderWidth: 1,
+    borderColor: colors.gray200,
+    borderRadius: 8,
+    alignItems: 'center',
+    gap: spacing[2],
+  },
 });

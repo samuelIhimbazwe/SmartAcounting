@@ -9,6 +9,7 @@ import {
   variantLabel,
 } from './inventoryRepository';
 import {resolveCheckoutUnitPrice} from '../pricing/resolveCheckoutPrice';
+import {hapticLight} from '../utils/haptics';
 
 function mapCurrency(code: string): 'FRW' | 'USD' {
   const u = code?.toUpperCase() ?? 'FRW';
@@ -78,6 +79,7 @@ export async function dispatchVariantToCart(
       batchExpiry: batch?.expiryDate,
     }),
   );
+  hapticLight();
 }
 
 export function showVariantPickerAlert(
