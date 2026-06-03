@@ -28,11 +28,10 @@ import type { RoleProfile } from '../../types/roleProfiles'
 import { rolePathMap } from '../../types/roles'
 
 export type NavGroupKey =
-  | 'nav.groupOverview'
   | 'nav.groupOperations'
   | 'nav.groupFinance'
   | 'nav.groupCompliance'
-  | 'nav.groupAdmin'
+  | 'nav.groupSettings'
 
 /** Retired nav ids — filtered even if a role profile still references them. */
 export const EXCLUDED_NAV_ITEM_IDS = new Set([
@@ -103,7 +102,7 @@ export const NAV_ITEMS: NavItem[] = [
     to: '/actions',
     labelKey: 'nav.actionsQueue',
     searchLabel: 'Approvals and actions',
-    group: 'nav.groupOverview',
+    group: 'nav.groupOperations',
     icon: ClipboardList,
     requiredAnyPermissions: ['ANALYTICS_OWN', 'ANALYTICS_ALL'],
   },
@@ -112,7 +111,7 @@ export const NAV_ITEMS: NavItem[] = [
     to: '/analytics/sales',
     labelKey: 'nav.salesAnalytics',
     searchLabel: 'Sales analytics',
-    group: 'nav.groupOverview',
+    group: 'nav.groupOperations',
     icon: BarChart3,
     requiredPermission: 'ANALYTICS_ALL',
   },
@@ -301,7 +300,7 @@ export const NAV_ITEMS: NavItem[] = [
     to: '/hr/employees',
     labelKey: 'nav.hrEmployees',
     searchLabel: 'Employees',
-    group: 'nav.groupAdmin',
+    group: 'nav.groupFinance',
     icon: Users,
     requiredPermission: 'HR_READ',
   },
@@ -310,7 +309,7 @@ export const NAV_ITEMS: NavItem[] = [
     to: '/hr/leave',
     labelKey: 'nav.hrLeave',
     searchLabel: 'Leave management',
-    group: 'nav.groupAdmin',
+    group: 'nav.groupFinance',
     icon: Users,
     requiredPermission: 'HR_READ',
   },
@@ -319,7 +318,7 @@ export const NAV_ITEMS: NavItem[] = [
     to: '/hr/shifts',
     labelKey: 'nav.hrShifts',
     searchLabel: 'Shift management',
-    group: 'nav.groupAdmin',
+    group: 'nav.groupFinance',
     icon: Users,
     requiredPermission: 'HR_READ',
   },
@@ -328,7 +327,7 @@ export const NAV_ITEMS: NavItem[] = [
     to: '/hr/attendance',
     labelKey: 'nav.attendance',
     searchLabel: 'Attendance',
-    group: 'nav.groupAdmin',
+    group: 'nav.groupFinance',
     icon: Users,
     requiredPermission: 'HR_READ',
   },
@@ -355,7 +354,7 @@ export const NAV_ITEMS: NavItem[] = [
     to: '/admin/workflow-rules',
     labelKey: 'nav.workflowRules',
     searchLabel: 'Workflow rules',
-    group: 'nav.groupAdmin',
+    group: 'nav.groupSettings',
     icon: ShieldCheck,
     requiredPermission: 'ROLE_MANAGE',
   },
@@ -373,7 +372,7 @@ export const NAV_ITEMS: NavItem[] = [
     to: '/hr/payroll',
     labelKey: 'nav.hrPayroll',
     searchLabel: 'Attendance and payroll',
-    group: 'nav.groupAdmin',
+    group: 'nav.groupFinance',
     icon: Users,
     requiredPermission: 'HR_READ',
   },
@@ -436,7 +435,7 @@ export const NAV_ITEMS: NavItem[] = [
     to: '/admin/roles',
     labelKey: 'nav.rolesPermissions',
     searchLabel: 'Roles and permissions',
-    group: 'nav.groupAdmin',
+    group: 'nav.groupSettings',
     icon: ShieldCheck,
     requiredPermission: 'ROLE_MANAGE',
   },
@@ -445,19 +444,51 @@ export const NAV_ITEMS: NavItem[] = [
     to: '/admin/users-tenants',
     labelKey: 'nav.userTenantManagement',
     searchLabel: 'User Tenant Management',
-    group: 'nav.groupAdmin',
+    group: 'nav.groupSettings',
     icon: ShieldCheck,
     requiredPermission: 'USER_MANAGE',
+  },
+  {
+    id: 'settings',
+    to: '/settings',
+    labelKey: 'nav.settingsPage',
+    searchLabel: 'Settings',
+    group: 'nav.groupSettings',
+    icon: Settings,
   },
 ]
 
 export const NAV_GROUP_ORDER: NavGroupKey[] = [
-  'nav.groupOverview',
   'nav.groupOperations',
   'nav.groupFinance',
   'nav.groupCompliance',
-  'nav.groupAdmin',
+  'nav.groupSettings',
 ]
+
+export interface NavBreadcrumb {
+  label: string
+  to?: string
+}
+
+export function findNavBreadcrumbs(
+  pathname: string,
+  items: NavItem[],
+  dashboardPath: string,
+  dashboardLabel: string,
+): NavBreadcrumb[] {
+  if (pathname === dashboardPath || pathname === '/dashboard') {
+    return []
+  }
+  const match = items.find((item) => pathname === item.to || pathname.startsWith(`${item.to}/`))
+  const crumbs: NavBreadcrumb[] = [{ label: dashboardLabel, to: dashboardPath }]
+  if (match) {
+    crumbs.push({ label: match.searchLabel })
+  } else {
+    const segment = pathname.split('/').filter(Boolean).pop() ?? 'Page'
+    crumbs.push({ label: segment.replace(/-/g, ' ') })
+  }
+  return crumbs
+}
 
 export function filterNavItems(hasPermission: (code: string) => boolean, allowedItemIds?: string[] | null): NavItem[] {
   const allowed = allowedItemIds && allowedItemIds.length > 0 ? new Set(allowedItemIds) : null

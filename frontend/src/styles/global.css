@@ -1,5 +1,6 @@
 @import './tokens.css';
 @import '../components/ui/components.css';
+@import './shell-layout.css';
 
 *,
 *::before,

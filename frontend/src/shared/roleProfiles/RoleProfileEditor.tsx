@@ -24,10 +24,10 @@ const NAV_OPTIONS_BY_GROUP = NAV_ITEM_OPTIONS.reduce<Record<string, typeof NAV_I
 }, {})
 
 const NAV_GROUP_LABELS: Record<string, string> = {
-  'nav.groupOverview': 'Overview',
   'nav.groupOperations': 'Operations',
   'nav.groupFinance': 'Finance',
-  'nav.groupAdmin': 'Admin',
+  'nav.groupCompliance': 'Compliance',
+  'nav.groupSettings': 'Settings',
 }
 
 export function RoleProfileEditor({

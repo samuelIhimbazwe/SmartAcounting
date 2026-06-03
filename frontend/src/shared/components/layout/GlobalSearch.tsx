@@ -425,7 +425,7 @@ export function GlobalSearch({ role }: GlobalSearchProps) {
         id: `dash-${r}`,
         label: ROLE_DASHBOARD_LABEL[r],
         to: roleDashboardPath(r),
-        group: t('nav.groupOverview'),
+        group: t('nav.dashboard'),
         icon: ROLE_DASHBOARD_ICON[r],
         searchText: `${ROLE_DASHBOARD_LABEL[r]} dashboard ${r} ${roleDashboardPath(r)}`.toLowerCase(),
       })
