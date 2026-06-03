@@ -7,6 +7,7 @@ public record CashierPerformanceSummary(
     String cashierName,
     long transactionCount,
     BigDecimal totalSales,
+    long totalVoids,
     long totalRefunds,
     BigDecimal refundAmount
 ) {}

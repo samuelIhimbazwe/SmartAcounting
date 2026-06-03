@@ -26,11 +26,22 @@ public class SalesAnalyticsController {
     }
 
     @GetMapping("/cashier-performance")
-    @PreAuthorize(PermissionExpressions.ANALYTICS_OWN)
+    @PreAuthorize(PermissionExpressions.ANALYTICS_ANY)
     public ResponseEntity<List<CashierPerformanceSummary>> getCashierPerformance(
         @RequestParam String from,
         @RequestParam String to) {
         return ResponseEntity.ok(salesAnalyticsService.getCashierPerformance(
+            TenantContext.tenantId().toString(),
+            LocalDate.parse(from),
+            LocalDate.parse(to)));
+    }
+
+    @GetMapping("/heatmap")
+    @PreAuthorize(PermissionExpressions.ANALYTICS_ANY)
+    public ResponseEntity<List<HourlySales>> getHeatmap(
+        @RequestParam String from,
+        @RequestParam String to) {
+        return ResponseEntity.ok(salesAnalyticsService.getHeatmap(
             TenantContext.tenantId().toString(),
             LocalDate.parse(from),
             LocalDate.parse(to)));

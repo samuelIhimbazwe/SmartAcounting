@@ -104,6 +104,10 @@ const PromotionsRoute = lazyNamedRoute(() => import('../features/production/Prod
 const CustomersRoute = lazyNamedRoute(() => import('../features/customers/CustomersRoute'), 'CustomersRoute')
 const CustomerDetailRoute = lazyNamedRoute(() => import('../features/customers/CustomersRoute'), 'CustomerDetailRoute')
 const ActionsRoute = lazyNamedRoute(() => import('../features/actions/ActionsRoute'), 'ActionsRoute')
+const SalesAnalyticsRoute = lazyNamedRoute(
+  () => import('../features/dashboards/SalesAnalyticsRoute'),
+  'SalesAnalyticsRoute',
+)
 const ComingSoonRoute = lazyNamedRoute(() => import('../features/common/ComingSoonRoute'), 'ComingSoonRoute')
 
 export const appRoutes: RouteObject[] = [
@@ -123,6 +127,7 @@ export const appRoutes: RouteObject[] = [
       { path: '/dashboard', element: guard(undefined, <DashboardIndexRedirect />) },
       { path: '/dashboard/:role', element: guard(undefined, lazyElement(DashboardRoute)) },
       { path: '/actions', element: guard(ANALYTICS_ANY, lazyElement(ActionsRoute)) },
+      { path: '/analytics/sales', element: guard('ANALYTICS_ALL', lazyElement(SalesAnalyticsRoute)) },
       { path: '/transactions/:type', element: guard(undefined, lazyElement(TransactionFormsRoute)) },
       { path: '/admin/users-tenants', element: guard('USER_MANAGE', lazyElement(UserTenantManagementRoute)) },
       { path: '/admin/roles', element: guard('ROLE_MANAGE', lazyElement(RoleManagementRoute)) },

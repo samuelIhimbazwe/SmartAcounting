@@ -19,7 +19,7 @@ public interface CashierPerformanceRepository extends JpaRepository<CashierPerfo
         select new com.smartaccounting.dto.CashierPerformanceSummary(
             cp.cashierId, cp.cashierName,
             sum(cp.transactionCount), sum(cp.totalSales),
-            sum(cp.totalRefunds), sum(cp.refundAmount))
+            sum(cp.totalVoids), sum(cp.totalRefunds), sum(cp.refundAmount))
         from CashierPerformance cp
         where cp.tenantId = :tenantId
           and cp.shiftDate between :from and :to

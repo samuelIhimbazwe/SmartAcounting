@@ -108,6 +108,15 @@ export const NAV_ITEMS: NavItem[] = [
     requiredAnyPermissions: ['ANALYTICS_OWN', 'ANALYTICS_ALL'],
   },
   {
+    id: 'sales-analytics',
+    to: '/analytics/sales',
+    labelKey: 'nav.salesAnalytics',
+    searchLabel: 'Sales analytics',
+    group: 'nav.groupOverview',
+    icon: BarChart3,
+    requiredPermission: 'ANALYTICS_ALL',
+  },
+  {
     id: 'invoice',
     to: '/transactions/invoice',
     labelKey: 'nav.invoice',

@@ -11,4 +11,7 @@ import java.util.UUID;
 public interface HourlySalesRepository extends JpaRepository<HourlySales, UUID> {
     Optional<HourlySales> findByTenantIdAndSaleDateAndHourOfDay(UUID tenantId, LocalDate saleDate, int hourOfDay);
     List<HourlySales> findByTenantIdAndSaleDateOrderByHourOfDayAsc(UUID tenantId, LocalDate saleDate);
+
+    List<HourlySales> findByTenantIdAndSaleDateBetweenOrderBySaleDateAscHourOfDayAsc(
+        UUID tenantId, LocalDate from, LocalDate to);
 }

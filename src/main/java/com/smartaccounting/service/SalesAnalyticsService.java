@@ -149,6 +149,12 @@ public class SalesAnalyticsService {
     }
 
     @Transactional(readOnly = true)
+    public List<HourlySales> getHeatmap(String tenantId, LocalDate from, LocalDate to) {
+        return hourlySalesRepository.findByTenantIdAndSaleDateBetweenOrderBySaleDateAscHourOfDayAsc(
+            UUID.fromString(tenantId), from, to);
+    }
+
+    @Transactional(readOnly = true)
     public LostSalesSummary getLostSalesSummary(String tenantId, LocalDate from, LocalDate to) {
         UUID tid = UUID.fromString(tenantId);
         Instant fromInstant = from.atStartOfDay().toInstant(ZoneOffset.UTC);
