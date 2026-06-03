@@ -12,11 +12,17 @@ import { DataTable, type DataTableColumn } from '../../shared/components/ui/Data
 
 import {
 
+  disableTenant,
+
   inviteTenantUser,
 
   listTenantUsers,
 
   listTenants,
+
+  provisionTenant,
+
+  updateTenantPlan,
 
   updateTenantUserRole,
 
@@ -56,7 +62,9 @@ export function UserTenantManagementPage() {
 
   const canManageRoles = useAnyPermission(['ROLE_MANAGE', 'TENANT_CONFIG'])
 
+  const canManageTenants = useAnyPermission(['TENANT_CONFIG'])
 
+  const TENANT_PLANS = ['TRIAL', 'STARTER', 'PROFESSIONAL', 'ENTERPRISE', 'STANDARD'] as const
 
   const [tab, setTab] = useState<TabId>('members')
 
@@ -83,6 +91,16 @@ export function UserTenantManagementPage() {
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null)
 
   const [roleCreatedBanner, setRoleCreatedBanner] = useState<string | null>(null)
+
+  const [newTenantName, setNewTenantName] = useState('')
+
+  const [tenantPlan, setTenantPlan] = useState<string>('TRIAL')
+
+  const [tenantAdminMessage, setTenantAdminMessage] = useState<string | null>(null)
+
+  const [tenantAdminError, setTenantAdminError] = useState<string | null>(null)
+
+  const [tenantAdminBusy, setTenantAdminBusy] = useState(false)
 
   const inviteStatusRef = useRef<HTMLParagraphElement | null>(null)
 
@@ -207,6 +225,11 @@ export function UserTenantManagementPage() {
 
 
   const tenantOptions = useMemo(() => tenantsQuery.data ?? [], [tenantsQuery.data])
+
+  const selectedTenantMeta = useMemo(
+    () => tenantOptions.find((tenant) => tenant.id === tenantId),
+    [tenantOptions, tenantId],
+  )
 
   const members = usersQuery.data?.rows ?? []
 
@@ -444,6 +467,118 @@ export function UserTenantManagementPage() {
 
     setRoleCreatedBanner(null)
 
+    setTenantAdminMessage(null)
+
+    setTenantAdminError(null)
+
+  }
+
+
+
+  async function onProvisionTenant(e: FormEvent) {
+
+    e.preventDefault()
+
+    const name = newTenantName.trim()
+
+    if (!name) return
+
+    setTenantAdminBusy(true)
+
+    setTenantAdminError(null)
+
+    setTenantAdminMessage(null)
+
+    try {
+
+      const created = await provisionTenant(name)
+
+      setNewTenantName('')
+
+      await queryClient.invalidateQueries({ queryKey: ['tenants'] })
+
+      if (created.tenantId) {
+
+        onChangeTenant(created.tenantId)
+
+      }
+
+      setTenantAdminMessage(t('management.tenantCreated'))
+
+    } catch (error) {
+
+      setTenantAdminError(normalizeApiError(error).message)
+
+    } finally {
+
+      setTenantAdminBusy(false)
+
+    }
+
+  }
+
+
+
+  async function onUpdateTenantPlan() {
+
+    if (!tenantId) return
+
+    setTenantAdminBusy(true)
+
+    setTenantAdminError(null)
+
+    setTenantAdminMessage(null)
+
+    try {
+
+      await updateTenantPlan(tenantId, tenantPlan)
+
+      setTenantAdminMessage(t('management.tenantPlanUpdated'))
+
+    } catch (error) {
+
+      setTenantAdminError(normalizeApiError(error).message)
+
+    } finally {
+
+      setTenantAdminBusy(false)
+
+    }
+
+  }
+
+
+
+  async function onDisableTenant() {
+
+    if (!tenantId) return
+
+    if (!window.confirm(t('management.tenantDisableConfirm'))) return
+
+    setTenantAdminBusy(true)
+
+    setTenantAdminError(null)
+
+    setTenantAdminMessage(null)
+
+    try {
+
+      await disableTenant(tenantId)
+
+      await queryClient.invalidateQueries({ queryKey: ['tenants'] })
+
+      setTenantAdminMessage(t('management.tenantDisabled'))
+
+    } catch (error) {
+
+      setTenantAdminError(normalizeApiError(error).message)
+
+    } finally {
+
+      setTenantAdminBusy(false)
+
+    }
+
   }
 
 
@@ -631,6 +766,146 @@ export function UserTenantManagementPage() {
           <p className="m-0 mt-3 text-xs text-amber-700">{t('management.tenantsUnavailable')}</p>
 
         )}
+
+        {selectedTenantMeta?.status ? (
+
+          <p className="m-0 mt-3 text-xs text-neutral-600">
+
+            {t('management.tenantStatus')}: <strong>{selectedTenantMeta.status}</strong>
+
+          </p>
+
+        ) : null}
+
+        {canManageTenants ? (
+
+          <div className="mt-4 space-y-4 border-t border-[var(--border-subtle)] pt-4">
+
+            <h3 className="m-0 text-sm font-semibold text-neutral-900">{t('management.tenantAdminTitle')}</h3>
+
+            <form onSubmit={onProvisionTenant} className="flex flex-wrap items-end gap-2">
+
+              <label className="block min-w-[12rem] flex-1 text-sm">
+
+                {t('management.newTenantName')}
+
+                <input
+
+                  className="mt-1 w-full rounded-md border border-[var(--border-default)] px-3 py-2"
+
+                  value={newTenantName}
+
+                  onChange={(event) => setNewTenantName(event.target.value)}
+
+                  required
+
+                />
+
+              </label>
+
+              <button
+
+                type="submit"
+
+                disabled={tenantAdminBusy}
+
+                className="rounded-md bg-[var(--color-brand-700)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+
+              >
+
+                {t('management.createTenant')}
+
+              </button>
+
+            </form>
+
+            <div className="flex flex-wrap items-end gap-2">
+
+              <label className="block text-sm">
+
+                {t('management.tenantPlan')}
+
+                <select
+
+                  className="mt-1 block rounded-md border border-[var(--border-default)] px-3 py-2"
+
+                  value={tenantPlan}
+
+                  onChange={(event) => setTenantPlan(event.target.value)}
+
+                >
+
+                  {TENANT_PLANS.map((plan) => (
+
+                    <option key={plan} value={plan}>
+
+                      {plan}
+
+                    </option>
+
+                  ))}
+
+                </select>
+
+              </label>
+
+              <button
+
+                type="button"
+
+                disabled={tenantAdminBusy || !tenantId}
+
+                onClick={() => void onUpdateTenantPlan()}
+
+                className="rounded-md border border-[var(--border-default)] px-4 py-2 text-sm font-medium hover:bg-neutral-50 disabled:opacity-60"
+
+              >
+
+                {t('management.updateTenantPlan')}
+
+              </button>
+
+              <button
+
+                type="button"
+
+                disabled={tenantAdminBusy || !tenantId || selectedTenantMeta?.status === 'DISABLED'}
+
+                onClick={() => void onDisableTenant()}
+
+                className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-800 hover:bg-red-50 disabled:opacity-60"
+
+              >
+
+                {t('management.disableTenant')}
+
+              </button>
+
+            </div>
+
+            {tenantAdminMessage ? (
+
+              <p className="m-0 text-sm text-emerald-800" role="status">
+
+                {tenantAdminMessage}
+
+              </p>
+
+            ) : null}
+
+            {tenantAdminError ? (
+
+              <p className="m-0 text-sm text-red-800" role="alert">
+
+                {tenantAdminError}
+
+              </p>
+
+            ) : null}
+
+          </div>
+
+        ) : null}
 
       </article>
 

@@ -87,6 +87,13 @@ public class BankReconciliationController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{accountId}/auto-match")
+    @PreAuthorize(PermissionExpressions.FINANCE_WRITE)
+    public ResponseEntity<Map<String, Integer>> runAutoMatch(@PathVariable UUID accountId) {
+        int suggested = bankReconciliationService.runAutoMatchForAccount(accountId);
+        return ResponseEntity.ok(Map.of("suggestedOrMatched", suggested));
+    }
+
     @GetMapping("/{accountId}/summary")
     @PreAuthorize(PermissionExpressions.FINANCE_READ)
     public ResponseEntity<BankReconciliationSummary> getSummary(@PathVariable UUID accountId) {

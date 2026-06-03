@@ -209,6 +209,15 @@ public class BankReconciliationService {
         bankStatementLineRepository.save(line);
     }
 
+    public int runAutoMatchForAccount(UUID bankAccountId) {
+        UUID tenantId = requireTenant();
+        bankAccountRepository.findByIdAndTenantIdAndDeletedAtIsNull(bankAccountId, tenantId)
+            .orElseThrow(() -> new IllegalArgumentException("Bank account not found"));
+        List<BankStatementLine> lines = bankStatementLineRepository.findByTenantIdAndBankAccountIdAndStatusIn(
+            tenantId, bankAccountId, List.of("UNMATCHED", "SUGGESTED"));
+        return autoMatch(tenantId, bankAccountId, lines);
+    }
+
     @Transactional(readOnly = true)
     public Page<BankStatementLine> getUnmatched(UUID bankAccountId, Pageable pageable) {
         UUID tenantId = requireTenant();

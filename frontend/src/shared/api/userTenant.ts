@@ -45,11 +45,45 @@ function shouldFallbackToSelfService(error: unknown) {
   return isApiError(error) ? error.status === 403 || error.status === 404 : false
 }
 
+function normalizeTenantSummary(raw: Record<string, unknown>): TenantSummary {
+  return {
+    id: String(raw.id ?? ''),
+    name: String(raw.name ?? ''),
+    status: raw.status != null ? String(raw.status) : undefined,
+  }
+}
+
 export async function listTenants() {
-  const response = await apiClient.get<{ content?: TenantSummary[] } | TenantSummary[]>('/api/v1/admin/tenants', {
+  const response = await apiClient.get<unknown>('/api/v1/admin/tenants', {
     params: { page: 0, size: 100 },
   })
-  return toList(response.data)
+  const rows = toList(response.data as TenantSummary[] | { content?: TenantSummary[] })
+  return rows.map((row) => {
+    if (typeof row === 'object' && row !== null && 'id' in row && 'name' in row) {
+      return row as TenantSummary
+    }
+    return normalizeTenantSummary(row as Record<string, unknown>)
+  })
+}
+
+export async function provisionTenant(name: string) {
+  const { data } = await apiClient.post<{ tenantId: string; status?: string }>('/api/v1/admin/tenants', { name })
+  return data
+}
+
+export async function updateTenantPlan(tenantId: string, plan: string) {
+  const { data } = await apiClient.patch<{ tenantId: string; plan: string }>(
+    `/api/v1/admin/tenants/${tenantId}/plan`,
+    { plan },
+  )
+  return data
+}
+
+export async function disableTenant(tenantId: string) {
+  const { data } = await apiClient.post<{ tenantId: string; status: string }>(
+    `/api/v1/admin/tenants/${tenantId}/disable`,
+  )
+  return data
 }
 
 export async function listTenantUsers(tenantId: string, params: ListTenantUsersParams): Promise<PaginatedUsers> {

@@ -16,6 +16,7 @@ export interface BankStatementLine {
   debitAmount?: number
   creditAmount?: number
   status: string
+  matchedJournalId?: string
 }
 
 export interface BankReconciliationSummary {
@@ -65,6 +66,25 @@ export async function listUnmatchedLines(accountId: string, page = 0, size = 20)
 export async function getBankSummary(accountId: string) {
   const { data } = await apiClient.get<BankReconciliationSummary>(
     `/api/v1/finance/bank-accounts/${accountId}/summary`,
+  )
+  return data
+}
+
+export async function confirmBankMatch(accountId: string, lineId: string, journalEntryId: string) {
+  await apiClient.post(`/api/v1/finance/bank-accounts/${accountId}/lines/${lineId}/match`, {
+    journalEntryId,
+  })
+}
+
+export async function postBankCharge(accountId: string, lineId: string, description?: string) {
+  await apiClient.post(`/api/v1/finance/bank-accounts/${accountId}/lines/${lineId}/bank-charge`, {
+    description,
+  })
+}
+
+export async function runBankAutoMatch(accountId: string) {
+  const { data } = await apiClient.post<{ suggestedOrMatched: number }>(
+    `/api/v1/finance/bank-accounts/${accountId}/auto-match`,
   )
   return data
 }

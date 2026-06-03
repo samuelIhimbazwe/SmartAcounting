@@ -1,11 +1,14 @@
 import { type FormEvent, useEffect, useState } from 'react'
 import { Landmark } from 'lucide-react'
 import {
+  confirmBankMatch,
   createBankAccount,
   getBankSummary,
   importBankStatement,
   listBankAccounts,
   listUnmatchedLines,
+  postBankCharge,
+  runBankAutoMatch,
   type BankAccount,
   type BankReconciliationSummary,
   type BankStatementLine,
@@ -19,6 +22,8 @@ export function BankReconciliationPage() {
   const [lines, setLines] = useState<BankStatementLine[]>([])
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [busyLineId, setBusyLineId] = useState<string | null>(null)
+  const [journalByLine, setJournalByLine] = useState<Record<string, string>>({})
   const [accountName, setAccountName] = useState('')
   const [accountNumber, setAccountNumber] = useState('')
   const [bankName, setBankName] = useState('Bank of Kigali')
@@ -31,6 +36,12 @@ export function BankReconciliationPage() {
     }
   }
 
+  async function refreshLines(accountId: string) {
+    const [s, l] = await Promise.all([getBankSummary(accountId), listUnmatchedLines(accountId)])
+    setSummary(s)
+    setLines(l)
+  }
+
   useEffect(() => {
     refreshAccounts().catch((e) => setError(normalizeApiError(e).message))
   }, [])
@@ -38,12 +49,7 @@ export function BankReconciliationPage() {
   useEffect(() => {
     if (!selectedId) return
     setError(null)
-    Promise.all([getBankSummary(selectedId), listUnmatchedLines(selectedId)])
-      .then(([s, l]) => {
-        setSummary(s)
-        setLines(l)
-      })
-      .catch((e) => setError(normalizeApiError(e).message))
+    refreshLines(selectedId).catch((e) => setError(normalizeApiError(e).message))
   }, [selectedId])
 
   async function onCreateAccount(e: FormEvent) {
@@ -69,9 +75,7 @@ export function BankReconciliationPage() {
     setError(null)
     try {
       await importBankStatement(selectedId, file)
-      const [s, l] = await Promise.all([getBankSummary(selectedId), listUnmatchedLines(selectedId)])
-      setSummary(s)
-      setLines(l)
+      await refreshLines(selectedId)
     } catch (err) {
       setError(normalizeApiError(err).message)
     } finally {
@@ -79,13 +83,79 @@ export function BankReconciliationPage() {
     }
   }
 
+  async function onAutoMatch() {
+    if (!selectedId) return
+    setBusy(true)
+    setError(null)
+    try {
+      await runBankAutoMatch(selectedId)
+      await refreshLines(selectedId)
+    } catch (err) {
+      setError(normalizeApiError(err).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onConfirmSuggested(line: BankStatementLine) {
+    if (!selectedId || !line.matchedJournalId) return
+    setBusyLineId(line.id)
+    setError(null)
+    try {
+      await confirmBankMatch(selectedId, line.id, line.matchedJournalId)
+      await refreshLines(selectedId)
+    } catch (err) {
+      setError(normalizeApiError(err).message)
+    } finally {
+      setBusyLineId(null)
+    }
+  }
+
+  async function onManualMatch(line: BankStatementLine) {
+    if (!selectedId) return
+    const journalEntryId = (journalByLine[line.id] ?? '').trim()
+    if (!journalEntryId) {
+      setError('Enter a journal entry ID to match this line.')
+      return
+    }
+    setBusyLineId(line.id)
+    setError(null)
+    try {
+      await confirmBankMatch(selectedId, line.id, journalEntryId)
+      await refreshLines(selectedId)
+      setJournalByLine((prev) => {
+        const next = { ...prev }
+        delete next[line.id]
+        return next
+      })
+    } catch (err) {
+      setError(normalizeApiError(err).message)
+    } finally {
+      setBusyLineId(null)
+    }
+  }
+
+  async function onBankCharge(line: BankStatementLine) {
+    if (!selectedId) return
+    setBusyLineId(line.id)
+    setError(null)
+    try {
+      await postBankCharge(selectedId, line.id, line.description)
+      await refreshLines(selectedId)
+    } catch (err) {
+      setError(normalizeApiError(err).message)
+    } finally {
+      setBusyLineId(null)
+    }
+  }
+
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <header className="flex items-center gap-2">
         <Landmark className="h-8 w-8 text-[var(--color-brand-700)]" aria-hidden />
         <div>
           <h1 className="m-0 font-[var(--font-display)] text-2xl font-bold text-neutral-900">Bank reconciliation</h1>
-          <p className="m-0 text-sm text-neutral-600">Import CSV statements and match lines to journal entries (Sprint 1.1).</p>
+          <p className="m-0 text-sm text-neutral-600">Import CSV statements and match lines to journal entries.</p>
         </div>
       </header>
 
@@ -131,13 +201,21 @@ export function BankReconciliationPage() {
               onChange={(e) => void onImport(e.target.files?.[0])}
             />
           </label>
+          <button
+            type="button"
+            disabled={busy || !selectedId}
+            onClick={() => void onAutoMatch()}
+            className="rounded-lg border border-[var(--border-subtle)] bg-white px-3 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-50"
+          >
+            Run auto-match
+          </button>
         </div>
       )}
 
       {summary && (
         <p className="text-sm text-neutral-700">
-          Unmatched: <strong>{summary.unmatched}</strong> · Matched: <strong>{summary.matched}</strong> · Match rate:{' '}
-          <strong>{(summary.matchRate * 100).toFixed(0)}%</strong>
+          Unmatched: <strong>{summary.unmatched}</strong> · Suggested: <strong>{summary.suggested}</strong> · Matched:{' '}
+          <strong>{summary.matched}</strong> · Match rate: <strong>{summary.matchRate.toFixed(0)}%</strong>
         </p>
       )}
 
@@ -150,19 +228,78 @@ export function BankReconciliationPage() {
                 <th className="px-3 py-2">Description</th>
                 <th className="px-3 py-2">Amount</th>
                 <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {lines.map((line) => (
-                <tr key={line.id} className="border-t border-[var(--border-subtle)]">
-                  <td className="px-3 py-2">{line.transactionDate}</td>
-                  <td className="px-3 py-2">{line.description}</td>
-                  <td className="px-3 py-2">
-                    {line.creditAmount != null ? `+${line.creditAmount}` : line.debitAmount != null ? `-${line.debitAmount}` : '—'}
-                  </td>
-                  <td className="px-3 py-2">{line.status}</td>
-                </tr>
-              ))}
+              {lines.map((line) => {
+                const lineBusy = busyLineId === line.id
+                const isDebit = line.debitAmount != null && line.debitAmount > 0
+                return (
+                  <tr key={line.id} className="border-t border-[var(--border-subtle)]">
+                    <td className="px-3 py-2">{line.transactionDate}</td>
+                    <td className="px-3 py-2">
+                      <div>{line.description}</div>
+                      {line.reference ? <div className="text-xs text-neutral-500">Ref: {line.reference}</div> : null}
+                    </td>
+                    <td className="px-3 py-2">
+                      {line.creditAmount != null ? `+${line.creditAmount}` : line.debitAmount != null ? `-${line.debitAmount}` : '—'}
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className="font-medium">{line.status}</span>
+                      {line.matchedJournalId ? (
+                        <div className="mt-0.5 max-w-[12rem] truncate text-xs text-neutral-500" title={line.matchedJournalId}>
+                          Journal: {line.matchedJournalId}
+                        </div>
+                      ) : null}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex flex-col gap-2">
+                        {line.status === 'SUGGESTED' && line.matchedJournalId ? (
+                          <button
+                            type="button"
+                            disabled={lineBusy || busy}
+                            onClick={() => void onConfirmSuggested(line)}
+                            className="rounded border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-900 hover:bg-emerald-100"
+                          >
+                            Confirm match
+                          </button>
+                        ) : null}
+                        {line.status === 'UNMATCHED' ? (
+                          <div className="flex flex-wrap items-center gap-1">
+                            <input
+                              className="w-36 rounded border px-2 py-1 text-xs"
+                              placeholder="Journal entry ID"
+                              value={journalByLine[line.id] ?? ''}
+                              onChange={(e) =>
+                                setJournalByLine((prev) => ({ ...prev, [line.id]: e.target.value }))
+                              }
+                            />
+                            <button
+                              type="button"
+                              disabled={lineBusy || busy}
+                              onClick={() => void onManualMatch(line)}
+                              className="rounded border px-2 py-1 text-xs font-medium hover:bg-neutral-50"
+                            >
+                              Match
+                            </button>
+                          </div>
+                        ) : null}
+                        {isDebit ? (
+                          <button
+                            type="button"
+                            disabled={lineBusy || busy}
+                            onClick={() => void onBankCharge(line)}
+                            className="rounded border px-2 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+                          >
+                            Post bank charge
+                          </button>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

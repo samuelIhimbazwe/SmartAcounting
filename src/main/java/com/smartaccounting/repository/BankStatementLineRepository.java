@@ -18,5 +18,7 @@ public interface BankStatementLineRepository extends JpaRepository<BankStatement
     long countByTenantIdAndBankAccountIdAndStatus(UUID tenantId, UUID bankAccountId, String status);
     long countByTenantIdAndStatus(UUID tenantId, String status);
     List<BankStatementLine> findByImportBatchId(UUID importBatchId);
+    List<BankStatementLine> findByTenantIdAndBankAccountIdAndStatusIn(
+        UUID tenantId, UUID bankAccountId, Collection<String> statuses);
     boolean existsByTenantIdAndMatchedJournalIdAndStatus(UUID tenantId, UUID matchedJournalId, String status);
 }
