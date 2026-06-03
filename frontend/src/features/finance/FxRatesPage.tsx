@@ -3,6 +3,14 @@ import { useTranslation } from 'react-i18next'
 import { Banknote } from 'lucide-react'
 import { currencyUpsertRate } from '../../shared/api/currency'
 import { normalizeApiError } from '../../shared/api/errors'
+import { Button } from '../../shared/components/ui/Button'
+import {
+  FormActions,
+  FormField,
+  FormStack,
+  Input,
+  useFieldValidation,
+} from '../../components/ui'
 
 export function FxRatesPage() {
   const { t } = useTranslation()
@@ -15,8 +23,19 @@ export function FxRatesPage() {
   const [busy, setBusy] = useState(false)
   const [lastId, setLastId] = useState<string | null>(null)
 
+  const formValues = { baseCurrency, quoteCurrency, rate, asOfDate }
+  const { errors, valid, onBlur, validateAll } = useFieldValidation(formValues, {
+    baseCurrency: value => (String(value ?? '').trim() ? undefined : 'Base currency is required.'),
+    quoteCurrency: value => (String(value ?? '').trim() ? undefined : 'Quote currency is required.'),
+    rate: value => (String(value ?? '').trim() ? undefined : 'Rate is required.'),
+    asOfDate: value => (String(value ?? '').trim() ? undefined : 'As-of date is required.'),
+  })
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
+    if (!validateAll()) {
+      return
+    }
     setError(null)
     setLastId(null)
     setBusy(true)
@@ -52,60 +71,59 @@ export function FxRatesPage() {
       </p>
 
       <form onSubmit={onSubmit} className="space-y-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--color-surface)] p-4 shadow-sm">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block text-sm">
-            <span className="text-neutral-600">{t('fxRates.base')}</span>
-            <input
-              className="mt-1 w-full rounded border border-[var(--border-subtle)] px-2 py-2 uppercase"
-              value={baseCurrency}
-              onChange={(e) => setBaseCurrency(e.target.value)}
+        <FormStack>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <FormField label={t('fxRates.base')} required error={errors.baseCurrency} valid={valid.baseCurrency}>
+              <Input
+                className="uppercase"
+                value={baseCurrency}
+                onChange={(e) => setBaseCurrency(e.target.value)}
+                onBlur={() => onBlur('baseCurrency')}
+                required
+                maxLength={8}
+                spellCheck={false}
+              />
+            </FormField>
+            <FormField label={t('fxRates.quote')} required error={errors.quoteCurrency} valid={valid.quoteCurrency}>
+              <Input
+                className="uppercase"
+                value={quoteCurrency}
+                onChange={(e) => setQuoteCurrency(e.target.value)}
+                onBlur={() => onBlur('quoteCurrency')}
+                required
+                maxLength={8}
+                spellCheck={false}
+              />
+            </FormField>
+          </div>
+          <FormField label={t('fxRates.rate')} required error={errors.rate} valid={valid.rate}>
+            <Input
+              className="font-mono"
+              value={rate}
+              onChange={(e) => setRate(e.target.value)}
+              onBlur={() => onBlur('rate')}
+              placeholder={t('fxRates.ratePlaceholder')}
+              inputMode="decimal"
               required
-              maxLength={8}
-              spellCheck={false}
             />
-          </label>
-          <label className="block text-sm">
-            <span className="text-neutral-600">{t('fxRates.quote')}</span>
-            <input
-              className="mt-1 w-full rounded border border-[var(--border-subtle)] px-2 py-2 uppercase"
-              value={quoteCurrency}
-              onChange={(e) => setQuoteCurrency(e.target.value)}
+          </FormField>
+          <FormField label={t('fxRates.source')}>
+            <Input
+              value={source}
+              onChange={(e) => setSource(e.target.value)}
+              placeholder="manual"
+            />
+          </FormField>
+          <FormField label={t('fxRates.asOf')} required error={errors.asOfDate} valid={valid.asOfDate}>
+            <Input
+              type="date"
+              value={asOfDate}
+              onChange={(e) => setAsOfDate(e.target.value)}
+              onBlur={() => onBlur('asOfDate')}
               required
-              maxLength={8}
-              spellCheck={false}
             />
-          </label>
-        </div>
-        <label className="block text-sm">
-          <span className="text-neutral-600">{t('fxRates.rate')}</span>
-          <input
-            className="mt-1 w-full rounded border border-[var(--border-subtle)] px-2 py-2 font-mono"
-            value={rate}
-            onChange={(e) => setRate(e.target.value)}
-            placeholder={t('fxRates.ratePlaceholder')}
-            inputMode="decimal"
-            required
-          />
-        </label>
-        <label className="block text-sm">
-          <span className="text-neutral-600">{t('fxRates.source')}</span>
-          <input
-            className="mt-1 w-full rounded border border-[var(--border-subtle)] px-2 py-2"
-            value={source}
-            onChange={(e) => setSource(e.target.value)}
-            placeholder="manual"
-          />
-        </label>
-        <label className="block text-sm">
-          <span className="text-neutral-600">{t('fxRates.asOf')}</span>
-          <input
-            type="date"
-            className="mt-1 w-full rounded border border-[var(--border-subtle)] px-2 py-2"
-            value={asOfDate}
-            onChange={(e) => setAsOfDate(e.target.value)}
-            required
-          />
-        </label>
+          </FormField>
+        </FormStack>
 
         {error && (
           <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
@@ -118,13 +136,11 @@ export function FxRatesPage() {
           </div>
         )}
 
-        <button
-          type="submit"
-          disabled={busy}
-          className="w-full rounded-lg bg-[var(--color-brand-700)] py-2 font-medium text-white hover:bg-[var(--color-brand-800)] disabled:opacity-50"
-        >
-          {busy ? t('fxRates.saving') : t('fxRates.submit')}
-        </button>
+        <FormActions>
+          <Button type="submit" variant="primary" disabled={busy} className="w-full sm:w-auto">
+            {busy ? t('fxRates.saving') : t('fxRates.submit')}
+          </Button>
+        </FormActions>
       </form>
     </div>
   )

@@ -9,6 +9,7 @@ import {
 } from '../../shared/api/compliance'
 import { normalizeApiError } from '../../shared/api/errors'
 import { formatDate } from '../../shared/utils/intl'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
 import { ComplianceSubNav } from './ComplianceSubNav'
 
 function currentPeriod() {
@@ -54,6 +55,27 @@ export function PayePage() {
       exportRunId: source.find((r) => r.status === 'POSTED' || r.status === 'APPROVED')?.id ?? source[0]?.id,
     }
   }, [periodRuns])
+
+  const filingColumns = useMemo((): DataTableColumn<PayeFilingLogRow>[] => [
+    {
+      key: 'period',
+      header: 'Period',
+      render: value => <span className="font-mono">{String(value ?? '—')}</span>,
+    },
+    { key: 'status', header: 'Status', columnType: 'status' },
+    { key: 'rowCount', header: 'Rows', columnType: 'number' },
+    {
+      key: 'fileFormat',
+      header: 'Format',
+      render: value => <span className="text-xs">{String(value ?? '—')}</span>,
+    },
+    {
+      key: 'createdAt',
+      header: 'Exported',
+      columnType: 'date',
+      render: value => (value ? formatDate(String(value)) : '—'),
+    },
+  ], [])
 
   async function onExport() {
     if (!summary.exportRunId) {
@@ -128,40 +150,12 @@ export function PayePage() {
 
       <section className="space-y-2">
         <h2 className="text-lg font-semibold text-neutral-900">Submission history</h2>
-        <div className="overflow-x-auto rounded-xl border">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-neutral-50">
-              <tr>
-                <th className="px-3 py-2">Period</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2 text-right">Rows</th>
-                <th className="px-3 py-2">Format</th>
-                <th className="px-3 py-2">Exported</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filingLog.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-3 py-4 text-neutral-500">
-                    No PAYE exports yet. Export a CSV to record a filing log entry.
-                  </td>
-                </tr>
-              ) : (
-                filingLog.map((row) => (
-                  <tr key={row.id} className="border-t">
-                    <td className="px-3 py-2 font-mono">{row.period || '—'}</td>
-                    <td className="px-3 py-2">{row.status}</td>
-                    <td className="px-3 py-2 text-right">{row.rowCount ?? '—'}</td>
-                    <td className="px-3 py-2 text-xs">{row.fileFormat ?? '—'}</td>
-                    <td className="px-3 py-2 text-xs text-neutral-600">
-                      {row.createdAt ? formatDate(row.createdAt) : '—'}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={filingColumns}
+          rows={filingLog}
+          getRowKey={row => row.id}
+          emptyStateLabel="No PAYE exports yet. Export a CSV to record a filing log entry."
+        />
       </section>
     </div>
   )

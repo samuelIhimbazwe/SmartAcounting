@@ -13,6 +13,7 @@ import {
   retailTillExpected,
 } from '../../shared/api/retail'
 import { normalizeApiError } from '../../shared/api/errors'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
 
 const DEFAULT_LOC = 'SHOP'
 
@@ -180,6 +181,30 @@ export function RetailOpsPage() {
     }
   }
 
+  type ProductRow = (typeof products)[number]
+  type BalanceRow = (typeof balances)[number]
+  type BatchRow = (typeof batches)[number]
+
+  const productColumns = useMemo((): DataTableColumn<ProductRow>[] => [
+    { key: 'name', header: t('retail.productName') },
+    { key: 'sku', header: 'SKU', render: v => String(v ?? '—') },
+    { key: 'unit', header: t('retail.unit'), render: v => String(v ?? '—') },
+    { key: 'productId', header: 'productId', render: v => <span className="font-mono text-xs">{String(v)}</span> },
+  ], [t])
+
+  const balanceColumns = useMemo((): DataTableColumn<BalanceRow>[] => [
+    { key: 'productName', header: t('retail.product'), render: v => String(v ?? '—') },
+    { key: 'quantity', header: t('retail.qty') },
+    { key: 'productId', header: 'productId', render: v => <span className="font-mono text-xs">{String(v)}</span> },
+  ], [t])
+
+  const batchColumns = useMemo((): DataTableColumn<BatchRow>[] => [
+    { key: 'productName', header: t('retail.product'), render: v => String(v ?? '—') },
+    { key: 'lotCode', header: t('retail.recvLot'), render: v => String(v ?? '—') },
+    { key: 'expiryDate', header: t('retail.expiryDate'), columnType: 'date', render: v => String(v ?? '—') },
+    { key: 'quantityOnHand', header: t('retail.qty') },
+  ], [t])
+
   return (
     <div className="mx-auto max-w-5xl space-y-8">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] pb-4">
@@ -225,35 +250,15 @@ export function RetailOpsPage() {
         >
           {t('retail.createProduct')}
         </button>
-        <div className="mt-4 overflow-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-neutral-200">
-                <th className="py-2 pr-2">{t('retail.productName')}</th>
-                <th className="py-2 pr-2">SKU</th>
-                <th className="py-2">Unit</th>
-                <th className="py-2 font-mono">productId</th>
-              </tr>
-            </thead>
-            <tbody>
-              {products.map((p) => (
-                <tr key={p.productId} className="border-b border-neutral-100">
-                  <td className="py-2 pr-2">{p.name}</td>
-                  <td className="py-2 pr-2">{p.sku ?? 'â€”'}</td>
-                  <td className="py-2">{p.unit ?? 'â€”'}</td>
-                  <td className="py-2 font-mono text-xs">{p.productId}</td>
-                </tr>
-              ))}
-              {!products.length && (
-                <tr>
-                  <td colSpan={4} className="py-4 text-center text-neutral-500">
-                    {t('retail.noProducts')}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={productColumns}
+          rows={products}
+          isLoading={busy}
+          getRowKey={row => row.productId}
+          showSearch={false}
+          emptyStateLabel={t('retail.noProducts')}
+          noResultsLabel={t('retail.noProducts')}
+        />
       </section>
 
       <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--color-surface)] p-4 shadow-sm">
@@ -290,61 +295,25 @@ export function RetailOpsPage() {
         >
           {t('retail.receive')}
         </button>
-        <div className="mt-4 overflow-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-neutral-200">
-                <th className="py-2">{t('retail.product')}</th>
-                <th className="py-2">{t('retail.qty')}</th>
-                <th className="py-2 font-mono">productId</th>
-              </tr>
-            </thead>
-            <tbody>
-              {balances.map((b) => (
-                <tr key={`${b.productId}-${b.locationCode}`} className="border-b border-neutral-100">
-                  <td className="py-2">{b.productName ?? 'â€”'}</td>
-                  <td className="py-2">{b.quantity}</td>
-                  <td className="py-2 font-mono text-xs">{b.productId}</td>
-                </tr>
-              ))}
-              {!balances.length && (
-                <tr>
-                  <td colSpan={3} className="py-4 text-center text-neutral-500">
-                    {t('retail.noStock')}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        <div className="mt-4 overflow-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-neutral-200">
-                <th className="py-2">{t('retail.product')}</th>
-                <th className="py-2">{t('retail.recvLot')}</th>
-                <th className="py-2">{t('retail.expiryDate')}</th>
-                <th className="py-2">{t('retail.qty')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {batches.map((b) => (
-                <tr key={b.batchId} className="border-b border-neutral-100">
-                  <td className="py-2">{b.productName ?? 'â€”'}</td>
-                  <td className="py-2">{b.lotCode ?? 'â€”'}</td>
-                  <td className="py-2">{b.expiryDate ?? 'â€”'}</td>
-                  <td className="py-2">{b.quantityOnHand}</td>
-                </tr>
-              ))}
-              {!batches.length && (
-                <tr>
-                  <td colSpan={4} className="py-4 text-center text-neutral-500">
-                    {t('retail.noBatches')}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <DataTable
+          columns={balanceColumns}
+          rows={balances}
+          isLoading={busy}
+          getRowKey={row => `${row.productId}-${row.locationCode}`}
+          showSearch={false}
+          emptyStateLabel={t('retail.noStock')}
+          noResultsLabel={t('retail.noStock')}
+        />
+        <div className="mt-4">
+        <DataTable
+          columns={batchColumns}
+          rows={batches}
+          isLoading={busy}
+          getRowKey={row => row.batchId}
+          showSearch={false}
+          emptyStateLabel={t('retail.noBatches')}
+          noResultsLabel={t('retail.noBatches')}
+        />
         </div>
       </section>
 

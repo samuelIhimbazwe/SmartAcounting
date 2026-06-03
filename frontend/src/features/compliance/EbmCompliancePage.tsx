@@ -1,6 +1,7 @@
-import { type FormEvent, useEffect, useState } from 'react'
+import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import { EfdStatusBadge } from '../../components/fiscal/EfdStatusBadge'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
 import {
   getEbmConfig,
   getEbmReport,
@@ -64,6 +65,16 @@ export function EbmCompliancePage() {
     }
   }
 
+  const receiptColumns = useMemo((): DataTableColumn<EbmReceipt>[] => [
+    { key: 'status', header: 'Status', columnType: 'status' },
+    { key: 'ebmReceiptNumber', header: 'Receipt #' },
+    {
+      key: 'errorMessage',
+      header: 'Error',
+      render: value => <span className="text-xs text-red-700">{String(value ?? '')}</span>,
+    },
+  ], [])
+
   async function onRetry(receiptId: string) {
     setBusy(true)
     try {
@@ -122,34 +133,20 @@ export function EbmCompliancePage() {
         </p>
       )}
 
-      <div className="overflow-x-auto rounded-xl border">
-        <table className="min-w-full text-left text-sm">
-          <thead className="bg-neutral-50">
-            <tr>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">Receipt #</th>
-              <th className="px-3 py-2">Error</th>
-              <th className="px-3 py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {receipts.map((r) => (
-              <tr key={r.id} className="border-t">
-                <td className="px-3 py-2">{r.status}</td>
-                <td className="px-3 py-2">{r.ebmReceiptNumber ?? '—'}</td>
-                <td className="px-3 py-2 text-xs text-red-700">{r.errorMessage ?? ''}</td>
-                <td className="px-3 py-2">
-                  {r.status === 'FAILED' && (
-                    <button type="button" className="rounded border px-2 py-1 text-xs" onClick={() => void onRetry(r.id)}>
-                      Retry
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={receiptColumns}
+        rows={receipts}
+        getRowKey={row => row.id}
+        isLoading={busy}
+        rowActions={[
+          {
+            label: 'Retry',
+            onClick: row => void onRetry(row.id),
+            disabled: row => row.status !== 'FAILED' || busy,
+          },
+        ]}
+        emptyStateLabel="No EBM receipts yet"
+      />
     </div>
   )
 }

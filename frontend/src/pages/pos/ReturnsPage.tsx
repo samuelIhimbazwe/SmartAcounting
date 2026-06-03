@@ -16,6 +16,7 @@ import { RETURN_LINE_FALLBACK_PRODUCT_ID } from '../../utils/posReceiptPrint'
 import { ReceiptDeliveryModal } from '../../components/pos/ReceiptDeliveryModal'
 import { openPosReceiptPrint } from '../../utils/posReceiptPrint'
 import { Button } from '../../shared/components/ui/Button'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
 import { formatTenderType } from '../../services/posSaleHistory'
 
 type Step = 1 | 2 | 3 | 4
@@ -149,6 +150,24 @@ export function ReturnsPage() {
       .filter((l) => l.selected && l.returnQty > 0)
       .reduce((sum, l) => sum + l.returnQty * l.unitPrice, 0)
   }, [lines])
+
+  type SaleLineRow = NonNullable<PosSaleDetail['lines']>[number] & { rowKey: string }
+
+  const saleLineRows = useMemo((): SaleLineRow[] => {
+    if (!sale?.lines?.length) return []
+    return sale.lines.map((line, i) => ({ ...line, rowKey: `${sale.salesOrderId}-${i}` }))
+  }, [sale])
+
+  const saleLineColumns = useMemo((): DataTableColumn<SaleLineRow>[] => [
+    { key: 'product', header: 'Product' },
+    { key: 'quantity', header: 'Qty', columnType: 'number', align: 'right' },
+    {
+      key: 'lineTotal',
+      header: 'Total',
+      align: 'right',
+      render: v => formatRwf(Number(v)),
+    },
+  ], [])
 
   const selectedLines = lines.filter((l) => l.selected && l.returnQty > 0)
 
@@ -332,24 +351,15 @@ export function ReturnsPage() {
                   <dd>{formatTenderType(sale.primaryTender)}</dd>
                 </div>
               </dl>
-              <table className="table-scroll w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b text-xs uppercase text-neutral-500">
-                    <th className="py-2">Product</th>
-                    <th className="py-2 text-right">Qty</th>
-                    <th className="py-2 text-right">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(sale.lines ?? []).map((line, i) => (
-                    <tr key={`${line.product}-${i}`} className="border-b border-neutral-100">
-                      <td className="py-2">{line.product}</td>
-                      <td className="py-2 text-right tabular-nums">{line.quantity}</td>
-                      <td className="py-2 text-right tabular-nums">{formatRwf(line.lineTotal)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <DataTable
+                columns={saleLineColumns}
+                rows={saleLineRows}
+                getRowKey={row => row.rowKey}
+                showSearch={false}
+                showPagination={false}
+                emptyStateLabel="No line items"
+                noResultsLabel="No line items"
+              />
               <p className="m-0 text-right font-semibold tabular-nums">Total: {formatRwf(sale.totalAmount)}</p>
               <Button type="button" variant="primary" onClick={goToSelect}>
                 Select items to return
@@ -537,6 +547,24 @@ function ReturnHistoryPanel() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const historyColumns = useMemo((): DataTableColumn<ReturnHistoryRow>[] => [
+    { key: 'returnDate', header: 'Date' },
+    { key: 'customerName', header: 'Customer', render: v => String(v || 'Walk-in') },
+    { key: 'products', header: 'Products', render: v => <span className="max-w-xs truncate inline-block">{String(v || '—')}</span> },
+    {
+      key: 'totalRefundAmount',
+      header: 'Amount',
+      align: 'right',
+      render: v => formatRwf(Number(v)),
+    },
+    {
+      key: 'refundMethod',
+      header: 'Tender',
+      render: v => formatTenderType(String(v)),
+    },
+    { key: 'processedBy', header: 'Processed by' },
+  ], [])
+
   useEffect(() => {
     setLoading(true)
     setError(null)
@@ -564,34 +592,16 @@ function ReturnHistoryPanel() {
         </label>
       </div>
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
-      {loading ? <p className="text-sm text-neutral-500">Loading…</p> : null}
-      <div className="overflow-x-auto">
-        <table className="table-scroll w-full text-left text-sm">
-          <thead>
-            <tr className="border-b text-xs uppercase text-neutral-500">
-              <th className="py-2 pr-3">Date</th>
-              <th className="py-2 pr-3">Customer</th>
-              <th className="py-2 pr-3">Products</th>
-              <th className="py-2 pr-3 text-right">Amount</th>
-              <th className="py-2 pr-3">Tender</th>
-              <th className="py-2">Processed by</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.id} className="border-b border-neutral-100">
-                <td className="py-2 pr-3 whitespace-nowrap">{row.returnDate}</td>
-                <td className="py-2 pr-3">{row.customerName || 'Walk-in'}</td>
-                <td className="py-2 pr-3 max-w-xs truncate">{row.products || '—'}</td>
-                <td className="py-2 pr-3 text-right tabular-nums">{formatRwf(Number(row.totalRefundAmount))}</td>
-                <td className="py-2 pr-3">{formatTenderType(row.refundMethod)}</td>
-                <td className="py-2">{row.processedBy}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {!loading && rows.length === 0 ? <p className="py-4 text-sm text-neutral-500">No returns in this range.</p> : null}
-      </div>
+      <DataTable
+        columns={historyColumns}
+        rows={rows}
+        isLoading={loading}
+        getRowKey={row => row.id}
+        showSearch={false}
+        showPagination={false}
+        emptyStateLabel="No returns in this range"
+        noResultsLabel="No returns in this range"
+      />
     </section>
   )
 }

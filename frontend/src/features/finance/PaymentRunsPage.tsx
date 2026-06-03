@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FileText, Plus } from 'lucide-react'
 import {
@@ -11,7 +11,10 @@ import {
 } from '../../shared/api/productionFinance'
 import type { SupplierBillRow } from '../../shared/api/financeExtended'
 import { normalizeApiError } from '../../shared/api/errors'
+import { Button } from '../../shared/components/ui/Button'
+import { DataTable, type DataTableColumn, type DataTableRowAction } from '../../shared/components/ui/DataTable'
 import { PageSkeleton } from '../../shared/components/ui/LoadingSkeleton'
+import { FormActions, FormField, FormStack, Input } from '../../components/ui'
 
 function statusBadge(status: string, t: (k: string) => string) {
   const map: Record<string, string> = {
@@ -94,6 +97,32 @@ export function PaymentRunsPage() {
     }
   }
 
+  const columns = useMemo((): DataTableColumn<PaymentRun>[] => [
+    {
+      key: 'status',
+      header: t('common.status'),
+      render: v => statusBadge(String(v), t),
+    },
+    {
+      key: 'totalAmount',
+      header: t('common.amount'),
+      render: (_v, row) => `${row.totalAmount} ${row.currencyCode}`,
+    },
+  ], [t])
+
+  const rowActions = useMemo((): DataTableRowAction<PaymentRun>[] => [
+    {
+      label: t('pages.paymentRuns.approve'),
+      onClick: run => void approvePaymentRun(run.id).then(() => refresh()),
+      disabled: run => run.status !== 'DRAFT',
+    },
+    {
+      label: t('pages.paymentRuns.post'),
+      onClick: run => void onPost(run.id),
+      disabled: run => run.status !== 'APPROVED',
+    },
+  ], [t, refresh])
+
   if (loading) return <PageSkeleton />
 
   return (
@@ -136,47 +165,16 @@ export function PaymentRunsPage() {
           </button>
         </div>
       ) : (
-        <section className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 text-left text-slate-600">
-              <tr>
-                <th className="px-4 py-2">{t('common.status')}</th>
-                <th className="px-4 py-2">{t('common.amount')}</th>
-                <th className="px-4 py-2">{t('common.actions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {runs.map((run) => (
-                <tr key={run.id} className="border-t border-slate-100">
-                  <td className="px-4 py-2">{statusBadge(run.status, t)}</td>
-                  <td className="px-4 py-2">
-                    {run.totalAmount} {run.currencyCode}
-                  </td>
-                  <td className="px-4 py-2 flex flex-wrap gap-2">
-                    {run.status === 'DRAFT' ? (
-                      <button
-                        type="button"
-                        className="text-indigo-600 hover:underline"
-                        onClick={() => void approvePaymentRun(run.id).then(refresh)}
-                      >
-                        {t('pages.paymentRuns.approve')}
-                      </button>
-                    ) : null}
-                    {run.status === 'APPROVED' ? (
-                      <button
-                        type="button"
-                        className="text-indigo-600 hover:underline"
-                        onClick={() => void onPost(run.id)}
-                      >
-                        {t('pages.paymentRuns.post')}
-                      </button>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
+        <DataTable
+          columns={columns}
+          rows={runs}
+          getRowKey={run => run.id}
+          rowActions={rowActions}
+          showSearch={false}
+          emptyStateLabel={t('pages.paymentRuns.empty')}
+          noResultsLabel={t('pages.paymentRuns.empty')}
+          exportFilename="payment-runs"
+        />
       )}
 
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -201,44 +199,31 @@ export function PaymentRunsPage() {
         <div className="fixed inset-0 z-40 flex justify-end bg-black/30">
           <aside className="w-full max-w-md bg-white shadow-xl p-6 space-y-4 h-full overflow-y-auto">
             <h2 className="text-lg font-semibold">{t('pages.paymentRuns.newRun')}</h2>
-            <label className="block text-sm">
-              From
-              <input
-                type="date"
-                className="mt-1 w-full rounded-lg border px-3 py-2"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-              />
-            </label>
-            <label className="block text-sm">
-              To
-              <input
-                type="date"
-                className="mt-1 w-full rounded-lg border px-3 py-2"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-              />
-            </label>
+            <FormStack>
+              <FormField label="From">
+                <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} />
+              </FormField>
+              <FormField label="To">
+                <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} />
+              </FormField>
+            </FormStack>
             <p className="text-xs text-slate-500">
               {bills.length} approved bill{bills.length !== 1 ? 's' : ''} available
             </p>
-            <div className="flex gap-2 pt-4">
-              <button
-                type="button"
-                className="flex-1 rounded-lg border px-4 py-2 text-sm"
-                onClick={() => setDrawerOpen(false)}
-              >
+            <FormActions className="pt-4">
+              <Button type="button" variant="ghost" className="flex-1" onClick={() => setDrawerOpen(false)}>
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="primary"
+                className="flex-1"
                 disabled={busy}
-                className="flex-1 rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white disabled:opacity-50"
                 onClick={() => void onCreateRun()}
               >
                 {t('pages.paymentRuns.create')}
-              </button>
-            </div>
+              </Button>
+            </FormActions>
           </aside>
         </div>
       ) : null}

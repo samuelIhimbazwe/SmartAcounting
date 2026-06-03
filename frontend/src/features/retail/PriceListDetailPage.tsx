@@ -19,7 +19,9 @@ import { normalizeApiError } from '../../shared/api/errors'
 import { formatDate } from '../../shared/utils/intl'
 import { Button } from '../../shared/components/ui/Button'
 import { PageSkeleton } from '../../shared/components/ui/LoadingSkeleton'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
 import { usePermission } from '../../shared/hooks/usePermission'
+import { FormActions, FormField, FormSection, FormStack, Input } from '../../components/ui'
 
 type TabId = 'products' | 'customers' | 'rules'
 
@@ -245,6 +247,63 @@ export function PriceListDetailPage() {
     }
   }
 
+  const productLineColumns = useMemo((): DataTableColumn<PriceListLineRow>[] => {
+    const cols: DataTableColumn<PriceListLineRow>[] = [
+      {
+        key: 'productName',
+        header: 'Product',
+        render: (_v, line) => (
+          <>
+            <div className="font-medium text-neutral-900">{line.productName ?? line.productId}</div>
+            {line.sku ? <div className="text-xs text-neutral-500">{line.sku}</div> : null}
+          </>
+        ),
+      },
+      {
+        key: 'unitPrice',
+        header: 'List price',
+        render: (_v, line) =>
+          editLineId === line.id && canEdit ? (
+            <input
+              type="number"
+              min={1}
+              step={1}
+              className="w-28 rounded-md border border-neutral-300 px-2 py-1 text-sm"
+              value={editLinePrice}
+              onChange={ev => setEditLinePrice(ev.target.value)}
+            />
+          ) : (
+            moneyRwf(line.unitPrice)
+          ),
+      },
+      {
+        key: 'standardPrice',
+        header: 'Standard',
+        render: v => moneyRwf(v as number | string),
+      },
+      {
+        key: 'differencePct',
+        header: 'Difference',
+        render: v => priceListDifferenceLabel(v as number | null | undefined),
+      },
+    ]
+    return cols
+  }, [canEdit, editLineId, editLinePrice])
+
+  const customerColumns = useMemo((): DataTableColumn<PriceListDetail['customers'][number]>[] => [
+    {
+      key: 'name',
+      header: 'Customer',
+      render: (_v, c) => (
+        <Link to={`/customers/${c.id}`} className="font-medium text-[var(--color-brand-800)] hover:underline">
+          {c.name}
+        </Link>
+      ),
+    },
+    { key: 'phone', header: 'Phone', render: v => String(v ?? '—') },
+    { key: 'email', header: 'Email', render: v => String(v ?? '—') },
+  ], [])
+
   if (loading && !detail) {
     return <PageSkeleton />
   }
@@ -341,29 +400,25 @@ export function PriceListDetailPage() {
               onSubmit={e => void handleAddProduct(e)}
               className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm"
             >
-              <div className="grid gap-3 sm:grid-cols-3">
-                <label className="block text-sm sm:col-span-2">
-                  <span className="text-neutral-700">Search product</span>
-                  <input
-                    className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              <FormStack className="grid gap-3 sm:grid-cols-3">
+                <FormField label="Search product" className="sm:col-span-2">
+                  <Input
                     value={productSearch}
                     onChange={ev => setProductSearch(ev.target.value)}
                     placeholder="Name or SKU"
                   />
-                </label>
-                <label className="block text-sm">
-                  <span className="text-neutral-700">Price (RWF)</span>
-                  <input
+                </FormField>
+                <FormField label="Price (RWF)" required>
+                  <Input
                     type="number"
                     min={1}
                     step={1}
-                    className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
                     value={newProductPrice}
                     onChange={ev => setNewProductPrice(ev.target.value)}
                     required
                   />
-                </label>
-              </div>
+                </FormField>
+              </FormStack>
               <div className="mt-2 max-h-40 overflow-y-auto rounded-md border border-neutral-200">
                 {productOptions.map(p => (
                   <button
@@ -379,92 +434,46 @@ export function PriceListDetailPage() {
                   </button>
                 ))}
               </div>
-              <div className="mt-3 flex justify-end">
+              <FormActions className="mt-3">
                 <Button type="submit" disabled={busy || !selectedProductId}>
                   Add to list
                 </Button>
-              </div>
+              </FormActions>
             </form>
           ) : null}
 
-          <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
-            <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-neutral-200 bg-neutral-50 text-neutral-600">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Product</th>
-                  <th className="px-4 py-3 font-medium">List price</th>
-                  <th className="px-4 py-3 font-medium">Standard</th>
-                  <th className="px-4 py-3 font-medium">Difference</th>
-                  {canEdit ? <th className="px-4 py-3 font-medium">Actions</th> : null}
-                </tr>
-              </thead>
-              <tbody>
-                {detail.lines.length === 0 ? (
-                  <tr>
-                    <td colSpan={canEdit ? 5 : 4} className="px-4 py-8 text-center text-neutral-500">
-                      No products on this list yet.
-                    </td>
-                  </tr>
-                ) : (
-                  detail.lines.map(line => (
-                    <tr key={line.id} className="border-b border-neutral-100 last:border-0">
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-neutral-900">{line.productName ?? line.productId}</div>
-                        {line.sku ? <div className="text-xs text-neutral-500">{line.sku}</div> : null}
-                      </td>
-                      <td className="px-4 py-3">
-                        {editLineId === line.id && canEdit ? (
-                          <input
-                            type="number"
-                            min={1}
-                            step={1}
-                            className="w-28 rounded-md border border-neutral-300 px-2 py-1 text-sm"
-                            value={editLinePrice}
-                            onChange={ev => setEditLinePrice(ev.target.value)}
-                          />
-                        ) : (
-                          moneyRwf(line.unitPrice)
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-neutral-700">{moneyRwf(line.standardPrice)}</td>
-                      <td className="px-4 py-3 text-neutral-700">
-                        {priceListDifferenceLabel(line.differencePct)}
-                      </td>
-                      {canEdit ? (
-                        <td className="px-4 py-3">
-                          {editLineId === line.id ? (
-                            <div className="flex gap-2">
-                              <Button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => void handleSaveLinePrice(line)}
-                              >
-                                Save
-                              </Button>
-                              <Button type="button" variant="ghost" onClick={() => setEditLineId(null)}>
-                                Cancel
-                              </Button>
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              className="text-[var(--color-brand-800)] hover:underline"
-                              onClick={() => {
-                                setEditLineId(line.id)
-                                setEditLinePrice(String(num(line.unitPrice)))
-                              }}
-                            >
-                              Edit price
-                            </button>
-                          )}
-                        </td>
-                      ) : null}
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            columns={productLineColumns}
+            rows={detail.lines}
+            getRowKey={row => row.id}
+            showSearch={false}
+            rowActions={
+              canEdit
+                ? [
+                    {
+                      label: 'Edit price',
+                      onClick: line => {
+                        setEditLineId(line.id)
+                        setEditLinePrice(String(num(line.unitPrice)))
+                      },
+                      disabled: line => editLineId === line.id,
+                    },
+                    {
+                      label: 'Save',
+                      onClick: line => void handleSaveLinePrice(line),
+                      disabled: line => editLineId !== line.id || busy,
+                    },
+                    {
+                      label: 'Cancel',
+                      onClick: () => setEditLineId(null),
+                      disabled: line => editLineId !== line.id,
+                    },
+                  ]
+                : undefined
+            }
+            emptyStateLabel="No products on this list yet"
+            noResultsLabel="No products on this list yet"
+          />
         </section>
       ) : null}
 
@@ -481,15 +490,13 @@ export function PriceListDetailPage() {
 
           {assignOpen && canEdit ? (
             <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
-              <label className="block text-sm">
-                <span className="text-neutral-700">Search customers</span>
-                <input
-                  className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              <FormField label="Search customers">
+                <Input
                   value={customerSearch}
                   onChange={ev => setCustomerSearch(ev.target.value)}
                   placeholder="Name or phone"
                 />
-              </label>
+              </FormField>
               <ul className="mt-2 max-h-48 overflow-y-auto divide-y divide-neutral-100">
                 {customerOptions
                   .filter(c => !detail.customers.some(a => a.id === c.id))
@@ -508,51 +515,26 @@ export function PriceListDetailPage() {
             </div>
           ) : null}
 
-          <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
-            <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-neutral-200 bg-neutral-50 text-neutral-600">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Customer</th>
-                  <th className="px-4 py-3 font-medium">Phone</th>
-                  <th className="px-4 py-3 font-medium">Email</th>
-                  {canEdit ? <th className="px-4 py-3 font-medium">Actions</th> : null}
-                </tr>
-              </thead>
-              <tbody>
-                {detail.customers.length === 0 ? (
-                  <tr>
-                    <td colSpan={canEdit ? 4 : 3} className="px-4 py-8 text-center text-neutral-500">
-                      No customers assigned.
-                    </td>
-                  </tr>
-                ) : (
-                  detail.customers.map(c => (
-                    <tr key={c.id} className="border-b border-neutral-100 last:border-0">
-                      <td className="px-4 py-3 font-medium text-neutral-900">
-                        <Link to={`/customers/${c.id}`} className="text-[var(--color-brand-800)] hover:underline">
-                          {c.name}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 text-neutral-700">{c.phone ?? '—'}</td>
-                      <td className="px-4 py-3 text-neutral-700">{c.email ?? '—'}</td>
-                      {canEdit ? (
-                        <td className="px-4 py-3">
-                          <button
-                            type="button"
-                            className="text-red-700 hover:underline"
-                            disabled={busy}
-                            onClick={() => void handleRemoveCustomer(c.id)}
-                          >
-                            Remove customer
-                          </button>
-                        </td>
-                      ) : null}
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            columns={customerColumns}
+            rows={detail.customers}
+            getRowKey={row => row.id}
+            showSearch={false}
+            rowActions={
+              canEdit
+                ? [
+                    {
+                      label: 'Remove customer',
+                      onClick: c => void handleRemoveCustomer(c.id),
+                      disabled: () => busy,
+                      destructive: true,
+                    },
+                  ]
+                : undefined
+            }
+            emptyStateLabel="No customers assigned"
+            noResultsLabel="No customers assigned"
+          />
         </section>
       ) : null}
 
@@ -561,101 +543,80 @@ export function PriceListDetailPage() {
           {canEdit ? (
             <form
               onSubmit={e => void handleSaveRules(e)}
-              className="space-y-4 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm"
+              className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm"
             >
-              <fieldset className="space-y-2">
-                <legend className="text-sm font-semibold text-neutral-900">Pricing method</legend>
-                <label className="flex items-center gap-2 text-sm">
+              <FormSection title="Pricing method">
+                <FormField label="Percentage discount (apply % off all products)">
                   <input
                     type="radio"
                     name="pricingMode"
                     checked={pricingMode === 'PERCENTAGE'}
                     onChange={() => setPricingMode('PERCENTAGE')}
                   />
-                  Percentage discount (apply % off all products)
-                </label>
-                <label className="flex items-center gap-2 text-sm">
+                </FormField>
+                <FormField label="Individual product prices (use Products tab)">
                   <input
                     type="radio"
                     name="pricingMode"
                     checked={pricingMode === 'INDIVIDUAL'}
                     onChange={() => setPricingMode('INDIVIDUAL')}
                   />
-                  Individual product prices (use Products tab)
-                </label>
-              </fieldset>
+                </FormField>
+                {pricingMode === 'PERCENTAGE' ? (
+                  <FormField label="Discount %" className="max-w-xs">
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={0.1}
+                      value={discountPct}
+                      onChange={ev => setDiscountPct(ev.target.value)}
+                    />
+                  </FormField>
+                ) : null}
+              </FormSection>
 
-              {pricingMode === 'PERCENTAGE' ? (
-                <label className="block max-w-xs text-sm">
-                  <span className="text-neutral-700">Discount %</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    step={0.1}
-                    className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
-                    value={discountPct}
-                    onChange={ev => setDiscountPct(ev.target.value)}
-                  />
-                </label>
-              ) : null}
+              <FormSection title="List settings" className="mt-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <FormField label="List type">
+                    <select
+                      className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+                      value={listType}
+                      onChange={ev => setListType(ev.target.value as PriceListType)}
+                    >
+                      {(['STANDARD', 'WHOLESALE', 'VIP', 'PROMOTIONAL'] as PriceListType[]).map(t => (
+                        <option key={t} value={t}>
+                          {PRICE_LIST_TYPE_LABELS[t]}
+                        </option>
+                      ))}
+                    </select>
+                  </FormField>
+                  <FormField label="Minimum order quantity">
+                    <Input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={minOrderQty}
+                      onChange={ev => setMinOrderQty(ev.target.value)}
+                    />
+                  </FormField>
+                  <FormField label="Effective from">
+                    <Input type="date" value={validFrom} onChange={ev => setValidFrom(ev.target.value)} />
+                  </FormField>
+                  <FormField label="Effective to">
+                    <Input type="date" value={validTo} onChange={ev => setValidTo(ev.target.value)} />
+                  </FormField>
+                  <FormField label="Active">
+                    <input type="checkbox" checked={active} onChange={ev => setActive(ev.target.checked)} />
+                  </FormField>
+                </div>
+              </FormSection>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block text-sm">
-                  <span className="text-neutral-700">List type</span>
-                  <select
-                    className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
-                    value={listType}
-                    onChange={ev => setListType(ev.target.value as PriceListType)}
-                  >
-                    {(['STANDARD', 'WHOLESALE', 'VIP', 'PROMOTIONAL'] as PriceListType[]).map(t => (
-                      <option key={t} value={t}>
-                        {PRICE_LIST_TYPE_LABELS[t]}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="block text-sm">
-                  <span className="text-neutral-700">Minimum order quantity</span>
-                  <input
-                    type="number"
-                    min={1}
-                    step={1}
-                    className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
-                    value={minOrderQty}
-                    onChange={ev => setMinOrderQty(ev.target.value)}
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="text-neutral-700">Effective from</span>
-                  <input
-                    type="date"
-                    className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
-                    value={validFrom}
-                    onChange={ev => setValidFrom(ev.target.value)}
-                  />
-                </label>
-                <label className="block text-sm">
-                  <span className="text-neutral-700">Effective to</span>
-                  <input
-                    type="date"
-                    className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
-                    value={validTo}
-                    onChange={ev => setValidTo(ev.target.value)}
-                  />
-                </label>
-              </div>
-
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={active} onChange={ev => setActive(ev.target.checked)} />
-                Active
-              </label>
-
-              <div className="flex justify-end">
+              <FormActions className="mt-4">
                 <Button type="submit" disabled={busy}>
                   {busy ? 'Saving…' : 'Save rules'}
                 </Button>
-              </div>
+              </FormActions>
             </form>
           ) : (
             <div className="rounded-lg border border-neutral-200 bg-white p-4 text-sm text-neutral-700 shadow-sm">

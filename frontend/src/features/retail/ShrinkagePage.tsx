@@ -13,7 +13,16 @@ import { retailListProducts } from '../../shared/api/retail'
 import { normalizeApiError } from '../../shared/api/errors'
 import { formatDate } from '../../shared/utils/intl'
 import { Button } from '../../shared/components/ui/Button'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
 import { PageSkeleton } from '../../shared/components/ui/LoadingSkeleton'
+import {
+  FormActions,
+  FormField,
+  FormStack,
+  Input,
+  Modal,
+  useFieldValidation,
+} from '../../components/ui'
 
 const SHRINKAGE_REASONS = [
   { value: 'DAMAGED', label: 'Damaged' },
@@ -135,18 +144,62 @@ export function ShrinkagePage() {
     })
   }, [rows, filterProductId, filterReason])
 
+  const formValues = { selectedProductId, quantity, incidentDate }
+  const { errors, valid, onBlur, validateAll } = useFieldValidation(formValues, {
+    selectedProductId: v => (String(v ?? '') ? undefined : 'Select a product.'),
+    quantity: v => {
+      const qty = Number(v)
+      return Number.isFinite(qty) && qty > 0 ? undefined : 'Enter a valid quantity.'
+    },
+    incidentDate: v => (String(v ?? '') ? undefined : 'Date is required.'),
+  })
+
+  const columns = useMemo((): DataTableColumn<ShrinkageRecordRow>[] => [
+    {
+      key: 'incidentDate',
+      header: 'Date',
+      columnType: 'date',
+      render: (_v, row) =>
+        row.incidentDate ? formatDate(row.incidentDate) : row.createdAt ? formatDate(row.createdAt) : '—',
+    },
+    {
+      key: 'productName',
+      header: 'Product',
+      render: (_v, row) => row.productName ?? row.sku ?? row.productId.slice(0, 8),
+    },
+    {
+      key: 'quantity',
+      header: 'Quantity',
+      columnType: 'number',
+      render: (_v, row) => shrinkageQty(row),
+    },
+    {
+      key: 'reason',
+      header: 'Reason',
+      render: (_v, row) => reasonLabel(row.reason),
+    },
+    {
+      key: 'recordedBy',
+      header: 'Recorded by',
+      render: v => <span className="font-mono text-xs">{v ? String(v).slice(0, 8) : '—'}</span>,
+    },
+    {
+      key: 'unitCost',
+      header: 'Value',
+      columnType: 'currency',
+      render: (_v, row) => moneyRwf(shrinkageValue(row)),
+    },
+  ], [])
+
   async function handleRecord(e: FormEvent) {
     e.preventDefault()
+    if (!validateAll()) return
     const product = products.find(p => p.productId === selectedProductId)
     if (!product) {
       setError('Select a product.')
       return
     }
     const qty = Number(quantity)
-    if (!Number.isFinite(qty) || qty <= 0) {
-      setError('Enter a valid quantity.')
-      return
-    }
     setFormBusy(true)
     setError(null)
     try {
@@ -235,57 +288,35 @@ export function ShrinkagePage() {
         </select>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border">
-        <table className="min-w-full text-left text-sm">
-          <thead className="bg-neutral-50">
-            <tr>
-              <th className="px-3 py-2">Date</th>
-              <th className="px-3 py-2">Product</th>
-              <th className="px-3 py-2">Quantity</th>
-              <th className="px-3 py-2">Reason</th>
-              <th className="px-3 py-2">Recorded by</th>
-              <th className="px-3 py-2">Value</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredRows.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-neutral-500">
-                  No shrinkage records for this period.
-                </td>
-              </tr>
-            ) : (
-              filteredRows.map(row => (
-                <tr key={row.id} className="border-t">
-                  <td className="px-3 py-2">{row.incidentDate ? formatDate(row.incidentDate) : row.createdAt ? formatDate(row.createdAt) : '—'}</td>
-                  <td className="px-3 py-2">{row.productName ?? row.sku ?? row.productId.slice(0, 8)}</td>
-                  <td className="px-3 py-2">{shrinkageQty(row)}</td>
-                  <td className="px-3 py-2">{reasonLabel(row.reason)}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{row.recordedBy?.slice(0, 8) ?? '—'}</td>
-                  <td className="px-3 py-2">{moneyRwf(shrinkageValue(row))}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={columns}
+        rows={filteredRows}
+        isLoading={loading}
+        getRowKey={row => row.id}
+        showSearch={false}
+        emptyStateLabel="No shrinkage records for this period"
+        noResultsLabel="No shrinkage records match your filters"
+        exportFilename="shrinkage"
+      />
 
-      {formOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <form className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl" onSubmit={e => void handleRecord(e)}>
-            <h2 className="mb-4 text-lg font-semibold">Record shrinkage</h2>
-            <label className="mb-3 block text-sm">
-              Product search
-              <input
-                className="mt-1 w-full rounded border px-3 py-2"
+      <Modal open={formOpen} onClose={() => setFormOpen(false)} title="Record shrinkage" size="sm">
+        <form onSubmit={e => void handleRecord(e)}>
+          <FormStack>
+            <FormField label="Product search">
+              <Input
                 placeholder="Search by name or SKU…"
                 value={productSearch}
                 onChange={e => setProductSearch(e.target.value)}
               />
-            </label>
-            <label className="mb-3 block text-sm">
-              Product
-              <select className="mt-1 w-full rounded border px-3 py-2" value={selectedProductId} onChange={e => setSelectedProductId(e.target.value)} required>
+            </FormField>
+            <FormField label="Product" required error={errors.selectedProductId} valid={valid.selectedProductId}>
+              <select
+                className="mt-1 w-full rounded border px-3 py-2"
+                value={selectedProductId}
+                onChange={e => setSelectedProductId(e.target.value)}
+                onBlur={() => onBlur('selectedProductId')}
+                required
+              >
                 <option value="">Select product</option>
                 {productOptions.map(p => (
                   <option key={p.productId} value={p.productId}>
@@ -298,13 +329,19 @@ export function ShrinkagePage() {
                   Estimated unit cost: {moneyRwf(unitCostPreview)}
                 </span>
               ) : null}
-            </label>
-            <label className="mb-3 block text-sm">
-              Quantity lost
-              <input type="number" min={0.0001} step="any" className="mt-1 w-full rounded border px-3 py-2" value={quantity} onChange={e => setQuantity(e.target.value)} required />
-            </label>
-            <label className="mb-3 block text-sm">
-              Reason
+            </FormField>
+            <FormField label="Quantity lost" required error={errors.quantity} valid={valid.quantity}>
+              <Input
+                type="number"
+                min={0.0001}
+                step="any"
+                value={quantity}
+                onChange={e => setQuantity(e.target.value)}
+                onBlur={() => onBlur('quantity')}
+                required
+              />
+            </FormField>
+            <FormField label="Reason">
               <select className="mt-1 w-full rounded border px-3 py-2" value={reason} onChange={e => setReason(e.target.value)} required>
                 {SHRINKAGE_REASONS.map(r => (
                   <option key={r.value} value={r.value}>
@@ -312,26 +349,30 @@ export function ShrinkagePage() {
                   </option>
                 ))}
               </select>
-            </label>
-            <label className="mb-3 block text-sm">
-              Date
-              <input type="date" className="mt-1 w-full rounded border px-3 py-2" value={incidentDate} onChange={e => setIncidentDate(e.target.value)} required />
-            </label>
-            <label className="mb-4 block text-sm">
-              Notes
+            </FormField>
+            <FormField label="Date" required error={errors.incidentDate} valid={valid.incidentDate}>
+              <Input
+                type="date"
+                value={incidentDate}
+                onChange={e => setIncidentDate(e.target.value)}
+                onBlur={() => onBlur('incidentDate')}
+                required
+              />
+            </FormField>
+            <FormField label="Notes">
               <textarea className="mt-1 w-full rounded border px-3 py-2" rows={2} value={notes} onChange={e => setNotes(e.target.value)} />
-            </label>
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="ghost" onClick={() => setFormOpen(false)} disabled={formBusy}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={formBusy}>
-                {formBusy ? 'Saving…' : 'Save record'}
-              </Button>
-            </div>
-          </form>
-        </div>
-      ) : null}
+            </FormField>
+          </FormStack>
+          <FormActions>
+            <Button type="button" variant="ghost" onClick={() => setFormOpen(false)} disabled={formBusy}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={formBusy}>
+              {formBusy ? 'Saving…' : 'Save record'}
+            </Button>
+          </FormActions>
+        </form>
+      </Modal>
     </div>
   )
 }

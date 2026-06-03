@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { DataTable, type DataTableColumn } from '../../../shared/components/ui/DataTable'
 import {
   cancelCustomerLayaway,
   collectCustomerLayaway,
@@ -156,6 +157,80 @@ export function CustomerLayawayTab({ customerId }: CustomerLayawayTabProps) {
     }
   }
 
+  const layawayColumns = useMemo((): DataTableColumn<LayawayOrderRow>[] => [
+    {
+      key: 'createdAt',
+      header: 'Created',
+      columnType: 'date',
+      render: v => (v ? formatDate(String(v)) : '—'),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: v => statusLabel(String(v)),
+    },
+    {
+      key: 'totalAmount',
+      header: 'Total',
+      render: (_v, row) => money(row.totalAmount, row.currencyCode ?? 'RWF'),
+    },
+    {
+      key: 'depositAmount',
+      header: 'Deposit paid',
+      render: (_v, row) => money(row.depositAmount, row.currencyCode ?? 'RWF'),
+    },
+    {
+      key: 'balanceDue',
+      header: 'Remaining',
+      render: (_v, row) => <span className="font-medium">{money(row.balanceDue, row.currencyCode ?? 'RWF')}</span>,
+    },
+    {
+      key: 'collectionDate',
+      header: 'Expected pickup',
+      columnType: 'date',
+      render: v => (v ? formatDate(String(v)) : '—'),
+    },
+    {
+      key: 'id',
+      header: 'Actions',
+      sortable: false,
+      render: (_v, row) => {
+        const balance = num(row.balanceDue)
+        const isOpen = row.status.toUpperCase() === 'OPEN'
+        if (!isOpen) return '—'
+        return (
+          <div className="flex min-w-[12rem] flex-col gap-2">
+            {balance > 0.01 ? (
+              <div className="flex gap-1">
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="Payment"
+                  className="w-24 rounded border px-2 py-1 text-xs"
+                  value={payAmounts[row.id] ?? ''}
+                  onChange={e => setPayAmounts(prev => ({ ...prev, [row.id]: e.target.value }))}
+                />
+                <Button type="button" variant="ghost" disabled={busy} onClick={() => void handlePayment(row)}>
+                  Pay
+                </Button>
+              </div>
+            ) : null}
+            <div className="flex flex-wrap gap-1">
+              {balance <= 0.01 ? (
+                <Button type="button" disabled={busy} onClick={() => void handleCollect(row)}>
+                  Mark collected
+                </Button>
+              ) : null}
+              <Button type="button" variant="ghost" disabled={busy} onClick={() => void handleCancel(row)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )
+      },
+    },
+  ], [busy, payAmounts])
+
   if (loading) {
     return <p className="text-sm text-neutral-500">Loading layaway orders…</p>
   }
@@ -209,70 +284,14 @@ export function CustomerLayawayTab({ customerId }: CustomerLayawayTabProps) {
           {showAll ? 'No layaway orders recorded for this customer.' : 'No active layaway orders.'}
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)]">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-neutral-50 text-neutral-600">
-              <tr>
-                <th className="px-3 py-2 font-medium">Created</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Total</th>
-                <th className="px-3 py-2 font-medium">Deposit paid</th>
-                <th className="px-3 py-2 font-medium">Remaining</th>
-                <th className="px-3 py-2 font-medium">Expected pickup</th>
-                <th className="px-3 py-2 font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(row => {
-                const balance = num(row.balanceDue)
-                const isOpen = row.status.toUpperCase() === 'OPEN'
-                return (
-                  <tr key={row.id} className="border-t border-[var(--border-subtle)] align-top">
-                    <td className="px-3 py-2">{row.createdAt ? formatDate(row.createdAt) : '—'}</td>
-                    <td className="px-3 py-2">{statusLabel(row.status)}</td>
-                    <td className="px-3 py-2">{money(row.totalAmount, row.currencyCode ?? 'RWF')}</td>
-                    <td className="px-3 py-2">{money(row.depositAmount, row.currencyCode ?? 'RWF')}</td>
-                    <td className="px-3 py-2 font-medium">{money(row.balanceDue, row.currencyCode ?? 'RWF')}</td>
-                    <td className="px-3 py-2">{row.collectionDate ? formatDate(row.collectionDate) : '—'}</td>
-                    <td className="px-3 py-2">
-                      {isOpen ? (
-                        <div className="flex min-w-[12rem] flex-col gap-2">
-                          {balance > 0.01 ? (
-                            <div className="flex gap-1">
-                              <input
-                                type="number"
-                                min={0}
-                                placeholder="Payment"
-                                className="w-24 rounded border px-2 py-1 text-xs"
-                                value={payAmounts[row.id] ?? ''}
-                                onChange={e => setPayAmounts(prev => ({ ...prev, [row.id]: e.target.value }))}
-                              />
-                              <Button type="button" variant="ghost" disabled={busy} onClick={() => void handlePayment(row)}>
-                                Pay
-                              </Button>
-                            </div>
-                          ) : null}
-                          <div className="flex flex-wrap gap-1">
-                            {balance <= 0.01 ? (
-                              <Button type="button" disabled={busy} onClick={() => void handleCollect(row)}>
-                                Mark collected
-                              </Button>
-                            ) : null}
-                            <Button type="button" variant="ghost" disabled={busy} onClick={() => void handleCancel(row)}>
-                              Cancel
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={layawayColumns}
+          rows={rows}
+          getRowKey={row => row.id}
+          showSearch={false}
+          emptyStateLabel={showAll ? 'No layaway orders recorded for this customer.' : 'No active layaway orders.'}
+          noResultsLabel={showAll ? 'No layaway orders recorded for this customer.' : 'No active layaway orders.'}
+        />
       )}
     </div>
   )

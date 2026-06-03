@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MessageSquare, RefreshCw } from 'lucide-react'
 import { notificationsSmsDeliveries, notificationsSmsDeliveriesCsv, type NotificationSmsDeliveryRow } from '../../shared/api/finance'
 import { normalizeApiError } from '../../shared/api/errors'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
 
 function statusClass(status: string) {
   const s = status.toUpperCase()
@@ -70,6 +71,29 @@ export function SmsDeliveryLogPage() {
       }
     })()
   }, [eventId, phoneFilter, statusFilter])
+
+  const columns = useMemo((): DataTableColumn<NotificationSmsDeliveryRow>[] => [
+    {
+      key: 'createdAt',
+      header: t('smsLogs.time'),
+      render: v => new Date(String(v)).toLocaleString(),
+    },
+    { key: 'eventType', header: t('smsLogs.eventType') },
+    {
+      key: 'recipientPhone',
+      header: t('smsLogs.phone'),
+      render: v => <span className="font-mono">{String(v)}</span>,
+    },
+    {
+      key: 'status',
+      header: t('smsLogs.status'),
+      render: v => (
+        <span className={`rounded px-2 py-0.5 text-xs ${statusClass(String(v))}`}>{String(v)}</span>
+      ),
+    },
+    { key: 'responseCode', header: t('smsLogs.responseCode'), render: v => String(v ?? '—') },
+    { key: 'errorMessage', header: t('smsLogs.error'), render: v => String(v ?? '—') },
+  ], [t])
 
   return (
     <div className="space-y-4">
@@ -142,41 +166,16 @@ export function SmsDeliveryLogPage() {
 
       <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--color-surface)] p-4 shadow-sm">
         <h2 className="mt-0 text-lg font-semibold">{t('smsLogs.deliveries')}</h2>
-        <div className="mt-3 overflow-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-neutral-200">
-                <th className="py-2 pr-2">{t('smsLogs.time')}</th>
-                <th className="py-2 pr-2">{t('smsLogs.eventType')}</th>
-                <th className="py-2 pr-2">{t('smsLogs.phone')}</th>
-                <th className="py-2 pr-2">{t('smsLogs.status')}</th>
-                <th className="py-2 pr-2">{t('smsLogs.responseCode')}</th>
-                <th className="py-2">{t('smsLogs.error')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((r) => (
-                <tr key={r.id} className="border-b border-neutral-100">
-                  <td className="py-2 pr-2">{new Date(r.createdAt).toLocaleString()}</td>
-                  <td className="py-2 pr-2">{r.eventType}</td>
-                  <td className="py-2 pr-2 font-mono">{r.recipientPhone}</td>
-                  <td className="py-2 pr-2">
-                    <span className={`rounded px-2 py-0.5 text-xs ${statusClass(r.status)}`}>{r.status}</span>
-                  </td>
-                  <td className="py-2 pr-2">{r.responseCode ?? 'â€”'}</td>
-                  <td className="py-2">{r.errorMessage ?? 'â€”'}</td>
-                </tr>
-              ))}
-              {!filtered.length && (
-                <tr>
-                  <td colSpan={6} className="py-4 text-center text-neutral-500">
-                    {t('smsLogs.none')}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={columns}
+          rows={filtered}
+          isLoading={busy}
+          getRowKey={r => r.id}
+          showSearch={false}
+          emptyStateLabel={t('smsLogs.none')}
+          noResultsLabel={t('smsLogs.none')}
+          exportFilename="sms-deliveries"
+        />
       </section>
     </div>
   )

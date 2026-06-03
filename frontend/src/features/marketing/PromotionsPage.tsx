@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { listPromotions, type PromotionRow } from '../../shared/api/marketing'
 import { normalizeApiError } from '../../shared/api/errors'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
 import { PageSkeleton } from '../../shared/components/ui/LoadingSkeleton'
 
 export function PromotionsPage() {
@@ -24,8 +25,23 @@ export function PromotionsPage() {
     void refresh()
   }, [refresh])
 
-  if (loading) return <PageSkeleton />
-  if (error) return <p className="text-red-600">{error}</p>
+  const columns = useMemo((): DataTableColumn<PromotionRow>[] => [
+    { key: 'name', header: 'Name' },
+    { key: 'code', header: 'Code' },
+    { key: 'status', header: 'Status', columnType: 'status' },
+    {
+      key: 'discountValue',
+      header: 'Discount',
+      render: (_value, row) =>
+        row.discountValue != null
+          ? `${row.discountValue}${row.discountType === 'PERCENT' ? '%' : ' FRW'}`
+          : '—',
+    },
+  ], [])
+
+  if (loading && rows.length === 0) {
+    return <PageSkeleton />
+  }
 
   return (
     <div className="page-stack">
@@ -33,30 +49,15 @@ export function PromotionsPage() {
         <h1>Promotions</h1>
         <p className="text-neutral-500">Active and scheduled promotion rules.</p>
       </header>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b text-left">
-            <th className="py-2">Name</th>
-            <th>Code</th>
-            <th>Status</th>
-            <th>Discount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(r => (
-            <tr key={r.id} className="border-b">
-              <td className="py-2">{r.name}</td>
-              <td>{r.code ?? '—'}</td>
-              <td>{r.status ?? '—'}</td>
-              <td>
-                {r.discountValue != null
-                  ? `${r.discountValue}${r.discountType === 'PERCENT' ? '%' : ' FRW'}`
-                  : '—'}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {error ? <p className="text-red-600">{error}</p> : null}
+      <DataTable
+        columns={columns}
+        rows={rows}
+        isLoading={loading}
+        getRowKey={row => row.id}
+        emptyStateLabel="No promotions yet"
+        exportFilename="promotions"
+      />
     </div>
   )
 }

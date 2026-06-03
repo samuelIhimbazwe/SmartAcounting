@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Tags } from 'lucide-react'
 import {
   createPriceList,
@@ -12,8 +11,17 @@ import {
 } from '../../shared/api/priceLists'
 import { normalizeApiError } from '../../shared/api/errors'
 import { Button } from '../../shared/components/ui/Button'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
 import { PageSkeleton } from '../../shared/components/ui/LoadingSkeleton'
 import { usePermission } from '../../shared/hooks/usePermission'
+import {
+  FormActions,
+  FormField,
+  FormStack,
+  Input,
+  Select,
+  useFieldValidation,
+} from '../../components/ui'
 
 const LIST_TYPES: PriceListType[] = ['STANDARD', 'WHOLESALE', 'VIP', 'PROMOTIONAL']
 
@@ -26,6 +34,11 @@ export function PriceListsPage() {
   const [name, setName] = useState('')
   const [listType, setListType] = useState<PriceListType>('STANDARD')
   const [formBusy, setFormBusy] = useState(false)
+
+  const formValues = { name, listType }
+  const { errors, valid, onBlur, validateAll } = useFieldValidation(formValues, {
+    name: value => (String(value ?? '').trim() ? undefined : 'Name is required.'),
+  })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -43,11 +56,30 @@ export function PriceListsPage() {
     void load()
   }, [load])
 
+  const columns = useMemo((): DataTableColumn<PriceListSummary>[] => [
+    { key: 'name', header: 'Name' },
+    {
+      key: 'listType',
+      header: 'Type',
+      render: v => PRICE_LIST_TYPE_LABELS[v as PriceListType] ?? String(v),
+    },
+    { key: 'customersAssigned', header: 'Customers assigned', columnType: 'number' },
+    { key: 'products', header: 'Products', columnType: 'number' },
+    {
+      key: 'status',
+      header: 'Status',
+      render: v => (
+        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${priceListStatusTone(v as PriceListSummary['status'])}`}>
+          {PRICE_LIST_STATUS_LABELS[v as PriceListSummary['status']]}
+        </span>
+      ),
+    },
+  ], [])
+
   async function handleCreate(e: FormEvent) {
     e.preventDefault()
-    if (!canEdit) return
+    if (!canEdit || !validateAll()) return
     const trimmed = name.trim()
-    if (!trimmed) return
     setFormBusy(true)
     setError(null)
     try {
@@ -94,86 +126,45 @@ export function PriceListsPage() {
           className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm"
         >
           <h2 className="text-sm font-semibold text-neutral-900">New price list</h2>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm">
-              <span className="text-neutral-700">Name</span>
-              <input
-                className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          <FormStack className="mt-3 sm:grid-cols-2">
+            <FormField label="Name" required error={errors.name} valid={valid.name}>
+              <Input
                 value={name}
                 onChange={ev => setName(ev.target.value)}
+                onBlur={() => onBlur('name')}
                 required
               />
-            </label>
-            <label className="block text-sm">
-              <span className="text-neutral-700">Type</span>
-              <select
-                className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
+            </FormField>
+            <FormField label="Type">
+              <Select
                 value={listType}
-                onChange={ev => setListType(ev.target.value as PriceListType)}
-              >
-                {LIST_TYPES.map(t => (
-                  <option key={t} value={t}>
-                    {PRICE_LIST_TYPE_LABELS[t]}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <div className="mt-4 flex justify-end">
+                onChange={v => setListType((v ?? 'STANDARD') as PriceListType)}
+                options={LIST_TYPES.map(t => ({ value: t, label: PRICE_LIST_TYPE_LABELS[t] }))}
+                clearable={false}
+              />
+            </FormField>
+          </FormStack>
+          <FormActions>
             <Button type="submit" disabled={formBusy}>
               {formBusy ? 'Creating…' : 'Create'}
             </Button>
-          </div>
+          </FormActions>
         </form>
       ) : null}
 
-      <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white shadow-sm">
-        <table className="min-w-full text-left text-sm">
-          <thead className="border-b border-neutral-200 bg-neutral-50 text-neutral-600">
-            <tr>
-              <th className="px-4 py-3 font-medium">Name</th>
-              <th className="px-4 py-3 font-medium">Type</th>
-              <th className="px-4 py-3 font-medium">Customers assigned</th>
-              <th className="px-4 py-3 font-medium">Products</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-neutral-500">
-                  No price lists yet.{canEdit ? ' Create one to get started.' : ''}
-                </td>
-              </tr>
-            ) : (
-              rows.map(row => (
-                <tr key={row.id} className="border-b border-neutral-100 last:border-0">
-                  <td className="px-4 py-3 font-medium text-neutral-900">{row.name}</td>
-                  <td className="px-4 py-3 text-neutral-700">{PRICE_LIST_TYPE_LABELS[row.listType] ?? row.listType}</td>
-                  <td className="px-4 py-3 text-neutral-700">{row.customersAssigned}</td>
-                  <td className="px-4 py-3 text-neutral-700">{row.products}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${priceListStatusTone(row.status)}`}
-                    >
-                      {PRICE_LIST_STATUS_LABELS[row.status]}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <Link
-                      to={`/retail/price-lists/${row.id}`}
-                      className="text-[var(--color-brand-800)] hover:underline"
-                    >
-                      View
-                    </Link>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={columns}
+        rows={rows}
+        isLoading={loading}
+        getRowKey={row => row.id}
+        primaryAction={{
+          label: 'View',
+          href: row => `/retail/price-lists/${row.id}`,
+        }}
+        emptyStateLabel="No price lists yet"
+        noResultsLabel="No price lists match your search"
+        exportFilename="price-lists"
+      />
     </div>
   )
 }

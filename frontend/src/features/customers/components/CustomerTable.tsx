@@ -1,17 +1,18 @@
-import { Link } from 'react-router-dom'
-import { formatDate } from '../../../shared/utils/intl'
+import { User } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import {
   customerCreditUsed,
   customerLoyaltyPoints,
   type CustomerSummary,
 } from '../../../shared/api/customers'
-import { Button } from '../../../shared/components/ui/Button'
-
-function moneyRwf(amount: number) {
-  return new Intl.NumberFormat('en-RW', { style: 'currency', currency: 'RWF', maximumFractionDigits: 0 }).format(
-    amount,
-  )
-}
+import {
+  EmptyState,
+  ListCard,
+  ListCardStack,
+  formatTableCurrency,
+  formatTableDate,
+  statusToBadgeVariant,
+} from '../../../components/ui'
 
 export interface CustomerTableProps {
   rows: CustomerSummary[]
@@ -20,64 +21,65 @@ export interface CustomerTableProps {
   onSendReminder: (customer: CustomerSummary) => void
 }
 
+function creditBadge(row: CustomerSummary) {
+  if (row.level === 'EXCEEDED') {
+    return { label: 'Over limit', variant: 'error' as const }
+  }
+  if (Number(row.creditBalance ?? 0) > 0) {
+    return { label: 'On credit', variant: 'warning' as const }
+  }
+  return { label: 'Good standing', variant: statusToBadgeVariant('ACTIVE') }
+}
+
 export function CustomerTable({ rows, canWrite = true, onEdit, onSendReminder }: CustomerTableProps) {
+  const navigate = useNavigate()
+
   if (rows.length === 0) {
     return (
-      <p className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-4 py-8 text-center text-sm text-neutral-600">
-        No customers match your search and filters.
-      </p>
+      <EmptyState
+        title="No customers match your search and filters"
+        description="Try clearing filters or add a new customer."
+      />
     )
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)]">
-      <table className="min-w-full text-left text-sm">
-        <thead className="bg-neutral-50 text-neutral-600">
-          <tr>
-            <th className="px-3 py-2 font-medium">Name</th>
-            <th className="px-3 py-2 font-medium">Phone</th>
-            <th className="px-3 py-2 font-medium">Email</th>
-            <th className="px-3 py-2 font-medium">Credit balance</th>
-            <th className="px-3 py-2 font-medium">Loyalty pts</th>
-            <th className="px-3 py-2 font-medium">Last purchase</th>
-            <th className="px-3 py-2 font-medium">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(row => (
-            <tr key={row.id} className="border-t border-[var(--border-subtle)]">
-              <td className="px-3 py-2 font-medium text-neutral-900">{row.name}</td>
-              <td className="px-3 py-2">{row.phone ?? '—'}</td>
-              <td className="px-3 py-2">{row.email ?? '—'}</td>
-              <td className="px-3 py-2">{moneyRwf(customerCreditUsed(row))}</td>
-              <td className="px-3 py-2">{customerLoyaltyPoints(row)}</td>
-              <td className="px-3 py-2">
-                {row.lastPurchaseAt ? formatDate(row.lastPurchaseAt) : '—'}
-              </td>
-              <td className="px-3 py-2">
-                <div className="flex flex-wrap gap-1">
-                  <Link to={`/customers/${row.id}`}>
-                    <Button type="button" variant="ghost">
-                      View
-                    </Button>
-                  </Link>
-                  <Button type="button" variant="ghost" onClick={() => onEdit(row)} disabled={!canWrite}>
-                    Edit
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => onSendReminder(row)}
-                    disabled={!row.phone}
-                  >
-                    Send reminder
-                  </Button>
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <ListCardStack>
+      {rows.map(row => {
+        const dateParts = formatTableDate(row.lastPurchaseAt)
+        const secondary = [row.phone, row.email].filter(Boolean).join(' · ') || 'No contact details'
+        return (
+          <ListCard
+            key={row.id}
+            icon={User}
+            primary={row.name}
+            secondary={secondary}
+            metric={
+              <>
+                <span>{formatTableCurrency(customerCreditUsed(row))}</span>
+                <span>{customerLoyaltyPoints(row)} pts</span>
+                {row.lastPurchaseAt ? (
+                  <span title={dateParts.title}>{dateParts.display}</span>
+                ) : null}
+              </>
+            }
+            badge={creditBadge(row)}
+            onClick={() => navigate(`/customers/${row.id}`)}
+            menuActions={[
+              {
+                label: 'Edit',
+                disabled: !canWrite,
+                onClick: () => onEdit(row),
+              },
+              {
+                label: 'Send reminder',
+                disabled: !row.phone,
+                onClick: () => onSendReminder(row),
+              },
+            ]}
+          />
+        )
+      })}
+    </ListCardStack>
   )
 }

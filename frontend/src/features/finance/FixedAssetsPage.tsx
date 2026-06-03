@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   createFixedAsset,
@@ -8,6 +8,7 @@ import {
   type FixedAsset,
 } from '../../shared/api/productionFinance'
 import { normalizeApiError } from '../../shared/api/errors'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
 import { PageSkeleton } from '../../shared/components/ui/LoadingSkeleton'
 
 export function FixedAssetsPage() {
@@ -65,6 +66,17 @@ export function FixedAssetsPage() {
     }
   }
 
+  const columns = useMemo((): DataTableColumn<FixedAsset>[] => [
+    { key: 'assetName', header: t('pages.fixedAssets.name') },
+    { key: 'status', header: t('common.status'), columnType: 'status' },
+    {
+      key: 'netBookValue',
+      header: t('common.amount'),
+      columnType: 'currency',
+      render: (_value, row) => Number(row.netBookValue ?? row.cost ?? 0),
+    },
+  ], [t])
+
   if (loading) return <PageSkeleton />
 
   return (
@@ -95,56 +107,29 @@ export function FixedAssetsPage() {
           {t('common.add')}
         </button>
       </form>
-      <div className="overflow-x-auto rounded-xl border bg-white">
-        <table className="min-w-full text-sm">
-          <thead className="bg-slate-50">
-            <tr>
-              <th className="px-3 py-2 text-left">{t('pages.fixedAssets.name')}</th>
-              <th className="px-3 py-2 text-left">{t('common.status')}</th>
-              <th className="px-3 py-2 text-right">{t('common.amount')}</th>
-              <th className="px-3 py-2 text-right">{t('common.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {assets.map((a) => (
-              <tr key={a.id} className="border-t">
-                <td className="px-3 py-2">{a.assetName}</td>
-                <td className="px-3 py-2">{a.status}</td>
-                <td className="px-3 py-2 text-right">{a.netBookValue ?? a.cost}</td>
-                <td className="px-3 py-2 text-right space-x-2">
-                  {a.status === 'ACTIVE' ? (
-                    <>
-                      <button
-                        type="button"
-                        disabled={busyId === a.id}
-                        className="rounded border px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-50"
-                        onClick={() => void runDepreciation(a.id)}
-                      >
-                        Run Depreciation
-                      </button>
-                      <button
-                        type="button"
-                        disabled={busyId === a.id}
-                        className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
-                        onClick={() => {
-                          setDisposeTarget(a)
-                          setDisposeAmount(String(a.netBookValue ?? a.cost ?? '0'))
-                          setDisposeNotes('')
-                        }}
-                      >
-                        Dispose Asset
-                      </button>
-                    </>
-                  ) : (
-                    <span className="text-slate-400 text-xs">—</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {assets.length === 0 ? <p className="p-4 text-slate-500 text-sm">{t('common.empty')}</p> : null}
-      </div>
+      <DataTable
+        columns={columns}
+        rows={assets}
+        getRowKey={row => row.id}
+        emptyStateLabel={t('common.empty')}
+        rowActions={[
+          {
+            label: 'Run Depreciation',
+            onClick: row => void runDepreciation(row.id),
+            disabled: row => row.status !== 'ACTIVE' || busyId === row.id,
+          },
+          {
+            label: 'Dispose Asset',
+            onClick: row => {
+              setDisposeTarget(row)
+              setDisposeAmount(String(row.netBookValue ?? row.cost ?? '0'))
+              setDisposeNotes('')
+            },
+            disabled: row => row.status !== 'ACTIVE' || busyId === row.id,
+            destructive: true,
+          },
+        ]}
+      />
 
       {disposeTarget ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

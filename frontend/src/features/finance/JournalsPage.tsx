@@ -17,6 +17,7 @@ import {
 import { normalizeApiError } from '../../shared/api/errors'
 import { formatDate } from '../../shared/utils/intl'
 import { PageSkeleton } from '../../shared/components/ui/LoadingSkeleton'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
 
 type DraftLine = {
   key: string
@@ -253,6 +254,128 @@ export function JournalsPage() {
     }
   }
 
+  const journalColumns = useMemo((): DataTableColumn<JournalSummary>[] => [
+    {
+      key: 'entryDate',
+      header: t('journals.colDate'),
+      columnType: 'date',
+      render: v => formatDate(String(v)),
+    },
+    { key: 'referenceNumber', header: t('journals.colReference') },
+    {
+      key: 'description',
+      header: t('journals.colDescription'),
+      render: v => <span className="max-w-xs truncate inline-block">{String(v)}</span>,
+    },
+    {
+      key: 'debitTotal',
+      header: t('journals.colDebit'),
+      columnType: 'currency',
+      render: (v, row) => money(Number(v), row.currencyCode),
+    },
+    {
+      key: 'creditTotal',
+      header: t('journals.colCredit'),
+      columnType: 'currency',
+      render: (v, row) => money(Number(v), row.currencyCode),
+    },
+    { key: 'postedBy', header: t('journals.colPostedBy'), render: v => String(v ?? '—') },
+    {
+      key: 'status',
+      header: t('journals.status'),
+      render: v => statusBadge(String(v)),
+    },
+  ], [t])
+
+  const detailLineColumns = useMemo((): DataTableColumn<JournalLine & { idx: number }>[] => [
+    { key: 'account', header: t('journals.account') },
+    { key: 'description', header: t('journals.colDescription'), render: v => String(v || '—') },
+    {
+      key: 'debit',
+      header: t('journals.colDebit'),
+      align: 'right',
+      render: (v, _row) =>
+        detail && Number(v) > 0 ? money(Number(v), detail.currencyCode) : '—',
+    },
+    {
+      key: 'credit',
+      header: t('journals.colCredit'),
+      align: 'right',
+      render: (v, _row) =>
+        detail && Number(v) > 0 ? money(Number(v), detail.currencyCode) : '—',
+    },
+  ], [detail, t])
+
+  const draftLineColumns = useMemo((): DataTableColumn<DraftLine>[] => [
+    {
+      key: 'account',
+      header: t('journals.account'),
+      sortable: false,
+      render: (_v, line) => (
+        <select
+          value={line.account}
+          onChange={e => updateLine(line.key, { account: e.target.value })}
+          className="w-full min-w-[140px] rounded-md border px-2 py-1"
+        >
+          {accounts.map(account => (
+            <option key={account.accountCode} value={account.accountCode}>
+              {accountLabel(account)}
+            </option>
+          ))}
+        </select>
+      ),
+    },
+    {
+      key: 'description',
+      header: t('journals.colDescription'),
+      sortable: false,
+      render: (_v, line) => (
+        <input
+          value={line.description}
+          onChange={e => updateLine(line.key, { description: e.target.value })}
+          className="w-full min-w-[120px] rounded-md border px-2 py-1"
+        />
+      ),
+    },
+    {
+      key: 'debit',
+      header: t('journals.colDebit'),
+      align: 'right',
+      sortable: false,
+      render: (_v, line) => (
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          value={line.debit}
+          onChange={e => updateLine(line.key, { debit: e.target.value, credit: e.target.value ? '' : line.credit })}
+          className="w-full min-w-[90px] rounded-md border px-2 py-1 text-right"
+        />
+      ),
+    },
+    {
+      key: 'credit',
+      header: t('journals.colCredit'),
+      align: 'right',
+      sortable: false,
+      render: (_v, line) => (
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          value={line.credit}
+          onChange={e => updateLine(line.key, { credit: e.target.value, debit: e.target.value ? '' : line.debit })}
+          className="w-full min-w-[90px] rounded-md border px-2 py-1 text-right"
+        />
+      ),
+    },
+  ], [accounts, t])
+
+  const detailLinesWithIdx = useMemo(
+    () => (detail?.lines ?? []).map((line, idx) => ({ ...line, idx })),
+    [detail?.lines],
+  )
+
   if (loading && rows.length === 0) {
     return <PageSkeleton />
   }
@@ -326,39 +449,17 @@ export function JournalsPage() {
           </label>
         </div>
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-slate-600">
-                <th className="py-2 pr-3">{t('journals.colDate')}</th>
-                <th className="py-2 pr-3">{t('journals.colReference')}</th>
-                <th className="py-2 pr-3">{t('journals.colDescription')}</th>
-                <th className="py-2 pr-3 text-right">{t('journals.colDebit')}</th>
-                <th className="py-2 pr-3 text-right">{t('journals.colCredit')}</th>
-                <th className="py-2 pr-3">{t('journals.colPostedBy')}</th>
-                <th className="py-2">{t('journals.status')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr
-                  key={row.id}
-                  className={`border-b cursor-pointer hover:bg-slate-50 ${selectedId === row.id ? 'bg-indigo-50' : ''}`}
-                  onClick={() => void openDetail(row.id)}
-                >
-                  <td className="py-2 pr-3 whitespace-nowrap">{formatDate(row.entryDate)}</td>
-                  <td className="py-2 pr-3 font-medium">{row.referenceNumber}</td>
-                  <td className="py-2 pr-3 max-w-xs truncate">{row.description}</td>
-                  <td className="py-2 pr-3 text-right">{money(Number(row.debitTotal), row.currencyCode)}</td>
-                  <td className="py-2 pr-3 text-right">{money(Number(row.creditTotal), row.currencyCode)}</td>
-                  <td className="py-2 pr-3">{row.postedBy ?? '—'}</td>
-                  <td className="py-2">{statusBadge(row.status)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {rows.length === 0 ? <p className="text-sm text-slate-500 py-4">{t('common.empty')}</p> : null}
-        </div>
+        <DataTable
+          columns={journalColumns}
+          rows={rows}
+          isLoading={loading}
+          getRowKey={row => row.id}
+          onRowClick={row => void openDetail(row.id)}
+          showSearch={false}
+          emptyStateLabel={t('common.empty')}
+          noResultsLabel={t('common.empty')}
+          exportFilename="journals"
+        />
       </section>
 
       {selectedId ? (
@@ -388,32 +489,15 @@ export function JournalsPage() {
                 <p><span className="text-slate-600">{t('journals.status')}:</span> {statusBadge(detail.status)}</p>
                 <p><span className="text-slate-600">{t('journals.colPostedBy')}:</span> {detail.postedBy ?? '—'}</p>
               </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left text-slate-600">
-                      <th className="py-2 pr-3">{t('journals.account')}</th>
-                      <th className="py-2 pr-3">{t('journals.colDescription')}</th>
-                      <th className="py-2 pr-3 text-right">{t('journals.colDebit')}</th>
-                      <th className="py-2 pr-3 text-right">{t('journals.colCredit')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {detail.lines.map((line, idx) => (
-                      <tr key={`${line.account}-${idx}`} className="border-b">
-                        <td className="py-2 pr-3 font-medium">{line.account}</td>
-                        <td className="py-2 pr-3">{line.description || '—'}</td>
-                        <td className="py-2 pr-3 text-right">
-                          {Number(line.debit) > 0 ? money(Number(line.debit), detail.currencyCode) : '—'}
-                        </td>
-                        <td className="py-2 pr-3 text-right">
-                          {Number(line.credit) > 0 ? money(Number(line.credit), detail.currencyCode) : '—'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable
+                columns={detailLineColumns}
+                rows={detailLinesWithIdx}
+                getRowKey={row => `${row.account}-${row.idx}`}
+                showSearch={false}
+                showPagination={false}
+                emptyStateLabel={t('common.empty')}
+                noResultsLabel={t('common.empty')}
+              />
               <div className="flex flex-wrap gap-2">
                 {detail.status === 'DRAFT' ? (
                   <button
@@ -485,76 +569,23 @@ export function JournalsPage() {
                 />
               </label>
             </div>
-            <div className="overflow-x-auto rounded-lg border">
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-slate-50 text-left text-slate-600">
-                    <th className="py-2 px-2">{t('journals.account')}</th>
-                    <th className="py-2 px-2">{t('journals.colDescription')}</th>
-                    <th className="py-2 px-2 text-right">{t('journals.colDebit')}</th>
-                    <th className="py-2 px-2 text-right">{t('journals.colCredit')}</th>
-                    <th className="py-2 px-2" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {lines.map((line) => (
-                    <tr key={line.key} className="border-b">
-                      <td className="p-2">
-                        <select
-                          value={line.account}
-                          onChange={(e) => updateLine(line.key, { account: e.target.value })}
-                          className="w-full min-w-[140px] rounded-md border px-2 py-1"
-                        >
-                          {accounts.map((account) => (
-                            <option key={account.accountCode} value={account.accountCode}>
-                              {accountLabel(account)}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="p-2">
-                        <input
-                          value={line.description}
-                          onChange={(e) => updateLine(line.key, { description: e.target.value })}
-                          className="w-full min-w-[120px] rounded-md border px-2 py-1"
-                        />
-                      </td>
-                      <td className="p-2">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={line.debit}
-                          onChange={(e) => updateLine(line.key, { debit: e.target.value, credit: e.target.value ? '' : line.credit })}
-                          className="w-full min-w-[90px] rounded-md border px-2 py-1 text-right"
-                        />
-                      </td>
-                      <td className="p-2">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={line.credit}
-                          onChange={(e) => updateLine(line.key, { credit: e.target.value, debit: e.target.value ? '' : line.debit })}
-                          className="w-full min-w-[90px] rounded-md border px-2 py-1 text-right"
-                        />
-                      </td>
-                      <td className="p-2">
-                        <button
-                          type="button"
-                          disabled={lines.length <= 2}
-                          onClick={() => setLines((prev) => prev.filter((row) => row.key !== line.key))}
-                          className="text-slate-500 hover:text-red-600 disabled:opacity-30"
-                          aria-label={t('common.remove')}
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              columns={draftLineColumns}
+              rows={lines}
+              getRowKey={row => row.key}
+              showSearch={false}
+              showPagination={false}
+              rowActions={[
+                {
+                  label: t('common.remove'),
+                  onClick: line => setLines(prev => prev.filter(row => row.key !== line.key)),
+                  disabled: () => lines.length <= 2,
+                  destructive: true,
+                },
+              ]}
+              emptyStateLabel={t('common.empty')}
+              noResultsLabel={t('common.empty')}
+            />
             <button
               type="button"
               onClick={() => setLines((prev) => [...prev, emptyLine(defaultAccount)])}

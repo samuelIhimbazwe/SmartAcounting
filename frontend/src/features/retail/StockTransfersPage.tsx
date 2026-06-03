@@ -13,9 +13,17 @@ import {
 import { listLocations, type LocationDto } from '../../shared/api/locations'
 import { retailListProducts } from '../../shared/api/retail'
 import { normalizeApiError } from '../../shared/api/errors'
-import { formatDate } from '../../shared/utils/intl'
 import { Button } from '../../shared/components/ui/Button'
+import { DataTable, type DataTableColumn, type DataTableRowAction } from '../../shared/components/ui/DataTable'
 import { PageSkeleton } from '../../shared/components/ui/LoadingSkeleton'
+import {
+  FormActions,
+  FormField,
+  FormStack,
+  Input,
+  Modal,
+  useFieldValidation,
+} from '../../components/ui'
 
 type TabId = 'pending' | 'approved' | 'in-transit' | 'history'
 
@@ -145,17 +153,61 @@ export function StockTransfersPage() {
           ? inTransitRows
           : historyRows
 
+  const formValues = { fromLocationId, toLocationId, selectedProductId, quantity }
+  const { errors, valid, onBlur, validateAll } = useFieldValidation(formValues, {
+    fromLocationId: v => (String(v ?? '') ? undefined : 'From location is required.'),
+    toLocationId: v => (String(v ?? '') ? undefined : 'To location is required.'),
+    selectedProductId: v => (String(v ?? '') ? undefined : 'Product is required.'),
+    quantity: v => {
+      const qty = Number(v)
+      return Number.isFinite(qty) && qty > 0 ? undefined : 'Enter a valid quantity.'
+    },
+  })
+
+  const columns = useMemo((): DataTableColumn<StockTransferRow>[] => [
+    { key: 'createdAt', header: 'Date', columnType: 'date' },
+    {
+      key: 'fromLocationId',
+      header: 'From → To',
+      render: (_v, row) =>
+        `${locationLabel(locations, row.fromLocationId)} → ${locationLabel(locations, row.toLocationId)}`,
+    },
+    {
+      key: 'id',
+      header: 'Products',
+      render: (_v, row) => (
+        <ul className="space-y-1">
+          {row.lines.map(line => (
+            <li key={line.id ?? line.productId}>
+              {productName(line.productId)} × {transferQty(line)}
+            </li>
+          ))}
+        </ul>
+      ),
+    },
+    { key: 'status', header: 'Status', columnType: 'status' },
+  ], [locations, products])
+
+  const rowActions = useMemo((): DataTableRowAction<StockTransferRow>[] => {
+    if (tab === 'pending') {
+      return [
+        { label: 'Approve', onClick: row => void handleApprove(row.id), disabled: row => busyId === row.id },
+        { label: 'Reject', onClick: row => void handleReject(row.id), disabled: row => busyId === row.id, destructive: true },
+      ]
+    }
+    if (tab === 'approved') {
+      return [{ label: 'Dispatch', onClick: row => void handleDispatch(row.id), disabled: row => busyId === row.id }]
+    }
+    if (tab === 'in-transit') {
+      return [{ label: 'Confirm received', onClick: row => void handleReceive(row), disabled: row => busyId === row.id }]
+    }
+    return []
+  }, [tab, busyId])
+
   async function handleCreate(e: FormEvent) {
     e.preventDefault()
-    if (!fromLocationId || !toLocationId || !selectedProductId) {
-      setError('From location, to location, and product are required.')
-      return
-    }
+    if (!validateAll()) return
     const qty = Number(quantity)
-    if (!Number.isFinite(qty) || qty <= 0) {
-      setError('Enter a valid quantity.')
-      return
-    }
     setFormBusy(true)
     setError(null)
     try {
@@ -272,10 +324,9 @@ export function StockTransfersPage() {
 
       {error ? <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p> : null}
 
-      <label className="block max-w-xs text-sm">
-        Working location
+      <FormField label="Working location" className="max-w-xs">
         <select
-          className="mt-1 w-full rounded-lg border px-3 py-2"
+          className="w-full rounded-lg border px-3 py-2 text-sm"
           value={contextLocationId}
           onChange={e => setContextLocationId(e.target.value)}
         >
@@ -285,7 +336,7 @@ export function StockTransfersPage() {
             </option>
           ))}
         </select>
-      </label>
+      </FormField>
 
       <div className="border-b border-neutral-200">
         <nav className="-mb-px flex flex-wrap gap-4">
@@ -329,79 +380,29 @@ export function StockTransfersPage() {
         </div>
       ) : null}
 
-      <div className="overflow-x-auto rounded-xl border">
-        <table className="min-w-full text-left text-sm">
-          <thead className="bg-neutral-50">
-            <tr>
-              <th className="px-3 py-2">Date</th>
-              <th className="px-3 py-2">From → To</th>
-              <th className="px-3 py-2">Products</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visibleRows.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-3 py-8 text-center text-neutral-500">
-                  No transfers in this view.
-                </td>
-              </tr>
-            ) : (
-              visibleRows.map(row => (
-                <tr key={row.id} className="border-t align-top">
-                  <td className="px-3 py-2">{row.createdAt ? formatDate(row.createdAt) : '—'}</td>
-                  <td className="px-3 py-2">
-                    {locationLabel(locations, row.fromLocationId)} → {locationLabel(locations, row.toLocationId)}
-                  </td>
-                  <td className="px-3 py-2">
-                    <ul className="space-y-1">
-                      {row.lines.map(line => (
-                        <li key={line.id ?? line.productId}>
-                          {productName(line.productId)} × {transferQty(line)}
-                        </li>
-                      ))}
-                    </ul>
-                  </td>
-                  <td className="px-3 py-2">{row.status}</td>
-                  <td className="px-3 py-2">
-                    <div className="flex flex-wrap gap-1">
-                      {tab === 'pending' ? (
-                        <>
-                          <Button type="button" disabled={busyId === row.id} onClick={() => void handleApprove(row.id)}>
-                            Approve
-                          </Button>
-                          <Button type="button" variant="ghost" disabled={busyId === row.id} onClick={() => void handleReject(row.id)}>
-                            Reject
-                          </Button>
-                        </>
-                      ) : null}
-                      {tab === 'approved' ? (
-                        <Button type="button" disabled={busyId === row.id} onClick={() => void handleDispatch(row.id)}>
-                          Dispatch
-                        </Button>
-                      ) : null}
-                      {tab === 'in-transit' ? (
-                        <Button type="button" disabled={busyId === row.id} onClick={() => void handleReceive(row)}>
-                          Confirm received
-                        </Button>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={columns}
+        rows={visibleRows}
+        isLoading={loading}
+        getRowKey={row => row.id}
+        rowActions={rowActions.length > 0 ? rowActions : undefined}
+        showSearch={false}
+        emptyStateLabel="No transfers in this view"
+        noResultsLabel="No transfers in this view"
+        exportFilename="stock-transfers"
+      />
 
-      {formOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <form className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl" onSubmit={e => void handleCreate(e)}>
-            <h2 className="mb-4 text-lg font-semibold">Request transfer</h2>
-            <label className="mb-3 block text-sm">
-              From location
-              <select className="mt-1 w-full rounded border px-3 py-2" value={fromLocationId} onChange={e => setFromLocationId(e.target.value)} required>
+      <Modal open={formOpen} onClose={() => setFormOpen(false)} title="Request transfer" size="sm">
+        <form onSubmit={e => void handleCreate(e)}>
+          <FormStack>
+            <FormField label="From location" required error={errors.fromLocationId} valid={valid.fromLocationId}>
+              <select
+                className="mt-1 w-full rounded border px-3 py-2"
+                value={fromLocationId}
+                onChange={e => setFromLocationId(e.target.value)}
+                onBlur={() => onBlur('fromLocationId')}
+                required
+              >
                 <option value="">Select location</option>
                 {locations.map(loc => (
                   <option key={loc.id} value={loc.id}>
@@ -409,10 +410,15 @@ export function StockTransfersPage() {
                   </option>
                 ))}
               </select>
-            </label>
-            <label className="mb-3 block text-sm">
-              To location
-              <select className="mt-1 w-full rounded border px-3 py-2" value={toLocationId} onChange={e => setToLocationId(e.target.value)} required>
+            </FormField>
+            <FormField label="To location" required error={errors.toLocationId} valid={valid.toLocationId}>
+              <select
+                className="mt-1 w-full rounded border px-3 py-2"
+                value={toLocationId}
+                onChange={e => setToLocationId(e.target.value)}
+                onBlur={() => onBlur('toLocationId')}
+                required
+              >
                 <option value="">Select location</option>
                 {locations.filter(l => l.id !== fromLocationId).map(loc => (
                   <option key={loc.id} value={loc.id}>
@@ -420,19 +426,22 @@ export function StockTransfersPage() {
                   </option>
                 ))}
               </select>
-            </label>
-            <label className="mb-3 block text-sm">
-              Product search
-              <input
-                className="mt-1 w-full rounded border px-3 py-2"
+            </FormField>
+            <FormField label="Product search">
+              <Input
                 placeholder="Search by name or SKU…"
                 value={productSearch}
                 onChange={e => setProductSearch(e.target.value)}
               />
-            </label>
-            <label className="mb-3 block text-sm">
-              Product
-              <select className="mt-1 w-full rounded border px-3 py-2" value={selectedProductId} onChange={e => setSelectedProductId(e.target.value)} required>
+            </FormField>
+            <FormField label="Product" required error={errors.selectedProductId} valid={valid.selectedProductId}>
+              <select
+                className="mt-1 w-full rounded border px-3 py-2"
+                value={selectedProductId}
+                onChange={e => setSelectedProductId(e.target.value)}
+                onBlur={() => onBlur('selectedProductId')}
+                required
+              >
                 <option value="">Select product</option>
                 {productOptions.map(p => (
                   <option key={p.productId} value={p.productId}>
@@ -440,26 +449,32 @@ export function StockTransfersPage() {
                   </option>
                 ))}
               </select>
-            </label>
-            <label className="mb-3 block text-sm">
-              Quantity
-              <input type="number" min={0.0001} step="any" className="mt-1 w-full rounded border px-3 py-2" value={quantity} onChange={e => setQuantity(e.target.value)} required />
-            </label>
-            <label className="mb-4 block text-sm">
-              Notes
+            </FormField>
+            <FormField label="Quantity" required error={errors.quantity} valid={valid.quantity}>
+              <Input
+                type="number"
+                min={0.0001}
+                step="any"
+                value={quantity}
+                onChange={e => setQuantity(e.target.value)}
+                onBlur={() => onBlur('quantity')}
+                required
+              />
+            </FormField>
+            <FormField label="Notes">
               <textarea className="mt-1 w-full rounded border px-3 py-2" rows={2} value={notes} onChange={e => setNotes(e.target.value)} />
-            </label>
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="ghost" onClick={() => setFormOpen(false)} disabled={formBusy}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={formBusy}>
-                {formBusy ? 'Submitting…' : 'Submit request'}
-              </Button>
-            </div>
-          </form>
-        </div>
-      ) : null}
+            </FormField>
+          </FormStack>
+          <FormActions>
+            <Button type="button" variant="ghost" onClick={() => setFormOpen(false)} disabled={formBusy}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={formBusy}>
+              {formBusy ? 'Submitting…' : 'Submit request'}
+            </Button>
+          </FormActions>
+        </form>
+      </Modal>
     </div>
   )
 }

@@ -25,6 +25,7 @@ import {
 import { normalizeApiError } from '../../shared/api/errors'
 import { Button } from '../../shared/components/ui/Button'
 import { PageSkeleton } from '../../shared/components/ui/LoadingSkeleton'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
 
 const PERIODS: { id: SalesAnalyticsPeriod; label: string }[] = [
   { id: 'today', label: 'Today' },
@@ -136,6 +137,40 @@ export function SalesAnalyticsPage() {
       .slice(0, 6)
   }, [lost?.byProduct])
 
+  type CashierTableRow = CashierPerformanceRow & { avgBasket: number; rating: number }
+
+  const cashierTableRows = useMemo(
+    (): CashierTableRow[] =>
+      cashiers.map(row => ({
+        ...row,
+        avgBasket: row.transactionCount > 0 ? row.totalSales / row.transactionCount : 0,
+        rating: cashierRating(row),
+      })),
+    [cashiers],
+  )
+
+  const cashierColumns = useMemo((): DataTableColumn<CashierTableRow>[] => [
+    { key: 'cashierName', header: 'Cashier' },
+    { key: 'transactionCount', header: 'Sales count', columnType: 'number' },
+    {
+      key: 'totalSales',
+      header: 'Revenue',
+      render: v => moneyRwf(Number(v)),
+    },
+    {
+      key: 'avgBasket',
+      header: 'Avg basket',
+      render: v => moneyRwf(Number(v)),
+    },
+    { key: 'totalVoids', header: 'Voids', columnType: 'number' },
+    {
+      key: 'rating',
+      header: 'Rating',
+      columnType: 'number',
+      render: v => `${Number(v).toFixed(1)} / 5`,
+    },
+  ], [])
+
   if (loading && cashiers.length === 0) {
     return <PageSkeleton />
   }
@@ -182,44 +217,15 @@ export function SalesAnalyticsPage() {
       <section className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
         <h2 className="text-sm font-semibold text-neutral-800">Cashier performance</h2>
         <p className="mt-1 text-xs text-neutral-500">Sorted by revenue (highest first).</p>
-        <div className="mt-4 overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="border-b border-neutral-200 text-neutral-600">
-              <tr>
-                <th className="px-3 py-2 font-medium">Cashier</th>
-                <th className="px-3 py-2 font-medium">Sales count</th>
-                <th className="px-3 py-2 font-medium">Revenue</th>
-                <th className="px-3 py-2 font-medium">Avg basket</th>
-                <th className="px-3 py-2 font-medium">Voids</th>
-                <th className="px-3 py-2 font-medium">Rating</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cashiers.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-3 py-8 text-center text-neutral-500">
-                    No cashier activity in this period.
-                  </td>
-                </tr>
-              ) : (
-                cashiers.map(row => {
-                  const avg = row.transactionCount > 0 ? row.totalSales / row.transactionCount : 0
-                  const rating = cashierRating(row)
-                  return (
-                    <tr key={row.cashierId} className="border-b border-neutral-100 last:border-0">
-                      <td className="px-3 py-2 font-medium text-neutral-900">{row.cashierName}</td>
-                      <td className="px-3 py-2 text-neutral-700">{row.transactionCount}</td>
-                      <td className="px-3 py-2 text-neutral-700">{moneyRwf(row.totalSales)}</td>
-                      <td className="px-3 py-2 text-neutral-700">{moneyRwf(avg)}</td>
-                      <td className="px-3 py-2 text-neutral-700">{row.totalVoids}</td>
-                      <td className="px-3 py-2 text-neutral-700">{rating.toFixed(1)} / 5</td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={cashierColumns}
+          rows={cashierTableRows}
+          isLoading={loading}
+          getRowKey={row => row.cashierId}
+          showSearch={false}
+          emptyStateLabel="No cashier activity in this period"
+          noResultsLabel="No cashier activity in this period"
+        />
       </section>
 
       <section className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">

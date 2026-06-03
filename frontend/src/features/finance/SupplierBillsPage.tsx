@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { LayoutGrid, Table2, FileSpreadsheet } from 'lucide-react'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
+import type { ApAgingSupplierRow } from './supplierBills/apAging'
 import {
   accountingApplyPayment,
   accountingCreatePayment,
@@ -174,6 +176,66 @@ export function SupplierBillsPage() {
   const summarySplit = useMemo(() => apSummaryByCurrency(rows), [rows])
   const byKanban = useMemo(() => groupBillsByKanban(rows), [rows])
 
+  const agingColumns = useMemo((): DataTableColumn<ApAgingSupplierRow>[] => [
+    {
+      key: 'supplierName',
+      header: t('supplierBills.supplier'),
+      render: (_v, row) => (
+        <>
+          <Link className="font-medium text-[var(--color-brand-800)] hover:underline" to={`/finance/suppliers/${row.supplierId}`}>
+            {row.supplierName}
+          </Link>
+          <span className="text-xs text-neutral-500"> ({row.currencyCode})</span>
+        </>
+      ),
+    },
+    {
+      key: 'current',
+      header: t('creditLedger.agingCurrent'),
+      align: 'right',
+      sortable: false,
+      render: (_v, row) => <span className="tabular-nums text-green-800">{money(row.current, row.currencyCode)}</span>,
+    },
+    {
+      key: 'days1_30',
+      header: t('creditLedger.aging1_30'),
+      align: 'right',
+      sortable: false,
+      render: (_v, row) => <span className="tabular-nums text-yellow-800">{money(row.days1_30, row.currencyCode)}</span>,
+    },
+    {
+      key: 'days31_60',
+      header: t('creditLedger.aging31_60'),
+      align: 'right',
+      sortable: false,
+      render: (_v, row) => <span className="tabular-nums text-orange-800">{money(row.days31_60, row.currencyCode)}</span>,
+    },
+    {
+      key: 'days61_90',
+      header: t('creditLedger.aging61_90'),
+      align: 'right',
+      sortable: false,
+      render: (_v, row) => <span className="tabular-nums text-red-800">{money(row.days61_90, row.currencyCode)}</span>,
+    },
+    {
+      key: 'over90',
+      header: t('creditLedger.aging90plus'),
+      align: 'right',
+      sortable: false,
+      render: (_v, row) => <span className="tabular-nums font-bold text-red-900">{money(row.over90, row.currencyCode)}</span>,
+    },
+    {
+      key: 'supplierKey',
+      header: t('creditLedger.agingTotal'),
+      align: 'right',
+      sortable: false,
+      render: (_v, row) => {
+        const total = row.current + row.days1_30 + row.days31_60 + row.days61_90 + row.over90
+        return <span className="tabular-nums font-bold">{money(total, row.currencyCode)}</span>
+      },
+    },
+  ], [t])
+
   if (loading) {
     return (
       <div className="p-4">
@@ -332,43 +394,16 @@ export function SupplierBillsPage() {
               {t('supplierBills.emptyAging')}
             </p>
           ) : (
-            <div className="overflow-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--color-surface)]">
-              <table className="aging-table w-full min-w-[860px] text-left text-sm">
-                <thead>
-                  <tr>
-                    <th className="border-b px-2 py-2">{t('supplierBills.supplier')}</th>
-                    <th className="border-b px-2 py-2 text-right text-green-700">{t('creditLedger.agingCurrent')}</th>
-                    <th className="border-b px-2 py-2 text-right text-yellow-700">{t('creditLedger.aging1_30')}</th>
-                    <th className="border-b px-2 py-2 text-right text-orange-700">{t('creditLedger.aging31_60')}</th>
-                    <th className="border-b px-2 py-2 text-right text-red-700">{t('creditLedger.aging61_90')}</th>
-                    <th className="border-b px-2 py-2 text-right font-bold text-red-900">{t('creditLedger.aging90plus')}</th>
-                    <th className="border-b px-2 py-2 text-right font-bold">{t('creditLedger.agingTotal')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {agingRows.map((row) => {
-                    const total =
-                      row.current + row.days1_30 + row.days31_60 + row.days61_90 + row.over90
-                    return (
-                      <tr key={row.supplierKey} className="border-b border-neutral-100">
-                        <td className="px-2 py-2">
-                          <Link className="font-medium text-[var(--color-brand-800)] hover:underline" to={`/finance/suppliers/${row.supplierId}`}>
-                            {row.supplierName}
-                          </Link>
-                          <span className="text-xs text-neutral-500"> ({row.currencyCode})</span>
-                        </td>
-                        <td className="px-2 py-2 text-right tabular-nums text-green-800">{money(row.current, row.currencyCode)}</td>
-                        <td className="px-2 py-2 text-right tabular-nums text-yellow-800">{money(row.days1_30, row.currencyCode)}</td>
-                        <td className="px-2 py-2 text-right tabular-nums text-orange-800">{money(row.days31_60, row.currencyCode)}</td>
-                        <td className="px-2 py-2 text-right tabular-nums text-red-800">{money(row.days61_90, row.currencyCode)}</td>
-                        <td className="px-2 py-2 text-right tabular-nums font-bold text-red-900">{money(row.over90, row.currencyCode)}</td>
-                        <td className="px-2 py-2 text-right tabular-nums font-bold">{money(total, row.currencyCode)}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              columns={agingColumns}
+              rows={agingRows}
+              getRowKey={row => row.supplierKey}
+              showSearch={false}
+              showPagination={false}
+              emptyStateLabel={t('supplierBills.emptyAging')}
+              noResultsLabel={t('supplierBills.emptyAging')}
+              exportFilename="supplier-ap-aging"
+            />
           )}
         </section>
       )}

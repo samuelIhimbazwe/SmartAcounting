@@ -272,13 +272,9 @@ export function UserTenantManagementPage() {
     { key: 'email', header: t('management.email') },
 
     {
-
       key: 'status',
-
       header: t('management.status'),
-
-      render: (value) => String(value ?? 'active'),
-
+      columnType: 'status',
     },
 
     {
@@ -1335,7 +1331,7 @@ export function UserTenantManagementPage() {
 
                 isLoading={usersQuery.isLoading}
 
-                loadingLabel={t('management.loadingMembers')}
+                getRowKey={row => row.id}
 
                 skeletonRowCount={Math.min(size, 8)}
 

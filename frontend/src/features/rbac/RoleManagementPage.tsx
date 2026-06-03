@@ -1,7 +1,9 @@
+import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { useAnyPermission } from '../../shared/hooks/usePermission'
-import { listTenantRoles } from '../../shared/api/tenantRoles'
+import { listTenantRoles, type TenantRoleDto } from '../../shared/api/tenantRoles'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
 import { RoleSetupWizard } from './RoleSetupWizard'
 
 export function RoleManagementPage() {
@@ -11,6 +13,28 @@ export function RoleManagementPage() {
     queryFn: listTenantRoles,
     enabled: canManage,
   })
+
+  const columns = useMemo((): DataTableColumn<TenantRoleDto>[] => [
+    {
+      key: 'name',
+      header: 'Role',
+      render: (_value, role) => (
+        <span>
+          <span className="mr-2">{role.emoji}</span>
+          {role.name}
+          {role.isOwner ? (
+            <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-900">Owner</span>
+          ) : null}
+        </span>
+      ),
+    },
+    {
+      key: 'permissions',
+      header: 'Permissions',
+      render: (_value, role) => `${role.permissions.length} granted`,
+    },
+    { key: 'userCount', header: 'Users', columnType: 'number' },
+  ], [])
 
   if (!canManage) {
     return <p className="text-sm text-neutral-600">You do not have permission to manage roles.</p>
@@ -36,32 +60,14 @@ export function RoleManagementPage() {
           Manage users
         </Link>
       </div>
-      <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-white">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-[var(--surface-overlay)] text-xs uppercase text-neutral-500">
-            <tr>
-              <th className="px-4 py-3">Role</th>
-              <th className="px-4 py-3">Permissions</th>
-              <th className="px-4 py-3">Users</th>
-            </tr>
-          </thead>
-          <tbody>
-            {roles.map((role) => (
-              <tr key={role.id} className="border-t border-[var(--border-subtle)]">
-                <td className="px-4 py-3">
-                  <span className="mr-2">{role.emoji}</span>
-                  {role.name}
-                  {role.isOwner ? (
-                    <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-900">Owner</span>
-                  ) : null}
-                </td>
-                <td className="px-4 py-3 text-neutral-600">{role.permissions.length} granted</td>
-                <td className="px-4 py-3">{role.userCount}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={columns}
+        rows={roles}
+        isLoading={rolesQuery.isLoading}
+        getRowKey={row => row.id}
+        showSearch={roles.length > 10}
+        emptyStateLabel="No roles configured"
+      />
     </div>
   )
 }

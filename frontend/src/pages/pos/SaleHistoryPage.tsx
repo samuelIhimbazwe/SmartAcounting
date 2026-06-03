@@ -7,6 +7,7 @@ import { Permission } from '../../shared/security/permissions'
 import { formatRwf } from '../../utils/currency'
 import { SaleDetailModal } from '../../components/pos/SaleDetailModal'
 import { Button } from '../../shared/components/ui/Button'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
 import { Pagination } from '../../shared/components/ui/Pagination'
 
 function todayIso(): string {
@@ -85,6 +86,35 @@ export function SaleHistoryPage() {
   }, [rows])
 
   const pageCount = Math.max(1, Math.ceil(total / 25))
+
+  const columns = useMemo((): DataTableColumn<PosSaleListRow>[] => [
+    {
+      key: 'createdAt',
+      header: 'Date / time',
+      render: v => new Date(String(v)).toLocaleString(),
+    },
+    {
+      key: 'receiptNumber',
+      header: 'Receipt #',
+      render: v => <span className="font-mono text-xs">{String(v)}</span>,
+    },
+    { key: 'customerName', header: 'Customer' },
+    {
+      key: 'itemCount',
+      header: 'Items',
+      columnType: 'number',
+      align: 'right',
+      render: v => (v ? String(v) : '—'),
+    },
+    {
+      key: 'totalAmount',
+      header: 'Total',
+      columnType: 'currency',
+      render: v => formatRwf(Number(v)),
+    },
+    { key: 'tender', header: 'Tender' },
+    { key: 'status', header: 'Status', columnType: 'status' },
+  ], [])
 
   const exportCsv = () => {
     const blob = new Blob([toCsv(rows)], { type: 'text/csv;charset=utf-8' })
@@ -212,51 +242,19 @@ export function SaleHistoryPage() {
         </ul>
       </div>
 
-      <div className="table-scroll table-desktop-only surface-card" style={{ padding: 0 }}>
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b bg-neutral-50 text-xs uppercase text-neutral-500">
-              <th className="px-3 py-2">Date / time</th>
-              <th className="px-3 py-2">Receipt #</th>
-              <th className="px-3 py-2">Customer</th>
-              <th className="px-3 py-2 text-right">Items</th>
-              <th className="px-3 py-2 text-right">Total</th>
-              <th className="px-3 py-2">Tender</th>
-              <th className="px-3 py-2">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && !rows.length ? (
-              <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-neutral-500">
-                  Loading…
-                </td>
-              </tr>
-            ) : null}
-            {!loading && !rows.length ? (
-              <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-neutral-500">
-                  {emptyMessage}
-                </td>
-              </tr>
-            ) : null}
-            {rows.map((row) => (
-              <tr
-                key={row.salesOrderId}
-                className="cursor-pointer border-b border-neutral-100 hover:bg-[var(--surface-overlay)]"
-                onClick={() => setSelectedId(row.salesOrderId)}
-              >
-                <td className="px-3 py-2 whitespace-nowrap">{new Date(row.createdAt).toLocaleString()}</td>
-                <td className="px-3 py-2 font-mono text-xs">{row.receiptNumber}</td>
-                <td className="px-3 py-2">{row.customerName}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{row.itemCount || '—'}</td>
-                <td className="px-3 py-2 text-right tabular-nums">{formatRwf(row.totalAmount)}</td>
-                <td className="px-3 py-2">{row.tender}</td>
-                <td className="px-3 py-2">{row.status}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="table-desktop-only">
+        <DataTable
+          columns={columns}
+          rows={rows}
+          isLoading={loading}
+          getRowKey={row => row.salesOrderId}
+          onRowClick={row => setSelectedId(row.salesOrderId)}
+          showSearch={false}
+          showPagination={false}
+          emptyStateLabel={emptyMessage}
+          noResultsLabel={emptyMessage}
+          exportFilename="pos-sale-history"
+        />
       </div>
 
       <Pagination

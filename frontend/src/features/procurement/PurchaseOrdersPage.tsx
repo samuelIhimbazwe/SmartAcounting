@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ShoppingCart, X } from 'lucide-react'
 import {
   confirmPurchaseOrder,
@@ -14,6 +14,11 @@ import {
   type PurchaseOrderDetailResponse,
 } from '../../shared/api/procurement'
 import { normalizeApiError } from '../../shared/api/errors'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
+import { FormField, FormStack } from '../../components/ui'
+
+type PurchaseOrderLine = PurchaseOrderDetailResponse['lines'][number]
+type GrnQtyRow = PurchaseOrderLine & { qtyReceived: string }
 
 export function PurchaseOrdersPage() {
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
@@ -110,6 +115,59 @@ export function PurchaseOrdersPage() {
 
   const canCreateGrn = detail?.purchaseOrder.status === 'CONFIRMED' || detail?.purchaseOrder.status === 'PARTIALLY_RECEIVED'
 
+  const orderColumns = useMemo((): DataTableColumn<PurchaseOrder>[] => [
+    {
+      key: 'poNumber',
+      header: 'PO #',
+      render: v => <span className="font-mono text-xs">{String(v)}</span>,
+    },
+    { key: 'supplierName', header: 'Supplier' },
+    { key: 'status', header: 'Status', columnType: 'status' },
+    {
+      key: 'totalAmount',
+      header: 'Total',
+      render: (_v, po) => `${po.totalAmount?.toLocaleString()} ${po.currencyCode}`,
+    },
+  ], [])
+
+  const poLineColumns = useMemo((): DataTableColumn<PurchaseOrderLine>[] => [
+    { key: 'productName', header: 'Product' },
+    { key: 'orderedQuantity', header: 'Ordered', columnType: 'number', align: 'right' },
+    { key: 'receivedQuantity', header: 'Received', columnType: 'number', align: 'right' },
+    { key: 'status', header: 'Status', columnType: 'status' },
+  ], [])
+
+  const grnLineColumns = useMemo((): DataTableColumn<GrnLineRow>[] => [
+    { key: 'sku', header: 'SKU' },
+    { key: 'productName', header: 'Product' },
+    { key: 'receivedQuantity', header: 'Received', columnType: 'number', align: 'right' },
+  ], [])
+
+  const grnFormRows = useMemo((): GrnQtyRow[] => {
+    if (!detail) return []
+    return detail.lines.map(line => ({ ...line, qtyReceived: grnQty[line.id] ?? '' }))
+  }, [detail, grnQty])
+
+  const grnFormColumns = useMemo((): DataTableColumn<GrnQtyRow>[] => [
+    { key: 'productName', header: 'Line', sortable: false },
+    {
+      key: 'qtyReceived',
+      header: 'Qty received',
+      align: 'right',
+      sortable: false,
+      render: (_v, line) => (
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          className="w-24 rounded border px-2 py-1 text-right"
+          value={grnQty[line.id] ?? ''}
+          onChange={e => setGrnQty(prev => ({ ...prev, [line.id]: e.target.value }))}
+        />
+      ),
+    },
+  ], [grnQty])
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <header className="flex items-center gap-2">
@@ -122,42 +180,27 @@ export function PurchaseOrdersPage() {
 
       {error && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
 
-      <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)]">
-        <table className="min-w-full text-left text-sm">
-          <thead className="bg-neutral-50">
-            <tr>
-              <th className="px-3 py-2">PO #</th>
-              <th className="px-3 py-2">Supplier</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">Total</th>
-              <th className="px-3 py-2">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {orders.length === 0 && (
-              <tr><td colSpan={5} className="px-3 py-6 text-center text-neutral-500">No purchase orders yet.</td></tr>
-            )}
-            {orders.map((po) => (
-              <tr key={po.id} className={`border-t border-[var(--border-subtle)] ${selectedId === po.id ? 'bg-indigo-50' : ''}`}>
-                <td className="px-3 py-2">
-                  <button type="button" className="font-mono text-xs text-indigo-700 hover:underline" onClick={() => void openDetail(po.id)}>{po.poNumber}</button>
-                </td>
-                <td className="px-3 py-2">{po.supplierName}</td>
-                <td className="px-3 py-2">{po.status}</td>
-                <td className="px-3 py-2">{po.totalAmount?.toLocaleString()} {po.currencyCode}</td>
-                <td className="px-3 py-2 space-x-2">
-                  {po.status === 'DRAFT' && (
-                    <button type="button" disabled={busyId === po.id} className="rounded border px-2 py-1 text-xs" onClick={() => void runAction(po.id, 'send')}>Send</button>
-                  )}
-                  {po.status === 'SENT' && (
-                    <button type="button" disabled={busyId === po.id} className="rounded border px-2 py-1 text-xs" onClick={() => void runAction(po.id, 'confirm')}>Confirm</button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={orderColumns}
+        rows={orders}
+        getRowKey={row => row.id}
+        onRowClick={po => void openDetail(po.id)}
+        rowActions={[
+          {
+            label: 'Send',
+            onClick: po => void runAction(po.id, 'send'),
+            disabled: po => po.status !== 'DRAFT' || busyId === po.id,
+          },
+          {
+            label: 'Confirm',
+            onClick: po => void runAction(po.id, 'confirm'),
+            disabled: po => po.status !== 'SENT' || busyId === po.id,
+          },
+        ]}
+        showSearch={false}
+        emptyStateLabel="No purchase orders yet"
+        noResultsLabel="No purchase orders match your search"
+      />
 
       {detail && selectedId ? (
         <section className="rounded-xl border bg-white p-4 space-y-4">
@@ -171,19 +214,15 @@ export function PurchaseOrdersPage() {
           </div>
 
           {detailTab === 'lines' ? (
-            <table className="min-w-full text-sm">
-              <thead><tr className="border-b text-left text-slate-600"><th className="py-2">Product</th><th className="py-2 text-right">Ordered</th><th className="py-2 text-right">Received</th><th className="py-2">Status</th></tr></thead>
-              <tbody>
-                {detail.lines.map((line) => (
-                  <tr key={line.id} className="border-b">
-                    <td className="py-2">{line.productName}</td>
-                    <td className="py-2 text-right">{line.orderedQuantity}</td>
-                    <td className="py-2 text-right">{line.receivedQuantity}</td>
-                    <td className="py-2">{line.status}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              columns={poLineColumns}
+              rows={detail.lines}
+              getRowKey={row => row.id}
+              showSearch={false}
+              showPagination={false}
+              emptyStateLabel="No lines on this PO"
+              noResultsLabel="No lines on this PO"
+            />
           ) : (
             <div className="space-y-3">
               {canCreateGrn ? (
@@ -194,14 +233,16 @@ export function PurchaseOrdersPage() {
                 <div key={grn.id} className="rounded border p-3 space-y-2">
                   <p className="m-0 text-sm font-medium">{grn.grnNumber} · {grn.receivedDate} · {grn.status}</p>
                   {grn.notes ? <p className="m-0 text-xs text-slate-600">{grn.notes}</p> : null}
-                  <table className="min-w-full text-xs">
-                    <thead><tr className="text-left text-slate-500"><th className="py-1">SKU</th><th className="py-1">Product</th><th className="py-1 text-right">Received</th></tr></thead>
-                    <tbody>
-                      {(grnLines[grn.id] ?? []).map((line) => (
-                        <tr key={line.id} className="border-t"><td className="py-1">{line.sku}</td><td className="py-1">{line.productName}</td><td className="py-1 text-right">{line.receivedQuantity}</td></tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <DataTable
+                    columns={grnLineColumns}
+                    rows={grnLines[grn.id] ?? []}
+                    getRowKey={row => row.id}
+                    showSearch={false}
+                    showPagination={false}
+                    compact
+                    emptyStateLabel="No GRN lines"
+                    noResultsLabel="No GRN lines"
+                  />
                 </div>
               ))}
             </div>
@@ -213,21 +254,23 @@ export function PurchaseOrdersPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 space-y-3 shadow-xl">
             <h3 className="text-lg font-semibold m-0">Create GRN</h3>
-            <label className="block text-sm">Received date<input type="date" className="mt-1 w-full rounded border px-2 py-1.5" value={grnDate} onChange={(e) => setGrnDate(e.target.value)} /></label>
-            <label className="block text-sm">Notes<textarea className="mt-1 w-full rounded border px-2 py-1.5 min-h-[3rem]" value={grnNotes} onChange={(e) => setGrnNotes(e.target.value)} /></label>
-            <table className="min-w-full text-sm">
-              <thead><tr className="border-b text-left"><th className="py-1">Line</th><th className="py-1 text-right">Qty received</th></tr></thead>
-              <tbody>
-                {detail.lines.map((line) => (
-                  <tr key={line.id} className="border-b">
-                    <td className="py-2">{line.productName}</td>
-                    <td className="py-2 text-right">
-                      <input type="number" min="0" step="0.01" className="w-24 rounded border px-2 py-1 text-right" value={grnQty[line.id] ?? ''} onChange={(e) => setGrnQty((prev) => ({ ...prev, [line.id]: e.target.value }))} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <FormStack>
+              <FormField label="Received date">
+                <input type="date" className="w-full rounded border px-2 py-1.5" value={grnDate} onChange={(e) => setGrnDate(e.target.value)} />
+              </FormField>
+              <FormField label="Notes">
+                <textarea className="w-full rounded border px-2 py-1.5 min-h-[3rem]" value={grnNotes} onChange={(e) => setGrnNotes(e.target.value)} />
+              </FormField>
+            </FormStack>
+            <DataTable
+              columns={grnFormColumns}
+              rows={grnFormRows}
+              getRowKey={row => row.id}
+              showSearch={false}
+              showPagination={false}
+              emptyStateLabel="No PO lines"
+              noResultsLabel="No PO lines"
+            />
             <div className="flex justify-end gap-2">
               <button type="button" className="rounded border px-3 py-1.5 text-sm" onClick={() => setGrnModalOpen(false)}>Cancel</button>
               <button type="button" disabled={busyId === selectedId} className="rounded bg-indigo-600 px-3 py-1.5 text-sm text-white disabled:opacity-50" onClick={() => void submitGrn()}>Save GRN</button>

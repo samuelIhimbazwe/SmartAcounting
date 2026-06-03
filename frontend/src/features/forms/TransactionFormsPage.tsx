@@ -7,6 +7,8 @@ import { normalizeApiError } from '../../shared/api/errors'
 import { submitTransaction, type TransactionRecord, type TransactionType } from '../../shared/api/forms'
 import { formatCurrency } from '../../shared/utils/intl'
 import { invoiceSchema, purchaseOrderSchema, salesOrderSchema } from './transactionSchemas'
+import { Button } from '../../shared/components/ui/Button'
+import { FormActions, FormField, FormSection, Input } from '../../components/ui'
 
 const transactionMeta: Record<TransactionType, { titleKey: string; subtitleKey: string }> = {
   invoice: {
@@ -54,79 +56,33 @@ function getDefaultValues(type: TransactionType): FormValues {
   return base
 }
 
-function ErrorText({ errors, field }: { errors: FieldErrors<FormValues>; field: string }) {
-  const message = errors[field]?.message
-  if (typeof message !== 'string') {
-    return null
-  }
-  return (
-    <p id={`${field}-error`} className="m-0 mt-1 text-xs text-rose-700" role="alert">
-      {message}
-    </p>
-  )
-}
-
 function BaseFields({ register, errors }: { register: UseFormRegister<FormValues>; errors: FieldErrors<FormValues> }) {
   const { t } = useTranslation()
+  const fieldError = (field: string) => {
+    const message = errors[field]?.message
+    return typeof message === 'string' ? message : undefined
+  }
   return (
     <>
-      <label className="block text-sm">
-        {t('forms.fields.documentNumber')}
-        <input
-          className="mt-1 w-full rounded-md border border-[var(--border-default)] px-3 py-2"
-          aria-invalid={Boolean(errors.documentNumber)}
-          aria-describedby={errors.documentNumber ? 'documentNumber-error' : undefined}
-          {...register('documentNumber')}
-        />
-        <ErrorText errors={errors} field="documentNumber" />
-      </label>
+      <FormField label={t('forms.fields.documentNumber')} error={fieldError('documentNumber')}>
+        <Input {...register('documentNumber')} />
+      </FormField>
 
-      <label className="block text-sm">
-        {t('forms.fields.counterparty')}
-        <input
-          className="mt-1 w-full rounded-md border border-[var(--border-default)] px-3 py-2"
-          aria-invalid={Boolean(errors.partnerName)}
-          aria-describedby={errors.partnerName ? 'partnerName-error' : undefined}
-          {...register('partnerName')}
-        />
-        <ErrorText errors={errors} field="partnerName" />
-      </label>
+      <FormField label={t('forms.fields.counterparty')} error={fieldError('partnerName')}>
+        <Input {...register('partnerName')} />
+      </FormField>
 
-      <label className="block text-sm">
-        {t('forms.fields.amount')}
-        <input
-          type="number"
-          step="0.01"
-          className="mt-1 w-full rounded-md border border-[var(--border-default)] px-3 py-2"
-          aria-invalid={Boolean(errors.amount)}
-          aria-describedby={errors.amount ? 'amount-error' : undefined}
-          {...register('amount', { valueAsNumber: true })}
-        />
-        <ErrorText errors={errors} field="amount" />
-      </label>
+      <FormField label={t('forms.fields.amount')} error={fieldError('amount')}>
+        <Input type="number" step="0.01" {...register('amount', { valueAsNumber: true })} />
+      </FormField>
 
-      <label className="block text-sm">
-        {t('forms.fields.currency')}
-        <input
-          className="mt-1 w-full rounded-md border border-[var(--border-default)] px-3 py-2 uppercase"
-          aria-invalid={Boolean(errors.currency)}
-          aria-describedby={errors.currency ? 'currency-error' : undefined}
-          {...register('currency')}
-        />
-        <ErrorText errors={errors} field="currency" />
-      </label>
+      <FormField label={t('forms.fields.currency')} error={fieldError('currency')}>
+        <Input className="uppercase" {...register('currency')} />
+      </FormField>
 
-      <label className="block text-sm">
-        {t('forms.fields.dueDate')}
-        <input
-          type="date"
-          className="mt-1 w-full rounded-md border border-[var(--border-default)] px-3 py-2"
-          aria-invalid={Boolean(errors.dueDate)}
-          aria-describedby={errors.dueDate ? 'dueDate-error' : undefined}
-          {...register('dueDate')}
-        />
-        <ErrorText errors={errors} field="dueDate" />
-      </label>
+      <FormField label={t('forms.fields.dueDate')} error={fieldError('dueDate')}>
+        <Input type="date" {...register('dueDate')} />
+      </FormField>
     </>
   )
 }
@@ -227,88 +183,68 @@ export function TransactionFormsPage({ type }: { type: TransactionType }) {
       </header>
 
       <form
-        className="grid grid-cols-1 gap-4 rounded-2xl border border-[var(--border-subtle)] bg-white p-5 shadow-[var(--shadow-card)] md:grid-cols-2"
+        className="rounded-2xl border border-[var(--border-subtle)] bg-white p-5 shadow-[var(--shadow-card)]"
         onSubmit={handleSubmit((data) => void onSubmit(data))}
       >
-        <BaseFields register={register} errors={errors} />
+        <FormSection title={translatedTitle}>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <BaseFields register={register} errors={errors} />
 
-        {type === 'invoice' && (
-          <label className="block text-sm">
-            {t('forms.fields.taxRate')}
-            <input
-              type="number"
-              step="0.1"
-              className="mt-1 w-full rounded-md border border-[var(--border-default)] px-3 py-2"
-              aria-invalid={Boolean(errors.taxRate)}
-              aria-describedby={errors.taxRate ? 'taxRate-error' : undefined}
-              {...register('taxRate', { valueAsNumber: true })}
-            />
-            <ErrorText errors={errors} field="taxRate" />
-          </label>
-        )}
+            {type === 'invoice' && (
+              <FormField
+                label={t('forms.fields.taxRate')}
+                error={typeof errors.taxRate?.message === 'string' ? errors.taxRate.message : undefined}
+              >
+                <Input type="number" step="0.1" {...register('taxRate', { valueAsNumber: true })} />
+              </FormField>
+            )}
 
-        {type === 'purchase-order' && (
-          <label className="block text-sm">
-            {t('forms.fields.costCenter')}
-            <input
-              className="mt-1 w-full rounded-md border border-[var(--border-default)] px-3 py-2"
-              aria-invalid={Boolean(errors.costCenter)}
-              aria-describedby={errors.costCenter ? 'costCenter-error' : undefined}
-              {...register('costCenter')}
-            />
-            <ErrorText errors={errors} field="costCenter" />
-          </label>
-        )}
+            {type === 'purchase-order' && (
+              <FormField
+                label={t('forms.fields.costCenter')}
+                error={typeof errors.costCenter?.message === 'string' ? errors.costCenter.message : undefined}
+              >
+                <Input {...register('costCenter')} />
+              </FormField>
+            )}
 
-        {type === 'sales-order' && (
-          <label className="block text-sm">
-            {t('forms.fields.expectedCloseDate')}
-            <input
-              type="date"
-              className="mt-1 w-full rounded-md border border-[var(--border-default)] px-3 py-2"
-              aria-invalid={Boolean(errors.expectedCloseDate)}
-              aria-describedby={errors.expectedCloseDate ? 'expectedCloseDate-error' : undefined}
-              {...register('expectedCloseDate')}
-            />
-            <ErrorText errors={errors} field="expectedCloseDate" />
-          </label>
-        )}
+            {type === 'sales-order' && (
+              <FormField
+                label={t('forms.fields.expectedCloseDate')}
+                error={
+                  typeof errors.expectedCloseDate?.message === 'string' ? errors.expectedCloseDate.message : undefined
+                }
+              >
+                <Input type="date" {...register('expectedCloseDate')} />
+              </FormField>
+            )}
 
-        <label className="block text-sm md:col-span-2">
-          {t('forms.fields.notes')}
-          <textarea
-            rows={3}
-            className="mt-1 w-full rounded-md border border-[var(--border-default)] px-3 py-2"
-            aria-invalid={Boolean(errors.notes)}
-            aria-describedby={errors.notes ? 'notes-error' : undefined}
-            {...register('notes')}
-          />
-          <ErrorText errors={errors} field="notes" />
-        </label>
-
-        <div className="flex items-center justify-between md:col-span-2">
-          <p className="m-0 text-sm text-neutral-600">
-            {t('forms.previewTotal')}: <strong>{formatCurrency(Number.isFinite(amount) ? amount : 0)}</strong>
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="rounded-md border border-[var(--border-default)] px-4 py-2 text-sm text-neutral-700 disabled:opacity-60"
-              onClick={onDiscard}
-              disabled={submitting}
+            <FormField
+              label={t('forms.fields.notes')}
+              className="md:col-span-2"
+              error={typeof errors.notes?.message === 'string' ? errors.notes.message : undefined}
             >
-              {t('forms.discardChanges')}
-            </button>
-            <button
-              type="submit"
-              className="rounded-md bg-[var(--color-brand-700)] px-4 py-2 text-sm font-medium text-white disabled:opacity-70"
-              disabled={submitting}
-              aria-busy={submitting}
-            >
-              {submitting ? t('forms.submitting') : t('forms.submitEntry')}
-            </button>
+              <textarea
+                rows={3}
+                className="w-full rounded-md border border-[var(--border-default)] px-3 py-2"
+                {...register('notes')}
+              />
+            </FormField>
           </div>
-        </div>
+        </FormSection>
+
+        <p className="mt-4 text-sm text-neutral-600">
+          {t('forms.previewTotal')}: <strong>{formatCurrency(Number.isFinite(amount) ? amount : 0)}</strong>
+        </p>
+
+        <FormActions className="mt-4">
+          <Button type="button" variant="ghost" onClick={onDiscard} disabled={submitting}>
+            {t('forms.discardChanges')}
+          </Button>
+          <Button type="submit" variant="primary" disabled={submitting} aria-busy={submitting}>
+            {submitting ? t('forms.submitting') : t('forms.submitEntry')}
+          </Button>
+        </FormActions>
       </form>
 
       {hasUnsavedChanges && <p className="m-0 text-xs text-amber-700">{t('forms.unsavedChanges')}</p>}

@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Users } from 'lucide-react'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
 import {
   approvePayrollRun,
   downloadEmployeePayslipFile,
@@ -109,6 +110,55 @@ export function HrPayrollPage() {
     }
   }
 
+  const runColumns = useMemo((): DataTableColumn<PayrollRun>[] => [
+    { key: 'period', header: 'Period' },
+    { key: 'status', header: 'Status', columnType: 'status' },
+    {
+      key: 'totalGross',
+      header: 'Gross',
+      render: (_v, run) =>
+        run.totalGross != null ? `${run.totalGross.toLocaleString()} ${run.currencyCode ?? 'RWF'}` : '—',
+    },
+  ], [])
+
+  const lineColumns = useMemo((): DataTableColumn<PayrollLineRow>[] => [
+    { key: 'employeeName', header: 'Employee' },
+    { key: 'department', header: 'Department' },
+    {
+      key: 'grossSalary',
+      header: 'Gross',
+      columnType: 'number',
+      render: v => Number(v).toLocaleString(),
+    },
+    {
+      key: 'paye',
+      header: 'PAYE',
+      columnType: 'number',
+      render: v => Number(v).toLocaleString(),
+    },
+    {
+      key: 'netPay',
+      header: 'Net',
+      columnType: 'number',
+      render: v => Number(v).toLocaleString(),
+    },
+    {
+      key: 'id',
+      header: 'Payslip',
+      sortable: false,
+      render: (_v, line) =>
+        selectedRun ? (
+          <button
+            type="button"
+            className="text-indigo-700 text-xs hover:underline"
+            onClick={() => void downloadEmployeePayslipFile(selectedRun.id, line.employeeId, line.employeeName)}
+          >
+            Download payslip
+          </button>
+        ) : null,
+    },
+  ], [selectedRun])
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <header className="flex items-center gap-2">
@@ -136,45 +186,32 @@ export function HrPayrollPage() {
         Prepare payroll run
       </button>
 
-      <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)]">
-        <table className="min-w-full text-left text-sm">
-          <thead className="bg-neutral-50">
-            <tr>
-              <th className="px-3 py-2">Period</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">Gross</th>
-              <th className="px-3 py-2">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {runs.map((run) => (
-              <tr key={run.id} className={`border-t border-[var(--border-subtle)] ${selectedRun?.id === run.id ? 'bg-indigo-50' : ''}`}>
-                <td className="px-3 py-2">
-                  <button type="button" className="text-indigo-700 hover:underline" onClick={() => void openRunDetail(run)}>
-                    {run.period}
-                  </button>
-                </td>
-                <td className="px-3 py-2">{run.status}</td>
-                <td className="px-3 py-2">{run.totalGross != null ? `${run.totalGross.toLocaleString()} ${run.currencyCode ?? 'RWF'}` : '—'}</td>
-                <td className="px-3 py-2 flex flex-wrap gap-2">
-                  {run.status === 'DRAFT' && (
-                    <button type="button" className="rounded border px-2 py-1 text-xs" onClick={() => void onApprove(run.id)}>Approve</button>
-                  )}
-                  {run.status === 'APPROVED' && (
-                    <>
-                      <button type="button" className="rounded border px-2 py-1 text-xs" onClick={() => void onPost(run.id)}>Post to GL</button>
-                      <button type="button" className="rounded border border-indigo-200 bg-indigo-50 px-2 py-1 text-xs text-indigo-800" onClick={() => void onDownloadPayslips(run.id)}>Download all payslips</button>
-                    </>
-                  )}
-                  {run.status === 'POSTED' && (
-                    <button type="button" className="rounded border border-indigo-200 bg-indigo-50 px-2 py-1 text-xs text-indigo-800" onClick={() => void onDownloadPayslips(run.id)}>Download all payslips</button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={runColumns}
+        rows={runs}
+        getRowKey={row => row.id}
+        onRowClick={run => void openRunDetail(run)}
+        rowActions={[
+          {
+            label: 'Approve',
+            onClick: run => void onApprove(run.id),
+            disabled: run => run.status !== 'DRAFT' || busy,
+          },
+          {
+            label: 'Post to GL',
+            onClick: run => void onPost(run.id),
+            disabled: run => run.status !== 'APPROVED' || busy,
+          },
+          {
+            label: 'Download all payslips',
+            onClick: run => void onDownloadPayslips(run.id),
+            disabled: run => run.status !== 'APPROVED' && run.status !== 'POSTED',
+          },
+        ]}
+        showSearch={false}
+        emptyStateLabel="No payroll runs yet"
+        noResultsLabel="No payroll runs match your filters"
+      />
 
       {selectedRun ? (
         <section className="rounded-xl border bg-white p-4 space-y-3">
@@ -189,37 +226,16 @@ export function HrPayrollPage() {
               <button type="button" className="rounded border px-3 py-1.5 text-sm" onClick={() => setSelectedRun(null)}>Close</button>
             </div>
           </div>
-          {linesLoading ? <p className="text-sm text-slate-500">Loading employees…</p> : null}
-          {!linesLoading && lines.length === 0 ? <p className="text-sm text-slate-500">No employee lines on this run.</p> : null}
           {lines.length > 0 ? (
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-slate-600">
-                  <th className="py-2 pr-3">Employee</th>
-                  <th className="py-2 pr-3">Department</th>
-                  <th className="py-2 pr-3 text-right">Gross</th>
-                  <th className="py-2 pr-3 text-right">PAYE</th>
-                  <th className="py-2 pr-3 text-right">Net</th>
-                  <th className="py-2">Payslip</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lines.map((line) => (
-                  <tr key={line.id} className="border-b">
-                    <td className="py-2 pr-3">{line.employeeName}</td>
-                    <td className="py-2 pr-3">{line.department}</td>
-                    <td className="py-2 pr-3 text-right">{Number(line.grossSalary).toLocaleString()}</td>
-                    <td className="py-2 pr-3 text-right">{Number(line.paye).toLocaleString()}</td>
-                    <td className="py-2 pr-3 text-right">{Number(line.netPay).toLocaleString()}</td>
-                    <td className="py-2">
-                      <button type="button" className="text-indigo-700 text-xs hover:underline" onClick={() => void downloadEmployeePayslipFile(selectedRun.id, line.employeeId, line.employeeName)}>
-                        Download payslip
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              columns={lineColumns}
+              rows={lines}
+              isLoading={linesLoading}
+              getRowKey={row => row.id}
+              showSearch={false}
+              emptyStateLabel="No employee lines on this run"
+              noResultsLabel="No employee lines on this run"
+            />
           ) : null}
         </section>
       ) : null}

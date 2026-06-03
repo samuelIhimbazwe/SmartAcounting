@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
 import { normalizeApiError } from '../../shared/api/errors'
 import {
   CATEGORY_LABELS,
@@ -534,6 +535,36 @@ export function MyTeamPage() {
     roleChangeMutation.mutate({ userId: user.id, roleId })
   }
 
+  const staffColumns = useMemo((): DataTableColumn<TenantUser>[] => [
+    { key: 'name', header: 'Name' },
+    { key: 'email', header: 'Email' },
+    {
+      key: 'roleId',
+      header: 'Role',
+      sortable: false,
+      render: (_v, user) => (
+        <select
+          className="rounded-md border border-[var(--border-default)] px-2 py-1"
+          value={user.roleId ?? ''}
+          disabled={roleChangeMutation.isPending && updatingUserId === user.id}
+          onChange={e => onStaffRoleChange(user, e.target.value)}
+          aria-label={`Role for ${user.name}`}
+        >
+          {roles.map(role => (
+            <option key={role.id} value={role.id}>
+              {role.emoji} {role.name}
+            </option>
+          ))}
+        </select>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: v => String(v ?? 'active'),
+    },
+  ], [roleChangeMutation.isPending, roles, updatingUserId])
+
   if (!canManage) {
     return <p className="text-sm text-neutral-600">You do not have permission to manage your team.</p>
   }
@@ -667,52 +698,16 @@ export function MyTeamPage() {
           </section>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-white">
-          {usersQuery.isLoading ? (
-            <p className="p-4 text-sm text-neutral-500">Loading staff…</p>
-          ) : (
-            <table className="w-full text-left text-sm">
-              <thead className="bg-[var(--surface-overlay)] text-xs uppercase text-neutral-500">
-                <tr>
-                  <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3">Email</th>
-                  <th className="px-4 py-3">Role</th>
-                  <th className="px-4 py-3">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((user) => (
-                  <tr key={user.id} className="border-t border-[var(--border-subtle)]">
-                    <td className="px-4 py-3">{user.name}</td>
-                    <td className="px-4 py-3">{user.email}</td>
-                    <td className="px-4 py-3">
-                      <select
-                        className="rounded-md border border-[var(--border-default)] px-2 py-1"
-                        value={user.roleId ?? ''}
-                        disabled={roleChangeMutation.isPending && updatingUserId === user.id}
-                        onChange={(e) => onStaffRoleChange(user, e.target.value)}
-                        aria-label={`Role for ${user.name}`}
-                      >
-                        {roles.map((role) => (
-                          <option key={role.id} value={role.id}>
-                            {role.emoji} {role.name}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-4 py-3">{user.status ?? 'active'}</td>
-                  </tr>
-                ))}
-                {users.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-6 text-center text-neutral-500">
-                      No staff members found.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          )}
+        <div className="overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-white p-4">
+          <DataTable
+            columns={staffColumns}
+            rows={users}
+            isLoading={usersQuery.isLoading}
+            getRowKey={row => row.id}
+            showSearch={false}
+            emptyStateLabel="No staff members found"
+            noResultsLabel="No staff members found"
+          />
         </div>
       )}
     </div>

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { DataTable, type DataTableColumn } from '../../../shared/components/ui/DataTable'
 import {
   adjustCustomerLoyaltyPoints,
   getCustomerLoyaltyTransactions,
@@ -76,6 +77,26 @@ export function CustomerLoyaltyTab({ customer, onCustomerUpdated }: CustomerLoya
 
   const balance = customer.loyaltyPoints ?? 0
 
+  const columns = useMemo((): DataTableColumn<LoyaltyTransactionRow>[] => [
+    {
+      key: 'createdAt',
+      header: 'Date',
+      columnType: 'date',
+      render: v => (v ? formatDate(String(v)) : '—'),
+    },
+    { key: 'transactionType', header: 'Type' },
+    {
+      key: 'points',
+      header: 'Points',
+      columnType: 'number',
+      render: v => {
+        const n = Number(v)
+        return n > 0 ? `+${n}` : String(n)
+      },
+    },
+    { key: 'notes', header: 'Notes', render: v => String(v ?? '—') },
+  ], [])
+
   return (
     <div className="space-y-4">
       {error ? <p className="rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-800">{error}</p> : null}
@@ -121,28 +142,15 @@ export function CustomerLoyaltyTab({ customer, onCustomerUpdated }: CustomerLoya
         ) : rows.length === 0 ? (
           <p className="text-sm text-neutral-500">No loyalty transactions yet.</p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border">
-            <table className="min-w-full text-left text-sm">
-              <thead className="bg-neutral-50">
-                <tr>
-                  <th className="px-3 py-2">Date</th>
-                  <th className="px-3 py-2">Type</th>
-                  <th className="px-3 py-2">Points</th>
-                  <th className="px-3 py-2">Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(row => (
-                  <tr key={row.id} className="border-t">
-                    <td className="px-3 py-2">{row.createdAt ? formatDate(row.createdAt) : '—'}</td>
-                    <td className="px-3 py-2">{row.transactionType}</td>
-                    <td className="px-3 py-2">{row.points > 0 ? `+${row.points}` : row.points}</td>
-                    <td className="px-3 py-2">{row.notes ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            columns={columns}
+            rows={rows}
+            isLoading={loading}
+            getRowKey={row => row.id}
+            showSearch={false}
+            emptyStateLabel="No loyalty transactions yet"
+            noResultsLabel="No loyalty transactions match your search"
+          />
         )}
       </section>
     </div>

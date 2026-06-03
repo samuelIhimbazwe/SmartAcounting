@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { DataTable, type DataTableColumn } from '../../../shared/components/ui/DataTable'
 import {
   getCustomer,
   getCustomerCredit,
@@ -103,6 +104,33 @@ export function CustomerCreditTab({ customer, canWrite = true, onCustomerUpdated
 
   const balance = Number(customer.creditBalance ?? 0)
 
+  const invoiceColumns = useMemo((): DataTableColumn<InvoiceLedgerRow>[] => [
+    {
+      key: 'invoiceId',
+      header: 'Invoice',
+      render: v => <span className="font-mono text-xs">{String(v).slice(0, 8)}…</span>,
+    },
+    {
+      key: 'dueDate',
+      header: 'Due',
+      columnType: 'date',
+      render: v => (v ? formatDate(String(v)) : '—'),
+    },
+    {
+      key: 'amount',
+      header: 'Amount',
+      columnType: 'currency',
+      render: (_v, row) => moneyRwf(invoiceAmount(row)),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      columnType: 'status',
+      render: (_v, row) => (row.overdue || isOverdue(row.dueDate) ? 'Overdue' : (row.status ?? 'Open')),
+      statusVariant: (_v, row) => (row.overdue || isOverdue(row.dueDate) ? 'error' : 'neutral'),
+    },
+  ], [])
+
   if (loading) {
     return <p className="text-sm text-neutral-500">Loading credit information…</p>
   }
@@ -170,31 +198,14 @@ export function CustomerCreditTab({ customer, canWrite = true, onCustomerUpdated
         {invoices.length === 0 ? (
           <p className="text-sm text-neutral-500">No open invoices for this customer.</p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border">
-            <table className="min-w-full text-left text-sm">
-              <thead className="bg-neutral-50">
-                <tr>
-                  <th className="px-3 py-2">Invoice</th>
-                  <th className="px-3 py-2">Due</th>
-                  <th className="px-3 py-2">Amount</th>
-                  <th className="px-3 py-2">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoices.map(inv => {
-                  const overdue = inv.overdue || isOverdue(inv.dueDate)
-                  return (
-                    <tr key={inv.invoiceId} className={`border-t ${overdue ? 'bg-red-50 text-red-900' : ''}`}>
-                      <td className="px-3 py-2 font-mono text-xs">{inv.invoiceId.slice(0, 8)}…</td>
-                      <td className="px-3 py-2">{inv.dueDate ? formatDate(inv.dueDate) : '—'}</td>
-                      <td className="px-3 py-2">{moneyRwf(invoiceAmount(inv))}</td>
-                      <td className="px-3 py-2">{overdue ? 'Overdue' : (inv.status ?? 'Open')}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            columns={invoiceColumns}
+            rows={invoices}
+            getRowKey={row => row.invoiceId}
+            showSearch={false}
+            emptyStateLabel="No open invoices for this customer"
+            noResultsLabel="No invoices match your search"
+          />
         )}
       </section>
 

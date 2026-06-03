@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
 import { accountingListPaymentApplications } from '../../shared/api/finance'
 import { financeListSupplierBills, financeSupplierCreditStatus, type SupplierCreditStatus, type SupplierBillRow } from '../../shared/api/financeExtended'
 import { normalizeApiError } from '../../shared/api/errors'
@@ -131,6 +132,27 @@ export function SupplierRecordPage() {
   const lim = Number(credit.creditLimit)
   const avail = Number(credit.availableCredit)
 
+  const billColumns = useMemo((): DataTableColumn<SupplierBillRow>[] => [
+    {
+      key: 'reference',
+      header: t('supplierBills.reference'),
+      render: v => <span className="font-mono text-xs">{String(v).slice(0, 8)}…</span>,
+    },
+    {
+      key: 'amount',
+      header: t('creditLedger.amount'),
+      render: (_v, b) => `${b.amount} ${b.currencyCode}`,
+    },
+    { key: 'outstandingAmount', header: t('creditLedger.outstanding') },
+    {
+      key: 'dueDate',
+      header: t('creditLedger.dueDate'),
+      columnType: 'date',
+      render: v => (v ? formatDate(String(v)) : '—'),
+    },
+    { key: 'status', header: t('creditLedger.status'), columnType: 'status' },
+  ], [t])
+
   return (
     <div className="space-y-6 p-1">
       <header className="rounded-xl border border-[var(--border-subtle)] bg-[var(--color-surface)] p-4 shadow-sm">
@@ -192,32 +214,15 @@ export function SupplierRecordPage() {
             {t('supplierRecord.noBills')}
           </p>
         ) : (
-          <div className="overflow-auto rounded-xl border border-[var(--border-subtle)]">
-            <table className="w-full min-w-[640px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-neutral-200">
-                  <th className="py-2 pr-2">{t('supplierBills.reference')}</th>
-                  <th className="py-2 pr-2">{t('creditLedger.amount')}</th>
-                  <th className="py-2 pr-2">{t('creditLedger.outstanding')}</th>
-                  <th className="py-2 pr-2">{t('creditLedger.dueDate')}</th>
-                  <th className="py-2">{t('creditLedger.status')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bills.map((b) => (
-                  <tr key={b.supplierBillId} className="border-b border-neutral-100">
-                    <td className="py-2 pr-2 font-mono text-xs">{b.reference.slice(0, 8)}â€¦</td>
-                    <td className="py-2 pr-2">
-                      {b.amount} {b.currencyCode}
-                    </td>
-                    <td className="py-2 pr-2">{b.outstandingAmount}</td>
-                    <td className="py-2 pr-2">{b.dueDate ? formatDate(b.dueDate) : 'â€”'}</td>
-                    <td className="py-2">{b.status}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            columns={billColumns}
+            rows={bills}
+            isLoading={loading}
+            getRowKey={row => row.supplierBillId}
+            showSearch={false}
+            emptyStateLabel={t('supplierRecord.noBills')}
+            noResultsLabel={t('supplierRecord.noBills')}
+          />
         )}
       </section>
 

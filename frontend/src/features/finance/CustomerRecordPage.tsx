@@ -20,6 +20,7 @@ import { notificationsSmsDeliveries } from '../../shared/api/finance'
 import { normalizeApiError } from '../../shared/api/errors'
 import { formatDate } from '../../shared/utils/intl'
 import { PageSkeleton } from '../../shared/components/ui/LoadingSkeleton'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
 import { useAuthStore } from '../../shared/stores/authStore'
 
 function money(n: number, currencyCode: string) {
@@ -262,6 +263,37 @@ export function CustomerRecordPage() {
   const lim = Number(credit.creditLimit)
   const avail = Number(credit.availableCredit)
 
+  const invoiceColumns = useMemo((): DataTableColumn<InvoiceLedgerRow>[] => [
+    {
+      key: 'invoiceId',
+      header: t('customerRecord.colRef'),
+      render: v => <span className="font-mono text-xs">{String(v).slice(0, 8)}…</span>,
+    },
+    {
+      key: 'createdAt',
+      header: t('customerRecord.colDate'),
+      columnType: 'date',
+      render: v => formatDate(String(v)),
+    },
+    {
+      key: 'dueDate',
+      header: t('customerRecord.colDue'),
+      columnType: 'date',
+      render: v => (v ? formatDate(String(v)) : '—'),
+    },
+    {
+      key: 'amount',
+      header: t('customerRecord.colAmount'),
+      render: (_v, row) => `${row.amount} ${row.currencyCode}`,
+    },
+    {
+      key: 'status',
+      header: t('customerRecord.colStatus'),
+      columnType: 'status',
+      statusVariant: (_v, row) => (row.overdue ? 'error' : 'neutral'),
+    },
+  ], [t])
+
   return (
     <div className="space-y-6 p-1">
       <header className="record-header rounded-xl border border-[var(--border-subtle)] bg-[var(--color-surface)] p-4 shadow-sm">
@@ -366,54 +398,25 @@ export function CustomerRecordPage() {
             {t('customerRecord.noInvoices')}
           </p>
         ) : (
-          <div className="overflow-auto rounded-xl border border-[var(--border-subtle)]">
-            <table className="w-full min-w-[720px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-neutral-200">
-                  <th className="py-2 pr-2">{t('customerRecord.colRef')}</th>
-                  <th className="py-2 pr-2">{t('customerRecord.colDate')}</th>
-                  <th className="py-2 pr-2">{t('customerRecord.colDue')}</th>
-                  <th className="py-2 pr-2">{t('customerRecord.colAmount')}</th>
-                  <th className="py-2 pr-2">{t('customerRecord.colStatus')}</th>
-                  <th className="py-2">{t('customerRecord.colAction')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoices.map((row) => (
-                  <tr key={row.invoiceId} className="border-b border-neutral-100">
-                    <td className="py-2 pr-2 font-mono text-xs">{row.invoiceId.slice(0, 8)}â€¦</td>
-                    <td className="py-2 pr-2">{formatDate(row.createdAt)}</td>
-                    <td className="py-2 pr-2">{row.dueDate ? formatDate(row.dueDate) : 'â€”'}</td>
-                    <td className="py-2 pr-2">
-                      {row.amount} {row.currencyCode}
-                    </td>
-                    <td className="py-2 pr-2">
-                      <span
-                        className={`rounded px-2 py-0.5 text-xs ${
-                          row.overdue ? 'bg-red-100 text-red-800' : 'bg-neutral-100 text-neutral-800'
-                        }`}
-                      >
-                        {row.status}
-                      </span>
-                    </td>
-                    <td className="py-2">
-                      <button
-                        type="button"
-                        disabled={Number(row.outstandingAmount) <= 0}
-                        className="rounded border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs disabled:opacity-40"
-                        onClick={() => {
-                          setPayInvoice(row)
-                          setPayAmount(Number(row.outstandingAmount).toFixed(2))
-                        }}
-                      >
-                        {t('customerRecord.recordPayment')}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            columns={invoiceColumns}
+            rows={invoices}
+            isLoading={loading}
+            getRowKey={row => row.invoiceId}
+            showSearch={false}
+            rowActions={[
+              {
+                label: t('customerRecord.recordPayment'),
+                onClick: row => {
+                  setPayInvoice(row)
+                  setPayAmount(Number(row.outstandingAmount).toFixed(2))
+                },
+                disabled: row => Number(row.outstandingAmount) <= 0,
+              },
+            ]}
+            emptyStateLabel={t('customerRecord.noInvoices')}
+            noResultsLabel={t('customerRecord.noInvoices')}
+          />
         )}
       </section>
 

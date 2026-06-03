@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { FileSpreadsheet } from 'lucide-react'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
 import {
   fetchVatCalendar,
   listRraFilings,
@@ -121,6 +122,25 @@ export function VatPage() {
     }
   }
 
+  type VatWorkbookRow = { line: string; amount: number | undefined }
+
+  const workbookRows = useMemo((): VatWorkbookRow[] => [
+    { line: 'Output VAT (sales)', amount: outputVat },
+    { line: 'Input VAT (purchases)', amount: inputVat },
+    { line: 'Net VAT payable', amount: netVat },
+  ], [inputVat, netVat, outputVat])
+
+  const workbookColumns = useMemo((): DataTableColumn<VatWorkbookRow>[] => [
+    { key: 'line', header: 'Line', sortable: false },
+    {
+      key: 'amount',
+      header: 'Amount (RWF)',
+      align: 'right',
+      sortable: false,
+      render: v => money(v as number | undefined),
+    },
+  ], [])
+
   return (
     <div className="mx-auto max-w-5xl space-y-8">
       <ComplianceSubNav />
@@ -194,28 +214,15 @@ export function VatPage() {
           </button>
         </div>
 
-        <table className="min-w-full text-left text-sm">
-          <thead className="bg-neutral-50">
-            <tr>
-              <th className="px-3 py-2">Line</th>
-              <th className="px-3 py-2 text-right">Amount (RWF)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="border-t">
-              <td className="px-3 py-2">Output VAT (sales)</td>
-              <td className="px-3 py-2 text-right font-mono">{money(outputVat)}</td>
-            </tr>
-            <tr className="border-t">
-              <td className="px-3 py-2">Input VAT (purchases)</td>
-              <td className="px-3 py-2 text-right font-mono">{money(inputVat)}</td>
-            </tr>
-            <tr className="border-t font-semibold">
-              <td className="px-3 py-2">Net VAT payable</td>
-              <td className="px-3 py-2 text-right font-mono">{money(netVat)}</td>
-            </tr>
-          </tbody>
-        </table>
+        <DataTable
+          columns={workbookColumns}
+          rows={workbookRows}
+          getRowKey={row => row.line}
+          showSearch={false}
+          showPagination={false}
+          emptyStateLabel="No VAT figures"
+          noResultsLabel="No VAT figures"
+        />
         {filingStatus ? (
           <p className="text-xs text-neutral-600">Filing status: {filingStatus}</p>
         ) : null}

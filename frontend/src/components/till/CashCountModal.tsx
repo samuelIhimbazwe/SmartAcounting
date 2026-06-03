@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
+import { FormField } from '../ui'
 import { formatRwf, parseRwfInput } from '../../utils/currency'
 import { computeCashCountTotal, TILL_COINS, TILL_NOTES } from '../../utils/cashCount'
 import { useModalFocusTrap } from '../../shared/hooks/useModalFocusTrap'
 import type { CashCountResult } from '../../shared/api/tillSessions'
-
-type Denom = (typeof TILL_COINS)[number] | (typeof TILL_NOTES)[number]
 
 export function CashCountModal({
   open,
@@ -28,6 +28,52 @@ export function CashCountModal({
   const containerRef = useModalFocusTrap({ active: open, onEscape: onClose })
 
   const total = useMemo(() => computeCashCountTotal(quantities), [quantities])
+
+  type DenomRow = { key: string; label: string; qtyKey: string; denom: number }
+
+  const denomRows = useMemo((): DenomRow[] => {
+    const coinRows = TILL_COINS.map(denom => ({
+      key: `c${denom}`,
+      label: `${denom} RWF (coin)`,
+      qtyKey: `c${denom}`,
+      denom,
+    }))
+    const noteRows = TILL_NOTES.map(denom => ({
+      key: `n${denom}`,
+      label: `${denom} RWF (note)`,
+      qtyKey: `n${denom}`,
+      denom,
+    }))
+    return [...coinRows, ...noteRows]
+  }, [])
+
+  const denomColumns = useMemo((): DataTableColumn<DenomRow>[] => [
+    { key: 'label', header: 'Denomination', sortable: false },
+    {
+      key: 'key',
+      header: 'Qty',
+      sortable: false,
+      render: (_v, row) => (
+        <input
+          type="text"
+          inputMode="numeric"
+          className="w-20 rounded border px-2 py-1"
+          value={quantities[row.qtyKey] ?? ''}
+          onChange={e => setQty(row.qtyKey, e.target.value)}
+        />
+      ),
+    },
+    {
+      key: 'denom',
+      header: 'Subtotal',
+      align: 'right',
+      sortable: false,
+      render: (_v, row) => {
+        const qty = parseRwfInput(quantities[row.qtyKey] ?? '0')
+        return formatRwf(row.denom * qty)
+      },
+    },
+  ], [quantities])
 
   if (!open) {
     return null
@@ -112,57 +158,24 @@ export function CashCountModal({
                 {error}
               </p>
             ) : null}
-            <table className="mt-4 w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs uppercase text-neutral-500">
-                  <th className="pb-2">Denomination</th>
-                  <th className="pb-2">Qty</th>
-                  <th className="pb-2 text-right">Subtotal</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td colSpan={3} className="pt-2 text-xs font-semibold text-neutral-500">
-                    Coins
-                  </td>
-                </tr>
-                {TILL_COINS.map((denom) => (
-                  <DenomRow
-                    key={denom}
-                    label={`${denom} RWF`}
-                    qtyKey={`c${denom}`}
-                    denom={denom}
-                    quantities={quantities}
-                    onQty={setQty}
-                  />
-                ))}
-                <tr>
-                  <td colSpan={3} className="pt-3 text-xs font-semibold text-neutral-500">
-                    Notes
-                  </td>
-                </tr>
-                {TILL_NOTES.map((denom) => (
-                  <DenomRow
-                    key={denom}
-                    label={`${denom} RWF`}
-                    qtyKey={`n${denom}`}
-                    denom={denom}
-                    quantities={quantities}
-                    onQty={setQty}
-                  />
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              columns={denomColumns}
+              rows={denomRows}
+              getRowKey={row => row.key}
+              showSearch={false}
+              showPagination={false}
+              emptyStateLabel="No denominations"
+              noResultsLabel="No denominations"
+            />
             <p className="mt-3 text-right text-base font-semibold">Total: {formatRwf(total)}</p>
-            <label className="mt-3 block text-sm">
-              Notes
+            <FormField label="Notes" className="mt-3">
               <textarea
-                className="mt-1 w-full rounded-md border border-[var(--border-default)] px-3 py-2"
+                className="w-full rounded-md border border-[var(--border-default)] px-3 py-2"
                 rows={2}
                 value={notes}
-                onChange={(e) => setNotes(e.target.value)}
+                onChange={e => setNotes(e.target.value)}
               />
-            </label>
+            </FormField>
             <button
               type="button"
               className="mt-4 w-full rounded-md bg-[var(--color-brand-700)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
@@ -176,36 +189,5 @@ export function CashCountModal({
       </div>
     </div>,
     document.body,
-  )
-}
-
-function DenomRow({
-  label,
-  qtyKey,
-  denom,
-  quantities,
-  onQty,
-}: {
-  label: string
-  qtyKey: string
-  denom: Denom
-  quantities: Record<string, string>
-  onQty: (key: string, value: string) => void
-}) {
-  const qty = parseRwfInput(quantities[qtyKey] ?? '0')
-  return (
-    <tr className="border-t border-[var(--border-subtle)]">
-      <td className="py-2">{label}</td>
-      <td className="py-2">
-        <input
-          type="text"
-          inputMode="numeric"
-          className="w-20 rounded border px-2 py-1"
-          value={quantities[qtyKey] ?? ''}
-          onChange={(e) => onQty(qtyKey, e.target.value)}
-        />
-      </td>
-      <td className="py-2 text-right tabular-nums">{formatRwf(denom * qty)}</td>
-    </tr>
   )
 }

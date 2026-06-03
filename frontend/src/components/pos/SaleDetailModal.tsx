@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { createPortal } from 'react-dom'
 
@@ -17,6 +17,7 @@ import { EfdStatusBadge } from '../fiscal/EfdStatusBadge'
 import { ReceiptDeliveryModal } from './ReceiptDeliveryModal'
 
 import { Button } from '../../shared/components/ui/Button'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
 
 
 
@@ -124,7 +125,29 @@ export function SaleDetailModal({
 
   }, [salesOrderId])
 
+  type SaleLineRow = NonNullable<PosSaleDetail['lines']>[number] & { rowKey: string }
 
+  const saleLineRows = useMemo((): SaleLineRow[] => {
+    if (!detail?.lines?.length) return []
+    return detail.lines.map((line, i) => ({ ...line, rowKey: `${detail.salesOrderId}-${i}` }))
+  }, [detail])
+
+  const saleLineColumns = useMemo((): DataTableColumn<SaleLineRow>[] => [
+    { key: 'product', header: 'Product' },
+    { key: 'quantity', header: 'Qty', columnType: 'number', align: 'right' },
+    {
+      key: 'unitPrice',
+      header: 'Unit',
+      align: 'right',
+      render: v => formatRwf(Number(v)),
+    },
+    {
+      key: 'lineTotal',
+      header: 'Total',
+      align: 'right',
+      render: v => formatRwf(Number(v)),
+    },
+  ], [])
 
   if (!open || !salesOrderId) {
 
@@ -135,12 +158,8 @@ export function SaleDetailModal({
 
 
   const subtotal = detail?.parsedSubtotal ?? detail?.totalAmount ?? 0
-
   const vat = detail?.parsedVat ?? 0
-
   const total = detail?.totalAmount ?? subtotal + vat
-
-
 
   return (
 
@@ -250,63 +269,15 @@ export function SaleDetailModal({
 
 
 
-                <div className="table-scroll rounded-lg border border-[var(--border-subtle)]">
-
-                  <table className="w-full text-left text-sm">
-
-                    <thead>
-
-                      <tr className="border-b text-xs uppercase text-neutral-500">
-
-                        <th className="px-2 py-2">Product</th>
-
-                        <th className="px-2 py-2 text-right">Qty</th>
-
-                        <th className="px-2 py-2 text-right">Unit</th>
-
-                        <th className="px-2 py-2 text-right">Total</th>
-
-                      </tr>
-
-                    </thead>
-
-                    <tbody>
-
-                      {(detail.lines ?? []).map((line, i) => (
-
-                        <tr key={`${line.product}-${i}`} className="border-b border-neutral-100">
-
-                          <td className="px-2 py-2">{line.product}</td>
-
-                          <td className="px-2 py-2 text-right tabular-nums">{line.quantity}</td>
-
-                          <td className="px-2 py-2 text-right tabular-nums">{formatRwf(line.unitPrice)}</td>
-
-                          <td className="px-2 py-2 text-right tabular-nums">{formatRwf(line.lineTotal)}</td>
-
-                        </tr>
-
-                      ))}
-
-                      {!detail.lines?.length ? (
-
-                        <tr>
-
-                          <td colSpan={4} className="px-2 py-4 text-center text-neutral-500">
-
-                            Line items not available — see receipt text below.
-
-                          </td>
-
-                        </tr>
-
-                      ) : null}
-
-                    </tbody>
-
-                  </table>
-
-                </div>
+                <DataTable
+                  columns={saleLineColumns}
+                  rows={saleLineRows}
+                  getRowKey={row => row.rowKey}
+                  showSearch={false}
+                  showPagination={false}
+                  emptyStateLabel="Line items not available — see receipt text below."
+                  noResultsLabel="Line items not available — see receipt text below."
+                />
 
 
 

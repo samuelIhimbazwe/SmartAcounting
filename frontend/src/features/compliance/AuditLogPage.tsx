@@ -4,6 +4,7 @@ import { fetchEbmAuditLog, type EbmAuditLogRow } from '../../shared/api/complian
 import { normalizeApiError } from '../../shared/api/errors'
 import { formatDate } from '../../shared/utils/intl'
 import { exportRowsToCsv } from '../../shared/utils/export'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
 import { ComplianceSubNav } from './ComplianceSubNav'
 
 export function AuditLogPage() {
@@ -43,6 +44,27 @@ export function AuditLogPage() {
       return true
     })
   }, [rows, userFilter, actionFilter, dateFrom, dateTo])
+
+  const columns = useMemo((): DataTableColumn<EbmAuditLogRow>[] => [
+    {
+      key: 'date',
+      header: 'Date',
+      columnType: 'date',
+      render: value => (value ? formatDate(String(value)) : '—'),
+    },
+    { key: 'user', header: 'User' },
+    {
+      key: 'action',
+      header: 'Action',
+      render: value => <span className="font-mono text-xs">{String(value ?? '—')}</span>,
+    },
+    {
+      key: 'documentRef',
+      header: 'Document ref',
+      render: value => <span className="font-mono text-xs">{String(value ?? '—')}</span>,
+    },
+    { key: 'status', header: 'Status', columnType: 'status' },
+  ], [])
 
   function onExport() {
     if (filtered.length === 0) {
@@ -122,46 +144,16 @@ export function AuditLogPage() {
         </label>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border">
-        <table className="min-w-full text-left text-sm">
-          <thead className="bg-neutral-50">
-            <tr>
-              <th className="px-3 py-2">Date</th>
-              <th className="px-3 py-2">User</th>
-              <th className="px-3 py-2">Action</th>
-              <th className="px-3 py-2">Document ref</th>
-              <th className="px-3 py-2">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={5} className="px-3 py-4 text-neutral-500">
-                  Loading…
-                </td>
-              </tr>
-            ) : filtered.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-3 py-4 text-neutral-500">
-                  No audit entries match your filters.
-                </td>
-              </tr>
-            ) : (
-              filtered.map((row) => (
-                <tr key={row.id} className="border-t">
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    {row.date ? formatDate(row.date) : '—'}
-                  </td>
-                  <td className="px-3 py-2">{row.user ?? '—'}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{row.action ?? '—'}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{row.documentRef ?? '—'}</td>
-                  <td className="px-3 py-2">{row.status ?? '—'}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={columns}
+        rows={filtered}
+        isLoading={loading}
+        getRowKey={row => row.id}
+        showSearch={false}
+        emptyStateLabel="No audit entries yet"
+        noResultsLabel="No audit entries match your filters"
+        exportFilename="compliance-audit-log"
+      />
     </div>
   )
 }

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
 import { UserPlus, Users } from 'lucide-react'
 import {
   createEmployee,
@@ -9,12 +8,17 @@ import {
 } from '../../shared/api/hr'
 import { normalizeApiError } from '../../shared/api/errors'
 import { Button } from '../../shared/components/ui/Button'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
 import { PageSkeleton } from '../../shared/components/ui/LoadingSkeleton'
 import { usePermission } from '../../shared/hooks/usePermission'
-
-function statusTone(status: string): string {
-  return status.toUpperCase() === 'ACTIVE' ? 'text-emerald-700' : 'text-neutral-500'
-}
+import {
+  FormActions,
+  FormField,
+  FormStack,
+  Input,
+  Modal,
+  useFieldValidation,
+} from '../../components/ui'
 
 export function EmployeesPage() {
   const canWrite = usePermission('HR_WRITE')
@@ -29,6 +33,13 @@ export function EmployeesPage() {
   const [dept, setDept] = useState('')
   const [title, setTitle] = useState('')
   const [busy, setBusy] = useState(false)
+
+  const formValues = { fullName, dept, title }
+  const { errors, valid, onBlur, validateAll } = useFieldValidation(formValues, {
+    fullName: value => (String(value ?? '').trim() ? undefined : 'Full name is required.'),
+    dept: value => (String(value ?? '').trim() ? undefined : 'Department is required.'),
+    title: value => (String(value ?? '').trim() ? undefined : 'Job title is required.'),
+  })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -59,10 +70,17 @@ export function EmployeesPage() {
     [rows],
   )
 
+  const columns = useMemo((): DataTableColumn<EmployeeSummary>[] => [
+    { key: 'fullName', header: 'Name' },
+    { key: 'title', header: 'Job title' },
+    { key: 'department', header: 'Department' },
+    { key: 'phone', header: 'Phone' },
+    { key: 'status', header: 'Status', columnType: 'status' },
+  ], [])
+
   async function handleCreate(e: FormEvent) {
     e.preventDefault()
-    if (!fullName.trim() || !dept.trim() || !title.trim()) {
-      setError('Name, department, and job title are required.')
+    if (!validateAll()) {
       return
     }
     setBusy(true)
@@ -112,8 +130,8 @@ export function EmployeesPage() {
       {error ? <p className="rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-800">{error}</p> : null}
 
       <div className="flex flex-wrap gap-3">
-        <input
-          className="min-w-[220px] flex-1 rounded-lg border px-3 py-2 text-sm"
+        <Input
+          className="min-w-[220px] flex-1"
           placeholder="Search by name…"
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -141,75 +159,58 @@ export function EmployeesPage() {
         </select>
       </div>
 
-      {rows.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-4 py-8 text-center text-sm text-neutral-600">
-          No employees match your filters.
-        </p>
-      ) : (
-        <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)]">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-neutral-50 text-neutral-600">
-              <tr>
-                <th className="px-3 py-2 font-medium">Name</th>
-                <th className="px-3 py-2 font-medium">Job title</th>
-                <th className="px-3 py-2 font-medium">Department</th>
-                <th className="px-3 py-2 font-medium">Phone</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                <th className="px-3 py-2 font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(row => (
-                <tr key={row.id} className="border-t border-[var(--border-subtle)]">
-                  <td className="px-3 py-2 font-medium text-neutral-900">{row.fullName}</td>
-                  <td className="px-3 py-2">{row.title}</td>
-                  <td className="px-3 py-2">{row.department}</td>
-                  <td className="px-3 py-2">{row.phone ?? '—'}</td>
-                  <td className={`px-3 py-2 font-medium ${statusTone(row.status)}`}>{row.status}</td>
-                  <td className="px-3 py-2">
-                    <Link to={`/hr/employees/${row.id}`}>
-                      <Button type="button" variant="ghost">
-                        View
-                      </Button>
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        columns={columns}
+        rows={rows}
+        isLoading={loading}
+        getRowKey={row => row.id}
+        primaryAction={{
+          label: 'View',
+          href: row => `/hr/employees/${row.id}`,
+        }}
+        emptyStateLabel="No employees yet"
+        noResultsLabel="No employees match your filters"
+        exportFilename="employees"
+      />
 
-      {formOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <form
-            className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
-            onSubmit={e => void handleCreate(e)}
-          >
-            <h2 className="mb-4 text-lg font-semibold">Add employee</h2>
-            <label className="mb-3 block text-sm">
-              Full name *
-              <input className="mt-1 w-full rounded border px-3 py-2" value={fullName} onChange={e => setFullName(e.target.value)} required />
-            </label>
-            <label className="mb-3 block text-sm">
-              Department *
-              <input className="mt-1 w-full rounded border px-3 py-2" value={dept} onChange={e => setDept(e.target.value)} required />
-            </label>
-            <label className="mb-4 block text-sm">
-              Job title *
-              <input className="mt-1 w-full rounded border px-3 py-2" value={title} onChange={e => setTitle(e.target.value)} required />
-            </label>
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="ghost" onClick={() => setFormOpen(false)} disabled={busy}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={busy}>
-                {busy ? 'Creating…' : 'Create employee'}
-              </Button>
-            </div>
-          </form>
-        </div>
-      ) : null}
+      <Modal open={formOpen} onClose={() => setFormOpen(false)} title="Add employee" size="sm">
+        <form onSubmit={e => void handleCreate(e)}>
+          <FormStack>
+            <FormField label="Full name" required error={errors.fullName} valid={valid.fullName}>
+              <Input
+                value={fullName}
+                onChange={e => setFullName(e.target.value)}
+                onBlur={() => onBlur('fullName')}
+                required
+              />
+            </FormField>
+            <FormField label="Department" required error={errors.dept} valid={valid.dept}>
+              <Input
+                value={dept}
+                onChange={e => setDept(e.target.value)}
+                onBlur={() => onBlur('dept')}
+                required
+              />
+            </FormField>
+            <FormField label="Job title" required error={errors.title} valid={valid.title}>
+              <Input
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                onBlur={() => onBlur('title')}
+                required
+              />
+            </FormField>
+          </FormStack>
+          <FormActions>
+            <Button type="button" variant="ghost" onClick={() => setFormOpen(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" disabled={busy}>
+              {busy ? 'Creating…' : 'Create employee'}
+            </Button>
+          </FormActions>
+        </form>
+      </Modal>
     </div>
   )
 }

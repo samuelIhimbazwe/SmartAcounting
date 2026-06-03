@@ -7,7 +7,7 @@ import {
 } from '../../shared/api/hr'
 import { normalizeApiError } from '../../shared/api/errors'
 import { formatDate } from '../../shared/utils/intl'
-import { Button } from '../../shared/components/ui/Button'
+import { DataTable, type DataTableColumn, type DataTableRowAction } from '../../shared/components/ui/DataTable'
 import { PageSkeleton } from '../../shared/components/ui/LoadingSkeleton'
 import { usePermission } from '../../shared/hooks/usePermission'
 
@@ -98,6 +98,54 @@ export function LeavePage() {
     }
   }
 
+  const pendingColumns = useMemo((): DataTableColumn<LeaveRequestRow>[] => [
+    {
+      key: 'employeeName',
+      header: 'Employee',
+      render: (_v, row) => row.employeeName ?? row.employeeId.slice(0, 8),
+    },
+    { key: 'leaveType', header: 'Type' },
+    {
+      key: 'startDate',
+      header: 'Dates',
+      render: (_v, row) => `${formatDate(row.startDate)} – ${formatDate(row.endDate)}`,
+    },
+    { key: 'days', header: 'Days', columnType: 'number', render: v => (v != null ? String(v) : '—') },
+    { key: 'reason', header: 'Reason', render: v => String(v ?? '—') },
+  ], [])
+
+  const pendingActions = useMemo((): DataTableRowAction<LeaveRequestRow>[] => {
+    if (!canWrite) return []
+    return [
+      { label: 'Approve', onClick: row => void handleApprove(row.id), disabled: row => busyId === row.id },
+      { label: 'Reject', onClick: row => void handleReject(row.id), disabled: row => busyId === row.id, destructive: true },
+    ]
+  }, [canWrite, busyId])
+
+  const allColumns = useMemo((): DataTableColumn<LeaveRequestRow>[] => [
+    {
+      key: 'employeeName',
+      header: 'Employee',
+      render: (_v, row) => row.employeeName ?? row.employeeId.slice(0, 8),
+    },
+    { key: 'leaveType', header: 'Type' },
+    {
+      key: 'startDate',
+      header: 'Dates',
+      render: (_v, row) => `${formatDate(row.startDate)} – ${formatDate(row.endDate)}`,
+    },
+    { key: 'days', header: 'Days', columnType: 'number', render: v => (v != null ? String(v) : '—') },
+    {
+      key: 'status',
+      header: 'Status',
+      render: v => (
+        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadge(String(v))}`}>
+          {String(v)}
+        </span>
+      ),
+    },
+  ], [])
+
   if (loading && rows.length === 0) {
     return <PageSkeleton />
   }
@@ -113,49 +161,16 @@ export function LeavePage() {
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Pending approvals</h2>
-        {pending.length === 0 ? (
-          <p className="text-sm text-neutral-500">No pending leave requests.</p>
-        ) : (
-          <div className="overflow-x-auto rounded-xl border">
-            <table className="min-w-full text-left text-sm">
-              <thead className="bg-neutral-50">
-                <tr>
-                  <th className="px-3 py-2">Employee</th>
-                  <th className="px-3 py-2">Type</th>
-                  <th className="px-3 py-2">Dates</th>
-                  <th className="px-3 py-2">Days</th>
-                  <th className="px-3 py-2">Reason</th>
-                  {canWrite ? <th className="px-3 py-2">Actions</th> : null}
-                </tr>
-              </thead>
-              <tbody>
-                {pending.map(row => (
-                  <tr key={row.id} className="border-t">
-                    <td className="px-3 py-2 font-medium">{row.employeeName ?? row.employeeId.slice(0, 8)}</td>
-                    <td className="px-3 py-2">{row.leaveType}</td>
-                    <td className="px-3 py-2">
-                      {formatDate(row.startDate)} – {formatDate(row.endDate)}
-                    </td>
-                    <td className="px-3 py-2">{row.days ?? '—'}</td>
-                    <td className="px-3 py-2">{row.reason ?? '—'}</td>
-                    {canWrite ? (
-                      <td className="px-3 py-2">
-                        <div className="flex gap-1">
-                          <Button type="button" disabled={busyId === row.id} onClick={() => void handleApprove(row.id)}>
-                            Approve
-                          </Button>
-                          <Button type="button" variant="ghost" disabled={busyId === row.id} onClick={() => void handleReject(row.id)}>
-                            Reject
-                          </Button>
-                        </div>
-                      </td>
-                    ) : null}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <DataTable
+          columns={pendingColumns}
+          rows={pending}
+          isLoading={loading}
+          getRowKey={row => row.id}
+          rowActions={pendingActions.length > 0 ? pendingActions : undefined}
+          showSearch={false}
+          emptyStateLabel="No pending leave requests"
+          noResultsLabel="No pending leave requests"
+        />
       </section>
 
       <section className="space-y-3">
@@ -182,36 +197,16 @@ export function LeavePage() {
           <input type="date" className="rounded-lg border px-3 py-2 text-sm" value={fromDate} onChange={e => setFromDate(e.target.value)} />
           <input type="date" className="rounded-lg border px-3 py-2 text-sm" value={toDate} onChange={e => setToDate(e.target.value)} />
         </div>
-        <div className="overflow-x-auto rounded-xl border">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-neutral-50">
-              <tr>
-                <th className="px-3 py-2">Employee</th>
-                <th className="px-3 py-2">Type</th>
-                <th className="px-3 py-2">Dates</th>
-                <th className="px-3 py-2">Days</th>
-                <th className="px-3 py-2">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(row => (
-                <tr key={row.id} className="border-t">
-                  <td className="px-3 py-2">{row.employeeName ?? row.employeeId.slice(0, 8)}</td>
-                  <td className="px-3 py-2">{row.leaveType}</td>
-                  <td className="px-3 py-2">
-                    {formatDate(row.startDate)} – {formatDate(row.endDate)}
-                  </td>
-                  <td className="px-3 py-2">{row.days ?? '—'}</td>
-                  <td className="px-3 py-2">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadge(row.status)}`}>
-                      {row.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={allColumns}
+          rows={filtered}
+          isLoading={loading}
+          getRowKey={row => row.id}
+          showSearch={false}
+          emptyStateLabel="No leave requests"
+          noResultsLabel="No leave requests match your filters"
+          exportFilename="leave-requests"
+        />
       </section>
     </div>
   )

@@ -11,8 +11,23 @@ import {
 } from '../../shared/api/hr'
 import { normalizeApiError } from '../../shared/api/errors'
 import { Button } from '../../shared/components/ui/Button'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
 import { PageSkeleton } from '../../shared/components/ui/LoadingSkeleton'
 import { usePermission } from '../../shared/hooks/usePermission'
+import {
+  FormActions,
+  FormField,
+  FormStack,
+  Input,
+  Modal,
+  useFieldValidation,
+} from '../../components/ui'
+
+type RosterRow = {
+  id: string
+  shiftLabel: string
+  shiftMeta: string
+} & Record<string, string>
 
 function mondayOfWeek(d: Date): string {
   const date = new Date(d)
@@ -99,16 +114,90 @@ export function ShiftsPage() {
     return assignments.filter(a => a.shiftId === shiftId && a.assignedDate === date)
   }
 
+  const rosterRows = useMemo((): RosterRow[] => {
+    return filteredShifts.map(shift => {
+      const row: RosterRow = {
+        id: shift.id,
+        shiftLabel: shift.shiftName,
+        shiftMeta: `${shift.startTime?.slice(0, 5)} – ${shift.endTime?.slice(0, 5)}${shift.location ? ` · ${shift.location}` : ''}`,
+      }
+      for (const date of days) {
+        row[`day_${date}`] = date
+      }
+      return row
+    })
+  }, [filteredShifts, days])
+
+  const rosterColumns = useMemo((): DataTableColumn<RosterRow>[] => {
+    const base: DataTableColumn<RosterRow>[] = [
+      {
+        key: 'shiftLabel',
+        header: 'Shift',
+        sortable: false,
+        render: (_v, row) => (
+          <>
+            <div>{row.shiftLabel}</div>
+            <div className="text-xs text-neutral-500">{row.shiftMeta}</div>
+          </>
+        ),
+      },
+    ]
+    const dayCols = days.map(
+      (date): DataTableColumn<RosterRow> => ({
+        key: `day_${date}` as keyof RosterRow & string,
+        header: dayLabel(date),
+        sortable: false,
+        render: (_v, row) => {
+          const shiftId = row.id
+          const dayAssignments = assignmentsFor(shiftId, date)
+          return (
+            <ul className="space-y-1">
+              {dayAssignments.map(a => (
+                <li key={a.id} className="rounded bg-[var(--color-brand-50)] px-2 py-1 text-xs">
+                  {employeeName(a.employeeId)}
+                </li>
+              ))}
+              {canWrite && dayAssignments.length === 0 ? (
+                <button
+                  type="button"
+                  className="text-xs text-[var(--color-brand-800)] hover:underline"
+                  onClick={() => {
+                    setAssignShiftId(shiftId)
+                    setAssignDate(date)
+                    setAssignOpen(true)
+                  }}
+                >
+                  + Assign
+                </button>
+              ) : null}
+            </ul>
+          )
+        },
+      }),
+    )
+    return [...base, ...dayCols]
+  }, [days, assignments, employees, canWrite])
+
+  const createFormValues = { shiftName, startTime, endTime }
+  const { errors: createErrors, valid: createValid, onBlur: onCreateBlur, validateAll: validateCreate } =
+    useFieldValidation(createFormValues, {
+      shiftName: v => (String(v ?? '').trim() ? undefined : 'Shift name is required.'),
+      startTime: v => (String(v ?? '') ? undefined : 'Start time is required.'),
+      endTime: v =>
+        String(v ?? '') && String(v) > startTime ? undefined : 'End time must be after start time.',
+    })
+
+  const assignFormValues = { assignShiftId, assignEmployeeId, assignDate }
+  const { errors: assignErrors, valid: assignValid, onBlur: onAssignBlur, validateAll: validateAssign } =
+    useFieldValidation(assignFormValues, {
+      assignShiftId: v => (String(v ?? '') ? undefined : 'Shift is required.'),
+      assignEmployeeId: v => (String(v ?? '') ? undefined : 'Employee is required.'),
+      assignDate: v => (String(v ?? '') ? undefined : 'Date is required.'),
+    })
+
   async function handleCreateShift(e: FormEvent) {
     e.preventDefault()
-    if (!shiftName.trim()) {
-      setError('Shift name is required.')
-      return
-    }
-    if (startTime >= endTime) {
-      setError('End time must be after start time.')
-      return
-    }
+    if (!validateCreate()) return
     setBusy(true)
     setError(null)
     try {
@@ -125,10 +214,7 @@ export function ShiftsPage() {
 
   async function handleAssign(e: FormEvent) {
     e.preventDefault()
-    if (!assignShiftId || !assignEmployeeId || !assignDate) {
-      setError('Shift, employee, and date are required.')
-      return
-    }
+    if (!validateAssign()) return
     setBusy(true)
     setError(null)
     try {
@@ -168,15 +254,9 @@ export function ShiftsPage() {
       {error ? <p className="rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-800">{error}</p> : null}
 
       <div className="flex flex-wrap gap-3">
-        <label className="text-sm">
-          Week starting
-          <input
-            type="date"
-            className="ml-2 rounded border px-2 py-1"
-            value={weekStart}
-            onChange={e => setWeekStart(e.target.value)}
-          />
-        </label>
+        <FormField label="Week starting" className="max-w-xs">
+          <Input type="date" value={weekStart} onChange={e => setWeekStart(e.target.value)} />
+        </FormField>
         <select
           className="rounded-lg border px-3 py-2 text-sm"
           value={locationFilter}
@@ -191,107 +271,75 @@ export function ShiftsPage() {
         </select>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border">
-        <table className="min-w-full text-left text-sm">
-          <thead className="bg-neutral-50">
-            <tr>
-              <th className="px-3 py-2">Shift</th>
-              {days.map(d => (
-                <th key={d} className="px-3 py-2 whitespace-nowrap">
-                  {dayLabel(d)}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filteredShifts.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="px-3 py-6 text-center text-neutral-500">
-                  No shifts defined. Create a shift to build the roster.
-                </td>
-              </tr>
-            ) : (
-              filteredShifts.map(shift => (
-                <tr key={shift.id} className="border-t align-top">
-                  <td className="px-3 py-2 font-medium">
-                    <div>{shift.shiftName}</div>
-                    <div className="text-xs text-neutral-500">
-                      {shift.startTime?.slice(0, 5)} – {shift.endTime?.slice(0, 5)}
-                      {shift.location ? ` · ${shift.location}` : ''}
-                    </div>
-                  </td>
-                  {days.map(date => (
-                    <td key={date} className="px-2 py-2">
-                      <ul className="space-y-1">
-                        {assignmentsFor(shift.id, date).map(a => (
-                          <li key={a.id} className="rounded bg-[var(--color-brand-50)] px-2 py-1 text-xs">
-                            {employeeName(a.employeeId)}
-                          </li>
-                        ))}
-                        {canWrite && assignmentsFor(shift.id, date).length === 0 ? (
-                          <button
-                            type="button"
-                            className="text-xs text-[var(--color-brand-800)] hover:underline"
-                            onClick={() => {
-                              setAssignShiftId(shift.id)
-                              setAssignDate(date)
-                              setAssignOpen(true)
-                            }}
-                          >
-                            + Assign
-                          </button>
-                        ) : null}
-                      </ul>
-                    </td>
-                  ))}
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={rosterColumns}
+        rows={rosterRows}
+        isLoading={loading}
+        getRowKey={row => row.id}
+        showSearch={false}
+        showPagination={false}
+        emptyStateLabel="No shifts defined. Create a shift to build the roster."
+        noResultsLabel="No shifts match your filters"
+        exportFilename="shift-roster"
+      />
 
-      {createOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <form className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl" onSubmit={e => void handleCreateShift(e)}>
-            <h2 className="mb-4 text-lg font-semibold">Create shift</h2>
-            <label className="mb-3 block text-sm">
-              Shift name
-              <input className="mt-1 w-full rounded border px-3 py-2" value={shiftName} onChange={e => setShiftName(e.target.value)} required />
-            </label>
-            <div className="mb-3 grid grid-cols-2 gap-3">
-              <label className="block text-sm">
-                Start
-                <input type="time" className="mt-1 w-full rounded border px-3 py-2" value={startTime} onChange={e => setStartTime(e.target.value)} required />
-              </label>
-              <label className="block text-sm">
-                End
-                <input type="time" className="mt-1 w-full rounded border px-3 py-2" value={endTime} onChange={e => setEndTime(e.target.value)} required />
-              </label>
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Create shift" size="sm">
+        <form onSubmit={e => void handleCreateShift(e)}>
+          <FormStack>
+            <FormField label="Shift name" required error={createErrors.shiftName} valid={createValid.shiftName}>
+              <Input
+                value={shiftName}
+                onChange={e => setShiftName(e.target.value)}
+                onBlur={() => onCreateBlur('shiftName')}
+                required
+              />
+            </FormField>
+            <div className="grid grid-cols-2 gap-3">
+              <FormField label="Start" required error={createErrors.startTime} valid={createValid.startTime}>
+                <Input
+                  type="time"
+                  value={startTime}
+                  onChange={e => setStartTime(e.target.value)}
+                  onBlur={() => onCreateBlur('startTime')}
+                  required
+                />
+              </FormField>
+              <FormField label="End" required error={createErrors.endTime} valid={createValid.endTime}>
+                <Input
+                  type="time"
+                  value={endTime}
+                  onChange={e => setEndTime(e.target.value)}
+                  onBlur={() => onCreateBlur('endTime')}
+                  required
+                />
+              </FormField>
             </div>
-            <label className="mb-4 block text-sm">
-              Location
-              <input className="mt-1 w-full rounded border px-3 py-2" value={location} onChange={e => setLocation(e.target.value)} />
-            </label>
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="ghost" onClick={() => setCreateOpen(false)} disabled={busy}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={busy}>
-                {busy ? 'Saving…' : 'Create'}
-              </Button>
-            </div>
-          </form>
-        </div>
-      ) : null}
+            <FormField label="Location">
+              <Input value={location} onChange={e => setLocation(e.target.value)} />
+            </FormField>
+          </FormStack>
+          <FormActions>
+            <Button type="button" variant="ghost" onClick={() => setCreateOpen(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={busy}>
+              {busy ? 'Saving…' : 'Create'}
+            </Button>
+          </FormActions>
+        </form>
+      </Modal>
 
-      {assignOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <form className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl" onSubmit={e => void handleAssign(e)}>
-            <h2 className="mb-4 text-lg font-semibold">Assign staff to shift</h2>
-            <label className="mb-3 block text-sm">
-              Shift
-              <select className="mt-1 w-full rounded border px-3 py-2" value={assignShiftId} onChange={e => setAssignShiftId(e.target.value)} required>
+      <Modal open={assignOpen} onClose={() => setAssignOpen(false)} title="Assign staff to shift" size="sm">
+        <form onSubmit={e => void handleAssign(e)}>
+          <FormStack>
+            <FormField label="Shift" required error={assignErrors.assignShiftId} valid={assignValid.assignShiftId}>
+              <select
+                className="mt-1 w-full rounded border px-3 py-2"
+                value={assignShiftId}
+                onChange={e => setAssignShiftId(e.target.value)}
+                onBlur={() => onAssignBlur('assignShiftId')}
+                required
+              >
                 <option value="">Select shift</option>
                 {shifts.map(s => (
                   <option key={s.id} value={s.id}>
@@ -299,33 +347,43 @@ export function ShiftsPage() {
                   </option>
                 ))}
               </select>
-            </label>
-            <label className="mb-3 block text-sm">
-              Employee
-              <select className="mt-1 w-full rounded border px-3 py-2" value={assignEmployeeId} onChange={e => setAssignEmployeeId(e.target.value)} required>
+            </FormField>
+            <FormField label="Employee" required error={assignErrors.assignEmployeeId} valid={assignValid.assignEmployeeId}>
+              <select
+                className="mt-1 w-full rounded border px-3 py-2"
+                value={assignEmployeeId}
+                onChange={e => setAssignEmployeeId(e.target.value)}
+                onBlur={() => onAssignBlur('assignEmployeeId')}
+                required
+              >
                 <option value="">Select employee</option>
-                {employees.map(e => (
-                  <option key={e.id} value={e.id}>
-                    {e.fullName}
+                {employees.map(emp => (
+                  <option key={emp.id} value={emp.id}>
+                    {emp.fullName}
                   </option>
                 ))}
               </select>
-            </label>
-            <label className="mb-4 block text-sm">
-              Date
-              <input type="date" className="mt-1 w-full rounded border px-3 py-2" value={assignDate} onChange={e => setAssignDate(e.target.value)} required />
-            </label>
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="ghost" onClick={() => setAssignOpen(false)} disabled={busy}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={busy}>
-                {busy ? 'Assigning…' : 'Assign'}
-              </Button>
-            </div>
-          </form>
-        </div>
-      ) : null}
+            </FormField>
+            <FormField label="Date" required error={assignErrors.assignDate} valid={assignValid.assignDate}>
+              <Input
+                type="date"
+                value={assignDate}
+                onChange={e => setAssignDate(e.target.value)}
+                onBlur={() => onAssignBlur('assignDate')}
+                required
+              />
+            </FormField>
+          </FormStack>
+          <FormActions>
+            <Button type="button" variant="ghost" onClick={() => setAssignOpen(false)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={busy}>
+              {busy ? 'Assigning…' : 'Assign'}
+            </Button>
+          </FormActions>
+        </form>
+      </Modal>
     </div>
   )
 }

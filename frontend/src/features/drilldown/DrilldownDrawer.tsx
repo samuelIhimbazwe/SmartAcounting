@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react'
 import { useDrilldownRows } from './useDrilldownRows'
 import { formatKpiValue } from '../../shared/utils/format'
 import type { Role } from '../../shared/types/roles'
-import { DataTable } from '../../shared/components/ui/DataTable'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
 import type { DrilldownRow } from '../../shared/types/dashboard'
 
 interface DrilldownDrawerProps {
@@ -22,6 +22,18 @@ export function DrilldownDrawer({ role, metric, onClose }: DrilldownDrawerProps)
   const totalRows = data?.total ?? rows.length
   const totalPages = useMemo(() => Math.max(1, Math.ceil(totalRows / PAGE_SIZE)), [totalRows, PAGE_SIZE])
 
+  const columns = useMemo((): DataTableColumn<DrilldownRow>[] => [
+    { key: 'entity', header: 'Entity' },
+    {
+      key: 'amount',
+      header: 'Amount',
+      columnType: 'currency',
+      render: value => formatKpiValue(Number(value), 'currency'),
+    },
+    { key: 'status', header: 'Status', columnType: 'status' },
+    { key: 'date', header: 'Date', columnType: 'date' },
+  ], [])
+
   if (!metric) {
     return null
   }
@@ -39,22 +51,13 @@ export function DrilldownDrawer({ role, metric, onClose }: DrilldownDrawerProps)
       </div>
       <div className="max-h-[80vh] overflow-auto">
         <DataTable<DrilldownRow>
-          columns={[
-            { key: 'entity', header: 'Entity' },
-            {
-              key: 'amount',
-              header: 'Amount',
-              render: (value) => formatKpiValue(Number(value), 'currency'),
-            },
-            { key: 'status', header: 'Status' },
-            { key: 'date', header: 'Date' },
-          ]}
+          columns={columns}
           rows={rows}
           exportFilename={`drilldown-${metric.toLowerCase().replace(/\s+/g, '-')}`}
           searchPlaceholder="Search current page..."
           pageSize={PAGE_SIZE}
-          isLoading={isLoading}
-          loadingLabel={isFetching ? 'Refreshing rows...' : 'Loading rows...'}
+          showPagination={false}
+          isLoading={isLoading || isFetching}
           skeletonRowCount={6}
         />
       </div>

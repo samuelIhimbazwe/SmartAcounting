@@ -1,5 +1,6 @@
-import { type FormEvent, useEffect, useState } from 'react'
+import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import { Landmark } from 'lucide-react'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
 import {
   confirmBankMatch,
   createBankAccount,
@@ -149,6 +150,48 @@ export function BankReconciliationPage() {
     }
   }
 
+  const lineColumns = useMemo((): DataTableColumn<BankStatementLine>[] => [
+    { key: 'transactionDate', header: 'Date', columnType: 'date' },
+    {
+      key: 'description',
+      header: 'Description',
+      sortable: false,
+      render: (_v, line) => (
+        <>
+          <div>{line.description}</div>
+          {line.reference ? <div className="text-xs text-neutral-500">Ref: {line.reference}</div> : null}
+        </>
+      ),
+    },
+    {
+      key: 'debitAmount',
+      header: 'Amount',
+      sortable: false,
+      render: (_v, line) =>
+        line.creditAmount != null
+          ? `+${line.creditAmount}`
+          : line.debitAmount != null
+            ? `-${line.debitAmount}`
+            : '—',
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      columnType: 'status',
+      sortable: false,
+      render: (_v, line) => (
+        <>
+          <span className="font-medium">{line.status}</span>
+          {line.matchedJournalId ? (
+            <div className="mt-0.5 max-w-[12rem] truncate text-xs text-neutral-500" title={line.matchedJournalId}>
+              Journal: {line.matchedJournalId}
+            </div>
+          ) : null}
+        </>
+      ),
+    },
+  ], [])
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <header className="flex items-center gap-2">
@@ -220,90 +263,53 @@ export function BankReconciliationPage() {
       )}
 
       {lines.length > 0 && (
-        <div className="overflow-x-auto rounded-xl border border-[var(--border-subtle)]">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-neutral-50">
-              <tr>
-                <th className="px-3 py-2">Date</th>
-                <th className="px-3 py-2">Description</th>
-                <th className="px-3 py-2">Amount</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lines.map((line) => {
-                const lineBusy = busyLineId === line.id
-                const isDebit = line.debitAmount != null && line.debitAmount > 0
-                return (
-                  <tr key={line.id} className="border-t border-[var(--border-subtle)]">
-                    <td className="px-3 py-2">{line.transactionDate}</td>
-                    <td className="px-3 py-2">
-                      <div>{line.description}</div>
-                      {line.reference ? <div className="text-xs text-neutral-500">Ref: {line.reference}</div> : null}
-                    </td>
-                    <td className="px-3 py-2">
-                      {line.creditAmount != null ? `+${line.creditAmount}` : line.debitAmount != null ? `-${line.debitAmount}` : '—'}
-                    </td>
-                    <td className="px-3 py-2">
-                      <span className="font-medium">{line.status}</span>
-                      {line.matchedJournalId ? (
-                        <div className="mt-0.5 max-w-[12rem] truncate text-xs text-neutral-500" title={line.matchedJournalId}>
-                          Journal: {line.matchedJournalId}
-                        </div>
-                      ) : null}
-                    </td>
-                    <td className="px-3 py-2">
-                      <div className="flex flex-col gap-2">
-                        {line.status === 'SUGGESTED' && line.matchedJournalId ? (
-                          <button
-                            type="button"
-                            disabled={lineBusy || busy}
-                            onClick={() => void onConfirmSuggested(line)}
-                            className="rounded border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-900 hover:bg-emerald-100"
-                          >
-                            Confirm match
-                          </button>
-                        ) : null}
-                        {line.status === 'UNMATCHED' ? (
-                          <div className="flex flex-wrap items-center gap-1">
-                            <input
-                              className="w-36 rounded border px-2 py-1 text-xs"
-                              placeholder="Journal entry ID"
-                              value={journalByLine[line.id] ?? ''}
-                              onChange={(e) =>
-                                setJournalByLine((prev) => ({ ...prev, [line.id]: e.target.value }))
-                              }
-                            />
-                            <button
-                              type="button"
-                              disabled={lineBusy || busy}
-                              onClick={() => void onManualMatch(line)}
-                              className="rounded border px-2 py-1 text-xs font-medium hover:bg-neutral-50"
-                            >
-                              Match
-                            </button>
-                          </div>
-                        ) : null}
-                        {isDebit ? (
-                          <button
-                            type="button"
-                            disabled={lineBusy || busy}
-                            onClick={() => void onBankCharge(line)}
-                            className="rounded border px-2 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
-                          >
-                            Post bank charge
-                          </button>
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={lineColumns}
+          rows={lines}
+          getRowKey={row => row.id}
+          showSearch={false}
+          rowActions={[
+            {
+              label: 'Confirm match',
+              onClick: line => void onConfirmSuggested(line),
+              disabled: line => line.status !== 'SUGGESTED' || !line.matchedJournalId || busyLineId === line.id || busy,
+            },
+            {
+              label: 'Post bank charge',
+              onClick: line => void onBankCharge(line),
+              disabled: line => !(line.debitAmount != null && line.debitAmount > 0) || busyLineId === line.id || busy,
+            },
+          ]}
+          emptyStateLabel="No unmatched lines"
+          noResultsLabel="No lines match your search"
+        />
       )}
+      {lines.some(l => l.status === 'UNMATCHED') ? (
+        <div className="space-y-2 rounded-xl border border-[var(--border-subtle)] p-4">
+          <p className="m-0 text-sm font-medium text-neutral-700">Manual match (unmatched lines)</p>
+          {lines
+            .filter(l => l.status === 'UNMATCHED')
+            .map(line => (
+              <div key={line.id} className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="min-w-[8rem] truncate">{line.description}</span>
+                <input
+                  className="w-36 rounded border px-2 py-1 text-xs"
+                  placeholder="Journal entry ID"
+                  value={journalByLine[line.id] ?? ''}
+                  onChange={e => setJournalByLine(prev => ({ ...prev, [line.id]: e.target.value }))}
+                />
+                <button
+                  type="button"
+                  disabled={busyLineId === line.id || busy}
+                  onClick={() => void onManualMatch(line)}
+                  className="rounded border px-2 py-1 text-xs font-medium hover:bg-neutral-50"
+                >
+                  Match
+                </button>
+              </div>
+            ))}
+        </div>
+      ) : null}
     </div>
   )
 }

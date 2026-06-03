@@ -1,4 +1,5 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
 import { FlowGuide } from '../../shared/components/ui/FlowGuide'
 import { collectionsFlowGuide, resolveFlowGuideSteps } from '../../shared/content/flowGuides'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -286,6 +287,53 @@ export function CreditLedgerPage() {
   const statusSelectValue =
     rawStatus === null || rawStatus === '' ? 'OPEN' : rawStatus === 'ALL' ? 'ALL' : rawStatus
 
+  const invoiceColumns = useMemo((): DataTableColumn<InvoiceLedgerRow>[] => [
+    {
+      key: 'customerName',
+      header: t('creditLedger.customer'),
+      render: (_v, r) =>
+        r.customerId ? (
+          <Link className="font-medium text-[var(--color-brand-800)] hover:underline" to={`/finance/customers/${r.customerId}`}>
+            {r.customerName}
+          </Link>
+        ) : (
+          <button type="button" className="text-left font-medium hover:underline" onClick={() => selectCustomer(r.customerName)}>
+            {r.customerName}
+          </button>
+        ),
+    },
+    {
+      key: 'amount',
+      header: t('creditLedger.amount'),
+      render: (_v, r) => `${r.amount} ${r.currencyCode}`,
+    },
+    {
+      key: 'outstandingAmount',
+      header: t('creditLedger.outstanding'),
+      render: (_v, r) => <span className="font-semibold">{r.outstandingAmount} {r.currencyCode}</span>,
+    },
+    {
+      key: 'status',
+      header: t('creditLedger.status'),
+      columnType: 'status',
+      statusVariant: (_v, r) => (r.overdue ? 'error' : 'neutral'),
+      render: (_v, r) => (r.overdue ? 'OVERDUE' : r.status),
+    },
+    {
+      key: 'dueDate',
+      header: t('creditLedger.dueDate'),
+      columnType: 'date',
+      render: v => String(v ?? '—'),
+    },
+    {
+      key: 'invoiceId',
+      header: 'invoiceId',
+      render: v => <span className="font-mono text-xs">{String(v)}</span>,
+    },
+  ], [selectCustomer, t])
+
+  const historyRow = historyOpenInvoiceId ? rows.find(r => r.invoiceId === historyOpenInvoiceId) : null
+
   return (
     <div className="space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] pb-4">
@@ -404,119 +452,58 @@ export function CreditLedgerPage() {
               onToggleHistory={(r) => void toggleHistory(r)}
             />
           ) : (
-            <div className="overflow-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-neutral-200">
-                    <th className="py-2 pr-2">{t('creditLedger.customer')}</th>
-                    <th className="py-2 pr-2">{t('creditLedger.amount')}</th>
-                    <th className="py-2 pr-2">{t('creditLedger.outstanding')}</th>
-                    <th className="py-2 pr-2">{t('creditLedger.status')}</th>
-                    <th className="py-2 pr-2">{t('creditLedger.dueDate')}</th>
-                    <th className="py-2 pr-2">{t('creditLedger.actions')}</th>
-                    <th className="py-2">invoiceId</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r) => (
-                    <Fragment key={r.invoiceId}>
-                      <tr className="border-b border-neutral-100">
-                        <td className="py-2 pr-2">
-                          {r.customerId ? (
-                            <Link
-                              className="font-medium text-[var(--color-brand-800)] hover:underline"
-                              to={`/finance/customers/${r.customerId}`}
-                            >
-                              {r.customerName}
-                            </Link>
-                          ) : (
-                            <button
-                              type="button"
-                              className="text-left font-medium hover:underline"
-                              onClick={() => selectCustomer(r.customerName)}
-                            >
-                              {r.customerName}
-                            </button>
-                          )}
-                        </td>
-                        <td className="py-2 pr-2">
-                          {r.amount} {r.currencyCode}
-                        </td>
-                        <td className="py-2 pr-2 font-semibold">
-                          {r.outstandingAmount} {r.currencyCode}
-                        </td>
-                        <td className="py-2 pr-2">
-                          <span
-                            className={`rounded px-2 py-0.5 text-xs ${r.overdue ? 'bg-red-100 text-red-700' : 'bg-neutral-100 text-neutral-700'}`}
-                          >
-                            {r.overdue ? 'OVERDUE' : r.status}
-                          </span>
-                        </td>
-                        <td className="py-2 pr-2">{r.dueDate ?? 'â€”'}</td>
-                        <td className="py-2 pr-2">
-                          <div className="flex flex-wrap gap-1">
-                            <button
-                              type="button"
-                              className="rounded border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs text-emerald-800 disabled:opacity-50"
-                              onClick={() => openSettleDialog(r)}
-                              disabled={settlingInvoiceId === r.invoiceId || Number(r.outstandingAmount) <= 0}
-                            >
-                              {settlingInvoiceId === r.invoiceId ? t('creditLedger.settling') : t('creditLedger.settleNow')}
-                            </button>
-                            <button
-                              type="button"
-                              className="rounded border border-[var(--border-subtle)] bg-[var(--color-surface)] px-2 py-1 text-xs"
-                              onClick={() => void toggleHistory(r)}
-                            >
-                              {historyOpenInvoiceId === r.invoiceId ? t('creditLedger.hideHistory') : t('creditLedger.history')}
-                            </button>
-                          </div>
-                        </td>
-                        <td className="py-2 font-mono text-xs">{r.invoiceId}</td>
-                      </tr>
-                      {historyOpenInvoiceId === r.invoiceId && (
-                        <tr className="border-b border-neutral-100 bg-[var(--surface-overlay)]">
-                          <td colSpan={7} className="px-2 py-2">
-                            {historyLoadingInvoiceId === r.invoiceId ? (
-                              <span className="text-xs text-neutral-500">{t('creditLedger.loadingHistory')}</span>
-                            ) : (
-                              <div className="space-y-1 text-xs">
-                                {(historyByInvoiceId[r.invoiceId] ?? []).map((h) => (
-                                  <div key={h.applicationId} className="flex flex-wrap gap-3 rounded bg-[var(--color-surface)] px-2 py-1">
-                                    <span>
-                                      {t('creditLedger.appliedOn')}: {new Date(h.createdAt).toLocaleString()}
-                                    </span>
-                                    <span>
-                                      {t('creditLedger.amount')}: {h.appliedAmount} {h.currencyCode ?? r.currencyCode}
-                                    </span>
-                                    <span>
-                                      {t('creditLedger.counterparty')}: {h.counterparty ?? 'â€”'}
-                                    </span>
-                                    <span>
-                                      {t('creditLedger.paymentId')}: <code>{h.paymentId}</code>
-                                    </span>
-                                  </div>
-                                ))}
-                                {!(historyByInvoiceId[r.invoiceId] ?? []).length && (
-                                  <span className="text-neutral-500">{t('creditLedger.noHistory')}</span>
-                                )}
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  ))}
-                  {!rows.length && (
-                    <tr>
-                      <td colSpan={7} className="py-4 text-center text-neutral-500">
-                        {t('creditLedger.none')}
-                      </td>
-                    </tr>
+            <>
+              <DataTable
+                columns={invoiceColumns}
+                rows={rows}
+                isLoading={busy}
+                getRowKey={row => row.invoiceId}
+                showSearch={false}
+                rowActions={[
+                  {
+                    label: t('creditLedger.settleNow'),
+                    onClick: row => openSettleDialog(row),
+                    disabled: row => settlingInvoiceId === row.invoiceId || Number(row.outstandingAmount) <= 0,
+                  },
+                  {
+                    label: t('creditLedger.history'),
+                    onClick: row => void toggleHistory(row),
+                  },
+                ]}
+                emptyStateLabel={t('creditLedger.none')}
+                noResultsLabel={t('creditLedger.none')}
+                exportFilename="credit-ledger-invoices"
+              />
+              {historyRow ? (
+                <div className="mt-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-overlay)] p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="m-0 text-sm font-medium">
+                      {t('creditLedger.history')}: {historyRow.customerName}
+                    </p>
+                    <button type="button" className="text-xs text-neutral-600 hover:underline" onClick={() => setHistoryOpenInvoiceId(null)}>
+                      {t('creditLedger.hideHistory')}
+                    </button>
+                  </div>
+                  {historyLoadingInvoiceId === historyRow.invoiceId ? (
+                    <span className="text-xs text-neutral-500">{t('creditLedger.loadingHistory')}</span>
+                  ) : (
+                    <div className="space-y-1 text-xs">
+                      {(historyByInvoiceId[historyRow.invoiceId] ?? []).map(h => (
+                        <div key={h.applicationId} className="flex flex-wrap gap-3 rounded bg-[var(--color-surface)] px-2 py-1">
+                          <span>{t('creditLedger.appliedOn')}: {new Date(h.createdAt).toLocaleString()}</span>
+                          <span>{t('creditLedger.amount')}: {h.appliedAmount} {h.currencyCode ?? historyRow.currencyCode}</span>
+                          <span>{t('creditLedger.counterparty')}: {h.counterparty ?? '—'}</span>
+                          <span>{t('creditLedger.paymentId')}: <code>{h.paymentId}</code></span>
+                        </div>
+                      ))}
+                      {!(historyByInvoiceId[historyRow.invoiceId] ?? []).length ? (
+                        <span className="text-neutral-500">{t('creditLedger.noHistory')}</span>
+                      ) : null}
+                    </div>
                   )}
-                </tbody>
-              </table>
-            </div>
+                </div>
+              ) : null}
+            </>
           )}
         </div>
       </section>

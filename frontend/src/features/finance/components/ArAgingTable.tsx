@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { InvoiceLedgerRow } from '../../../shared/api/finance'
+import { DataTable, type DataTableColumn } from '../../../shared/components/ui/DataTable'
 
 const HEADER = {
   current: 'bg-green-50 text-green-800',
@@ -99,7 +100,15 @@ function buildAgingRows(rows: InvoiceLedgerRow[]): AgingRow[] {
   return [...map.values()].sort((a, b) => a.customerName.localeCompare(b.customerName))
 }
 
-function AgingTotalsRow({ rows }: { rows: AgingRow[] }) {
+function agingCell(value: number, bucket: AgingBucketKey) {
+  return (
+    <span className={`inline-block w-full px-2 py-2 text-right tabular-nums ${CELL[bucket]}`}>
+      {value.toFixed(2)}
+    </span>
+  )
+}
+
+function AgingTotalsFooter({ rows }: { rows: AgingRow[] }) {
   const { t } = useTranslation()
   const totals = useMemo(() => {
     const z = { current: 0, days1_30: 0, days31_60: 0, days61_90: 0, over90: 0, all: 0 }
@@ -115,29 +124,19 @@ function AgingTotalsRow({ rows }: { rows: AgingRow[] }) {
   }, [rows])
 
   return (
-    <tr className="border-t-2 border-neutral-300 font-semibold">
-      <td className="px-2 py-2">{t('creditLedger.agingTotals')}</td>
-      <td className={`px-2 py-2 text-right tabular-nums ${CELL.current}`}>{totals.current.toFixed(2)}</td>
-      <td className={`px-2 py-2 text-right tabular-nums ${CELL.days1_30}`}>{totals.days1_30.toFixed(2)}</td>
-      <td className={`px-2 py-2 text-right tabular-nums ${CELL.days31_60}`}>{totals.days31_60.toFixed(2)}</td>
-      <td className={`px-2 py-2 text-right tabular-nums ${CELL.days61_90}`}>{totals.days61_90.toFixed(2)}</td>
-      <td className={`px-2 py-2 text-right tabular-nums ${CELL.over90}`}>{totals.over90.toFixed(2)}</td>
-      <td className="px-2 py-2 text-right tabular-nums">{totals.all.toFixed(2)}</td>
-    </tr>
-  )
-}
-
-function AgingDataCells({ row }: { row: AgingRow }) {
-  const total = row.current + row.days1_30 + row.days31_60 + row.days61_90 + row.over90
-  return (
-    <>
-      <td className={`px-2 py-2 text-right tabular-nums ${CELL.current}`}>{row.current.toFixed(2)}</td>
-      <td className={`px-2 py-2 text-right tabular-nums ${CELL.days1_30}`}>{row.days1_30.toFixed(2)}</td>
-      <td className={`px-2 py-2 text-right tabular-nums ${CELL.days31_60}`}>{row.days31_60.toFixed(2)}</td>
-      <td className={`px-2 py-2 text-right tabular-nums ${CELL.days61_90}`}>{row.days61_90.toFixed(2)}</td>
-      <td className={`px-2 py-2 text-right tabular-nums ${CELL.over90}`}>{row.over90.toFixed(2)}</td>
-      <td className="px-2 py-2 text-right tabular-nums font-medium">{total.toFixed(2)}</td>
-    </>
+    <div
+      className="aging-totals grid w-full min-w-[720px] grid-cols-7 border-t-2 border-neutral-300 text-left text-sm font-semibold"
+      role="row"
+      aria-label={t('creditLedger.agingTotals')}
+    >
+      <div className="px-2 py-2">{t('creditLedger.agingTotals')}</div>
+      <div className={`px-2 py-2 text-right tabular-nums ${CELL.current}`}>{totals.current.toFixed(2)}</div>
+      <div className={`px-2 py-2 text-right tabular-nums ${CELL.days1_30}`}>{totals.days1_30.toFixed(2)}</div>
+      <div className={`px-2 py-2 text-right tabular-nums ${CELL.days31_60}`}>{totals.days31_60.toFixed(2)}</div>
+      <div className={`px-2 py-2 text-right tabular-nums ${CELL.days61_90}`}>{totals.days61_90.toFixed(2)}</div>
+      <div className={`px-2 py-2 text-right tabular-nums ${CELL.over90}`}>{totals.over90.toFixed(2)}</div>
+      <div className="px-2 py-2 text-right tabular-nums">{totals.all.toFixed(2)}</div>
+    </div>
   )
 }
 
@@ -145,50 +144,91 @@ export function ArAgingTable({ rows }: { rows: InvoiceLedgerRow[] }) {
   const { t } = useTranslation()
   const agingRows = useMemo(() => buildAgingRows(rows), [rows])
 
+  const columns = useMemo((): DataTableColumn<AgingRow>[] => {
+    const bucketHeader = (key: AgingBucketKey, label: string) => (
+      <span className={`inline-block w-full px-2 py-2 text-right ${HEADER[key]}`}>{label}</span>
+    )
+    return [
+      {
+        key: 'customerName',
+        header: t('creditLedger.customer'),
+        render: (_v, row) => (
+          <>
+            {row.customerId ? (
+              <Link
+                className="font-medium text-[var(--color-brand-800)] hover:underline"
+                to={`/finance/customers/${row.customerId}`}
+              >
+                {row.customerName}
+              </Link>
+            ) : (
+              row.customerName
+            )}{' '}
+            <span className="text-xs text-neutral-500">({row.currencyCode})</span>
+          </>
+        ),
+      },
+      {
+        key: 'current',
+        header: bucketHeader('current', t('creditLedger.agingCurrent')) as unknown as string,
+        align: 'right',
+        sortable: false,
+        render: v => agingCell(Number(v), 'current'),
+      },
+      {
+        key: 'days1_30',
+        header: bucketHeader('days1_30', t('creditLedger.aging1_30')) as unknown as string,
+        align: 'right',
+        sortable: false,
+        render: v => agingCell(Number(v), 'days1_30'),
+      },
+      {
+        key: 'days31_60',
+        header: bucketHeader('days31_60', t('creditLedger.aging31_60')) as unknown as string,
+        align: 'right',
+        sortable: false,
+        render: v => agingCell(Number(v), 'days31_60'),
+      },
+      {
+        key: 'days61_90',
+        header: bucketHeader('days61_90', t('creditLedger.aging61_90')) as unknown as string,
+        align: 'right',
+        sortable: false,
+        render: v => agingCell(Number(v), 'days61_90'),
+      },
+      {
+        key: 'over90',
+        header: bucketHeader('over90', t('creditLedger.aging90plus')) as unknown as string,
+        align: 'right',
+        sortable: false,
+        render: v => agingCell(Number(v), 'over90'),
+      },
+      {
+        key: 'customerKey',
+        header: t('creditLedger.agingTotal'),
+        align: 'right',
+        sortable: false,
+        render: (_v, row) => {
+          const total = row.current + row.days1_30 + row.days31_60 + row.days61_90 + row.over90
+          return <span className="px-2 py-2 text-right tabular-nums font-medium">{total.toFixed(2)}</span>
+        },
+      },
+    ]
+  }, [t])
+
   return (
-    <div className="overflow-auto">
-      <table className="aging-table w-full min-w-[720px] border-collapse text-left text-sm">
-        <thead>
-          <tr>
-            <th className="border-b border-neutral-200 px-2 py-2">{t('creditLedger.customer')}</th>
-            <th className={`border-b border-neutral-200 px-2 py-2 text-right ${HEADER.current}`}>{t('creditLedger.agingCurrent')}</th>
-            <th className={`border-b border-neutral-200 px-2 py-2 text-right ${HEADER.days1_30}`}>{t('creditLedger.aging1_30')}</th>
-            <th className={`border-b border-neutral-200 px-2 py-2 text-right ${HEADER.days31_60}`}>{t('creditLedger.aging31_60')}</th>
-            <th className={`border-b border-neutral-200 px-2 py-2 text-right ${HEADER.days61_90}`}>{t('creditLedger.aging61_90')}</th>
-            <th className={`border-b border-neutral-200 px-2 py-2 text-right ${HEADER.over90}`}>{t('creditLedger.aging90plus')}</th>
-            <th className="border-b border-neutral-200 px-2 py-2 text-right">{t('creditLedger.agingTotal')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {agingRows.map((row) => (
-            <tr key={row.customerKey} className="border-b border-neutral-100">
-              <td className="px-2 py-2">
-                {row.customerId ? (
-                  <Link className="font-medium text-[var(--color-brand-800)] hover:underline" to={`/finance/customers/${row.customerId}`}>
-                    {row.customerName}
-                  </Link>
-                ) : (
-                  row.customerName
-                )}{' '}
-                <span className="text-xs text-neutral-500">({row.currencyCode})</span>
-              </td>
-              <AgingDataCells row={row} />
-            </tr>
-          ))}
-          {!agingRows.length && (
-            <tr>
-              <td colSpan={7} className="px-2 py-6 text-center text-neutral-500">
-                {t('creditLedger.agingNone')}
-              </td>
-            </tr>
-          )}
-        </tbody>
-        {agingRows.length > 0 && (
-          <tfoot>
-            <AgingTotalsRow rows={agingRows} />
-          </tfoot>
-        )}
-      </table>
+    <div className="space-y-0">
+      <DataTable
+        columns={columns}
+        rows={agingRows}
+        getRowKey={row => row.customerKey}
+        showSearch={false}
+        showPagination={false}
+        emptyStateLabel={t('creditLedger.agingNone')}
+        noResultsLabel={t('creditLedger.agingNone')}
+        tableAriaLabel={t('creditLedger.customer')}
+      />
+      {agingRows.length > 0 ? <AgingTotalsFooter rows={agingRows} /> : null}
     </div>
   )
 }

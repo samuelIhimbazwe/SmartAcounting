@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   createLeaveRequest,
@@ -17,6 +17,7 @@ import { normalizeApiError } from '../../shared/api/errors'
 import { formatDate } from '../../shared/utils/intl'
 import { Button } from '../../shared/components/ui/Button'
 import { PageSkeleton } from '../../shared/components/ui/LoadingSkeleton'
+import { DataTable, type DataTableColumn } from '../../shared/components/ui/DataTable'
 import { usePermission } from '../../shared/hooks/usePermission'
 
 type TabId = 'personal' | 'employment' | 'leave' | 'attendance' | 'payroll'
@@ -158,6 +159,21 @@ export function EmployeeDetailPage() {
       setError(normalizeApiError(e).message)
     }
   }
+
+  const leaveColumns = useMemo((): DataTableColumn<LeaveRequestRow>[] => [
+    { key: 'leaveType', header: 'Type' },
+    {
+      key: 'startDate',
+      header: 'Dates',
+      render: (_v, row) => `${formatDate(row.startDate)} – ${formatDate(row.endDate)}`,
+    },
+    {
+      key: 'days',
+      header: 'Days',
+      render: (_v, row) => String(row.days ?? leaveDays(row.startDate, row.endDate)),
+    },
+    { key: 'status', header: 'Status', columnType: 'status' },
+  ], [])
 
   if (loading && !employee) {
     return <PageSkeleton />
@@ -337,30 +353,14 @@ export function EmployeeDetailPage() {
             {leaveRows.length === 0 ? (
               <p className="text-sm text-neutral-500">No leave requests.</p>
             ) : (
-              <div className="overflow-x-auto rounded-xl border">
-                <table className="min-w-full text-left text-sm">
-                  <thead className="bg-neutral-50">
-                    <tr>
-                      <th className="px-3 py-2">Type</th>
-                      <th className="px-3 py-2">Dates</th>
-                      <th className="px-3 py-2">Days</th>
-                      <th className="px-3 py-2">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {leaveRows.map(row => (
-                      <tr key={row.id} className="border-t">
-                        <td className="px-3 py-2">{row.leaveType}</td>
-                        <td className="px-3 py-2">
-                          {formatDate(row.startDate)} – {formatDate(row.endDate)}
-                        </td>
-                        <td className="px-3 py-2">{row.days ?? leaveDays(row.startDate, row.endDate)}</td>
-                        <td className="px-3 py-2">{row.status}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable
+                columns={leaveColumns}
+                rows={leaveRows}
+                getRowKey={row => row.id}
+                showSearch={false}
+                emptyStateLabel="No leave requests"
+                noResultsLabel="No leave requests"
+              />
             )}
           </section>
         </div>
