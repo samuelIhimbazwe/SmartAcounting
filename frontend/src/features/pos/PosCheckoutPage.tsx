@@ -1,18 +1,29 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { FlowGuide } from '../../shared/components/ui/FlowGuide'
-import { posCheckoutFlowGuide, resolveFlowGuideSteps } from '../../shared/content/flowGuides'
 import { useTranslation } from 'react-i18next'
-import { Minus, Plus, Printer, ScanBarcode, ShoppingBag, Wallet } from 'lucide-react'
+import {
+  ArrowRight,
+  Banknote,
+  CreditCard,
+  FileText,
+  Landmark,
+  MessageCircle,
+  Search,
+  ShoppingBag,
+  Smartphone,
+  Wallet,
+  X,
+} from 'lucide-react'
+import { Badge, Button } from '../../components/ui'
 import { MomoPaymentModal } from '../../components/pos/MomoPaymentModal'
 import { ReceiptDeliveryModal } from '../../components/pos/ReceiptDeliveryModal'
+import { PosReceiptSuccessModal } from './PosReceiptSuccessModal'
 import { appendPosSaleHistory, primaryTenderLabel } from '../../services/posSaleHistory'
 import { useAuthStore } from '../../shared/stores/authStore'
 import {
   posCheckout,
   posCreateCatalogItem,
   posPrintReceipt,
-  posReprintReceipt,
   posScanBarcode,
   type PosPrintedReceiptDto,
   type PosTenderDto,
@@ -24,23 +35,31 @@ import { queueOfflineSale } from '../../services/offlineSale'
 import { supports } from '../../utils/webApis'
 import { useWebBarcode } from '../../hooks/useWebBarcode'
 import { useWebWakeLock } from '../../hooks/useWebWakeLock'
-import { printReceipt, printViaWebBluetooth, printViaWebSerial } from '../../hooks/useWebPrinter'
+import { printReceipt } from '../../hooks/useWebPrinter'
 import { isDesktop } from '../../utils/platform'
 import { connectHidScanner } from '../../hooks/useWebHidScanner'
 import { BrowserCompatibilityBanner } from './BrowserCompatibilityBanner'
-import { EfdStatusBadge } from '../../components/fiscal/EfdStatusBadge'
 import { useEfdQueue } from '../../hooks/useEfdQueue'
 import { usePermission } from '../../hooks/usePermission'
 import { buildPosEfdCheckoutPayload } from '../../services/fiscal/efdCheckout'
+import {
+  formatPosMoney,
+  loadRecentProducts,
+  POS_MOMO_PHONE_KEY,
+  saveRecentProduct,
+  stockBadgeVariant,
+  vatBreakdownIncl,
+  type RecentProduct,
+  type TenderChoice,
+} from './posCheckoutUtils'
+import './pos-checkout.css'
 
 type CartLine = {
   key: string
   barcode: string
   displayName: string
-  /** Catalog unit price in {@link CartLine.currencyCode}. */
   unitPrice: string
   currencyCode: string
-  /** Unit price converted to the session checkout currency (for totals and payment). */
   displayUnit: string
   convertError?: boolean
   quantity: number
@@ -56,7 +75,9 @@ function decMul(a: string, q: number): string {
 
 function printHtmlFragment(html: string) {
   const w = window.open('', '_blank', 'width=400,height=600')
-  if (!w) return
+  if (!w) {
+    return
+  }
   w.document.write(`<!DOCTYPE html><html><head><title>Receipt</title></head><body>${html}</body></html>`)
   w.document.close()
   w.focus()
@@ -64,24 +85,48 @@ function printHtmlFragment(html: string) {
   w.close()
 }
 
+function resetTenderState(setters: {
+  setSelectedTender: (v: TenderChoice | null) => void
+  setCashTendered: (v: string) => void
+  setMomoVerified: (v: boolean) => void
+  setAirtelVerified: (v: boolean) => void
+  setMomoRef: (v: string) => void
+  setAirtelRef: (v: string) => void
+  setOnAcctCustomer: (v: string) => void
+}) {
+  setters.setSelectedTender(null)
+  setters.setCashTendered('')
+  setters.setMomoVerified(false)
+  setters.setAirtelVerified(false)
+  setters.setMomoRef('')
+  setters.setAirtelRef('')
+  setters.setOnAcctCustomer('')
+}
+
 export function PosCheckoutPage() {
   const { t } = useTranslation()
   const { submitEfd } = useEfdQueue()
-  const posGuide = useMemo(() => resolveFlowGuideSteps(t, posCheckoutFlowGuide), [t])
-  const scanId = useId()
+  const searchId = useId()
   const currencyDatalistId = useId().replace(/:/g, '')
-  const scanRef = useRef<HTMLInputElement>(null)
-  const [barcode, setBarcode] = useState('')
+  const searchRef = useRef<HTMLInputElement>(null)
+  const [searchQuery, setSearchQuery] = useState('')
   const [currency, setCurrency] = useState('RWF')
   const [register, setRegister] = useState('')
   const [customer, setCustomer] = useState('')
   const [lines, setLines] = useState<CartLine[]>([])
+  const [removingKeys, setRemovingKeys] = useState<Set<string>>(() => new Set())
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [payFlash, setPayFlash] = useState(false)
   const [receipt, setReceipt] = useState<{ text: string; html: string } | null>(null)
+  const [receiptSuccessOpen, setReceiptSuccessOpen] = useState(false)
+  const [successReceiptNo, setSuccessReceiptNo] = useState('')
   const [printedReceipt, setPrintedReceipt] = useState<PosPrintedReceiptDto | null>(null)
   const [printingReceipt, setPrintingReceipt] = useState(false)
   const [lastSalesOrderId, setLastSalesOrderId] = useState<string | null>(null)
+  const [recentProducts, setRecentProducts] = useState<RecentProduct[]>(() => loadRecentProducts())
+  const [scanPreview, setScanPreview] = useState<RecentProduct | null>(null)
+  const [activeResultIndex, setActiveResultIndex] = useState(0)
   const [showCatalog, setShowCatalog] = useState(false)
   const [nBc, setNBc] = useState('')
   const [nName, setNName] = useState('')
@@ -92,10 +137,9 @@ export function PosCheckoutPage() {
   const [catalogProductsLoading, setCatalogProductsLoading] = useState(false)
   const [catalogProductsError, setCatalogProductsError] = useState<string | null>(null)
   const [nReorder, setNReorder] = useState('')
-  const [cash, setCash] = useState('')
-  const [momo, setMomo] = useState('')
-  const [airtel, setAirtel] = useState('')
-  const [card, setCard] = useState('')
+  const [selectedTender, setSelectedTender] = useState<TenderChoice | null>(null)
+  const [cashTendered, setCashTendered] = useState('')
+  const [momoPhone, setMomoPhone] = useState(() => localStorage.getItem(POS_MOMO_PHONE_KEY) ?? '')
   const [momoRef, setMomoRef] = useState('')
   const [airtelRef, setAirtelRef] = useState('')
   const [momoVerified, setMomoVerified] = useState(false)
@@ -103,11 +147,11 @@ export function PosCheckoutPage() {
   const [momoModalOpen, setMomoModalOpen] = useState(false)
   const [airtelModalOpen, setAirtelModalOpen] = useState(false)
   const [deliveryOpen, setDeliveryOpen] = useState(false)
+  const [deliveryChannel, setDeliveryChannel] = useState<'WHATSAPP' | 'SMS' | null>(null)
   const userId = useAuthStore((s) => s.userId)
   const canDiscount = usePermission('POS_DISCOUNT')
   const canReturns = usePermission('POS_RETURNS')
   const [discountAmount, setDiscountAmount] = useState('')
-  const [onAcct, setOnAcct] = useState('')
   const [onAcctCustomer, setOnAcctCustomer] = useState('')
   const linesRef = useRef<CartLine[]>([])
   linesRef.current = lines
@@ -131,6 +175,8 @@ export function PosCheckoutPage() {
             return
           }
         }
+        saveRecentProduct(item)
+        setRecentProducts(loadRecentProducts())
         const key = `${item.barcode}-${Date.now()}`
         setLines((prev) => [
           ...prev,
@@ -144,12 +190,13 @@ export function PosCheckoutPage() {
             quantity: 1,
           },
         ])
-        setBarcode('')
+        setSearchQuery('')
+        setScanPreview(null)
       } catch (e) {
         setError(normalizeApiError(e).message)
       } finally {
         setBusy(false)
-        scanRef.current?.focus()
+        searchRef.current?.focus()
       }
     },
     [currency],
@@ -162,11 +209,28 @@ export function PosCheckoutPage() {
   useWebWakeLock(lines.length > 0 || scanning)
 
   useEffect(() => {
-    scanRef.current?.focus()
+    searchRef.current?.focus()
   }, [])
 
   useEffect(() => {
-    if (!showCatalog) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === '/' && document.activeElement !== searchRef.current) {
+        const tag = (e.target as HTMLElement)?.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+          return
+        }
+        e.preventDefault()
+        searchRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  useEffect(() => {
+    if (!showCatalog) {
+      return
+    }
     let cancelled = false
     setCatalogProductsLoading(true)
     setCatalogProductsError(null)
@@ -182,7 +246,9 @@ export function PosCheckoutPage() {
         }
       })
       .finally(() => {
-        if (!cancelled) setCatalogProductsLoading(false)
+        if (!cancelled) {
+          setCatalogProductsLoading(false)
+        }
       })
     return () => {
       cancelled = true
@@ -193,7 +259,9 @@ export function PosCheckoutPage() {
     let cancelled = false
     void (async () => {
       const snapshot = [...linesRef.current]
-      if (!snapshot.length) return
+      if (!snapshot.length) {
+        return
+      }
       const next: CartLine[] = []
       for (const l of snapshot) {
         if (l.currencyCode === currency) {
@@ -211,13 +279,46 @@ export function PosCheckoutPage() {
         const latest = linesRef.current
         const snapKeys = snapshot.map((l) => l.key).sort().join('\u0000')
         const curKeys = latest.map((l) => l.key).sort().join('\u0000')
-        if (snapKeys === curKeys) setLines(next)
+        if (snapKeys === curKeys) {
+          setLines(next)
+        }
       }
     })()
     return () => {
       cancelled = true
     }
   }, [currency])
+
+  useEffect(() => {
+    const q = searchQuery.trim()
+    if (q.length < 4) {
+      setScanPreview(null)
+      return
+    }
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      void posScanBarcode(q)
+        .then((item) => {
+          if (!cancelled) {
+            setScanPreview({
+              barcode: item.barcode,
+              displayName: item.displayName,
+              unitPrice: item.unitPrice,
+              currencyCode: item.currencyCode,
+            })
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setScanPreview(null)
+          }
+        })
+    }, 350)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [searchQuery])
 
   const total = useMemo(() => {
     let sum = '0'
@@ -235,12 +336,65 @@ export function PosCheckoutPage() {
     return Math.max(0, Number(total) - discount).toFixed(2)
   }, [canDiscount, discountAmount, total])
 
-  const addFromScan = useCallback(() => void addBarcodeToCart(barcode), [addBarcodeToCart, barcode])
+  const { subtotal: subtotalDisplay, vat: vatDisplay } = useMemo(
+    () => vatBreakdownIncl(payableTotal),
+    [payableTotal],
+  )
 
-  const onScanKey = (e: React.KeyboardEvent) => {
+  const changeDue = useMemo(() => {
+    if (selectedTender !== 'CASH') {
+      return null
+    }
+    const tendered = Number(cashTendered || '0')
+    const due = Number(payableTotal)
+    if (!Number.isFinite(tendered) || tendered < due) {
+      return null
+    }
+    return (tendered - due).toFixed(2)
+  }, [cashTendered, payableTotal, selectedTender])
+
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    const fromRecent = recentProducts
+      .filter(
+        (r) =>
+          !q ||
+          r.displayName.toLowerCase().includes(q) ||
+          r.barcode.toLowerCase().includes(q),
+      )
+      .slice(0, 5)
+    if (scanPreview && !fromRecent.some((r) => r.barcode === scanPreview.barcode)) {
+      return [scanPreview, ...fromRecent].slice(0, 5)
+    }
+    return fromRecent
+  }, [recentProducts, scanPreview, searchQuery])
+
+  useEffect(() => {
+    setActiveResultIndex(0)
+  }, [searchQuery, searchResults.length])
+
+  const pickSearchResult = (item: RecentProduct) => {
+    void addBarcodeToCart(item.barcode)
+  }
+
+  const onSearchKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown' && searchResults.length > 0) {
+      e.preventDefault()
+      setActiveResultIndex((i) => Math.min(i + 1, searchResults.length - 1))
+      return
+    }
+    if (e.key === 'ArrowUp' && searchResults.length > 0) {
+      e.preventDefault()
+      setActiveResultIndex((i) => Math.max(i - 1, 0))
+      return
+    }
     if (e.key === 'Enter') {
       e.preventDefault()
-      void addFromScan()
+      if (searchResults.length > 0) {
+        pickSearchResult(searchResults[activeResultIndex])
+        return
+      }
+      void addBarcodeToCart(searchQuery)
     }
   }
 
@@ -252,26 +406,82 @@ export function PosCheckoutPage() {
     )
   }
 
-  const removeLine = (key: string) => setLines((prev) => prev.filter((l) => l.key !== key))
+  const removeLine = (key: string) => {
+    setRemovingKeys((prev) => new Set(prev).add(key))
+    window.setTimeout(() => {
+      setLines((prev) => prev.filter((l) => l.key !== key))
+      setRemovingKeys((prev) => {
+        const next = new Set(prev)
+        next.delete(key)
+        return next
+      })
+    }, 150)
+  }
 
-  const tenderSum = useMemo(() => {
-    const c = Number(cash || '0')
-    const m = Number(momo || '0')
-    const a = Number(airtel || '0')
-    const k = Number(card || '0')
-    const o = Number(onAcct || '0')
-    return (c + m + a + k + o).toFixed(2)
-  }, [cash, momo, airtel, card, onAcct])
+  const buildTenders = (): PosTenderDto[] => {
+    if (!selectedTender) {
+      return []
+    }
+    const amount = payableTotal
+    switch (selectedTender) {
+      case 'CASH':
+        return [{ tenderType: 'CASH', amount }]
+      case 'MOMO':
+        return [{ tenderType: 'MOMO', amount, reference: momoRef || momoPhone || undefined }]
+      case 'AIRTEL_MONEY':
+        return [{ tenderType: 'AIRTEL_MONEY', amount, reference: airtelRef || undefined }]
+      case 'CARD':
+        return [{ tenderType: 'CARD', amount }]
+      case 'ON_ACCOUNT':
+        return [{ tenderType: 'ON_ACCOUNT', amount }]
+      default:
+        return []
+    }
+  }
 
-  const fillRemainder = () => {
-    const rem = (Number(payableTotal) - Number(tenderSum)).toFixed(2)
-    const r = Number(rem)
-    if (r <= 0) return
-    if (!Number(cash || '0')) setCash(rem)
-    else if (!Number(momo || '0')) setMomo(rem)
-    else if (!Number(airtel || '0')) setAirtel(rem)
-    else if (!Number(card || '0')) setCard(rem)
-    else if (!Number(onAcct || '0')) setOnAcct(rem)
+  const canCharge = useMemo(() => {
+    if (!lines.length || !selectedTender || busy) {
+      return false
+    }
+    if (selectedTender === 'CASH') {
+      return Number(cashTendered || '0') >= Number(payableTotal)
+    }
+    if (selectedTender === 'MOMO') {
+      return momoVerified
+    }
+    if (selectedTender === 'AIRTEL_MONEY') {
+      return airtelVerified
+    }
+    if (selectedTender === 'ON_ACCOUNT') {
+      return onAcctCustomer.trim().length > 0
+    }
+    return true
+  }, [
+    airtelVerified,
+    busy,
+    cashTendered,
+    lines.length,
+    momoVerified,
+    onAcctCustomer,
+    payableTotal,
+    selectedTender,
+  ])
+
+  const clearSale = () => {
+    setLines([])
+    setReceipt(null)
+    setReceiptSuccessOpen(false)
+    setSearchQuery('')
+    resetTenderState({
+      setSelectedTender,
+      setCashTendered,
+      setMomoVerified,
+      setAirtelVerified,
+      setMomoRef,
+      setAirtelRef,
+      setOnAcctCustomer,
+    })
+    searchRef.current?.focus()
   }
 
   const pay = async () => {
@@ -280,21 +490,12 @@ export function PosCheckoutPage() {
       setError(t('pos.cartEmpty'))
       return
     }
-    const tenders: PosTenderDto[] = []
-    const push = (type: PosTenderDto['tenderType'], amountStr: string, reference?: string) => {
-      const a = Number(amountStr || '0')
-      if (a > 0) tenders.push({ tenderType: type, amount: a.toFixed(2), reference })
-    }
-    push('CASH', cash)
-    push('MOMO', momo, momoRef || undefined)
-    push('AIRTEL_MONEY', airtel, airtelRef || undefined)
-    push('CARD', card)
-    push('ON_ACCOUNT', onAcct)
-    if (!tenders.length) {
-      setError(t('pos.noTender'))
+    if (!selectedTender) {
+      setError(t('pos.selectTender'))
       return
     }
-    if (Number(onAcct || '0') > 0 && !onAcctCustomer.trim()) {
+    const tenders = buildTenders()
+    if (selectedTender === 'ON_ACCOUNT' && !onAcctCustomer.trim()) {
       setError(t('pos.onAccountCustomerRequired'))
       return
     }
@@ -302,37 +503,38 @@ export function PosCheckoutPage() {
       setError(t('pos.fxRequired'))
       return
     }
-    if (Math.abs(Number(tenderSum) - Number(payableTotal)) > 0.009) {
-      setError(t('pos.tenderMismatch', { tenderSum, total: payableTotal }))
+    if (selectedTender === 'MOMO' && !momoVerified) {
+      setMomoModalOpen(true)
       return
     }
-    if (Number(momo || '0') > 0 && !momoVerified) {
-      setError('Verify MTN MoMo payment before completing the sale.')
+    if (selectedTender === 'AIRTEL_MONEY' && !airtelVerified) {
+      setAirtelModalOpen(true)
       return
     }
-    if (Number(airtel || '0') > 0 && !airtelVerified) {
-      setError('Verify Airtel Money payment before completing the sale.')
+    if (selectedTender === 'CASH' && Number(cashTendered || '0') < Number(payableTotal)) {
+      setError(t('pos.cashInsufficient'))
       return
     }
+
     const checkoutPayload = {
       customerName: customer || undefined,
       currencyCode: currency,
       posRegisterCode: register || undefined,
       lines: lines.map((l) => ({ barcode: l.barcode, quantity: String(l.quantity) })),
       tenders,
-      ...(Number(onAcct || '0') > 0 ? { onAccountCustomerName: onAcctCustomer.trim() } : {}),
+      ...(selectedTender === 'ON_ACCOUNT' ? { onAccountCustomerName: onAcctCustomer.trim() } : {}),
     }
 
-    // Desktop offline: queue locally in SQLite (Sprint 4).
     if (typeof navigator !== 'undefined' && !navigator.onLine && isDesktop()) {
       setBusy(true)
       try {
         const { localId } = await queueOfflineSale(checkoutPayload)
         const offlineReceipt = `OFFLINE-${localId.slice(0, 8).toUpperCase()}`
         setLastSalesOrderId(localId)
+        setSuccessReceiptNo(offlineReceipt)
         setReceipt({
-          text: `Offline sale queued.\nReceipt: ${offlineReceipt}\nWill sync when connected.`,
-          html: `<div><p><strong>Sale saved offline</strong></p><p>Receipt: <code>${offlineReceipt}</code></p><p>Will sync when connected.</p></div>`,
+          text: `Offline sale queued.\nReceipt: ${offlineReceipt}`,
+          html: `<p><strong>Sale saved offline</strong></p><p>Receipt: ${offlineReceipt}</p>`,
         })
         appendPosSaleHistory({
           salesOrderId: localId,
@@ -342,7 +544,7 @@ export function PosCheckoutPage() {
           cashierId: userId,
           registerCode: register || undefined,
           itemCount: lines.length,
-          totalAmount: Number(total),
+          totalAmount: Number(payableTotal),
           currencyCode: currency,
           primaryTender: primaryTenderLabel(tenders),
           status: 'OFFLINE_PENDING',
@@ -354,15 +556,19 @@ export function PosCheckoutPage() {
             lineTotal: Number(l.displayUnit) * l.quantity,
           })),
         })
+        setPayFlash(true)
+        window.setTimeout(() => setPayFlash(false), 400)
+        setReceiptSuccessOpen(true)
         setLines([])
-        setCash('')
-        setMomo('')
-        setAirtel('')
-        setCard('')
-        setMomoRef('')
-        setAirtelRef('')
-        setOnAcct('')
-        setOnAcctCustomer('')
+        resetTenderState({
+          setSelectedTender,
+          setCashTendered,
+          setMomoVerified,
+          setAirtelVerified,
+          setMomoRef,
+          setAirtelRef,
+          setOnAcctCustomer,
+        })
       } catch (e) {
         setError(normalizeApiError(e).message)
       } finally {
@@ -392,18 +598,18 @@ export function PosCheckoutPage() {
       } finally {
         setPrintingReceipt(false)
       }
+      setSuccessReceiptNo(receiptNumber.slice(0, 8).toUpperCase())
 
-      const efdPayload = buildPosEfdCheckoutPayload({
-        salesOrderId: result.salesOrderId,
-        receiptNumber,
-        cartLines: cartSnapshot,
-        tenders: tendersSnapshot,
-        currencyCode: currency,
-        totalAmount: Number(result.totalAmount ?? total),
-      })
-      void submitEfd(efdPayload).catch(() => {
-        /* Non-blocking: local queue + badge handle retry */
-      })
+      void submitEfd(
+        buildPosEfdCheckoutPayload({
+          salesOrderId: result.salesOrderId,
+          receiptNumber,
+          cartLines: cartSnapshot,
+          tenders: tendersSnapshot,
+          currencyCode: currency,
+          totalAmount: Number(result.totalAmount ?? payableTotal),
+        }),
+      ).catch(() => undefined)
 
       appendPosSaleHistory({
         salesOrderId: result.salesOrderId,
@@ -413,7 +619,7 @@ export function PosCheckoutPage() {
         cashierId: userId,
         registerCode: register || undefined,
         itemCount: cartSnapshot.length,
-        totalAmount: Number(result.totalAmount ?? total),
+        totalAmount: Number(result.totalAmount ?? payableTotal),
         currencyCode: currency,
         primaryTender: primaryTenderLabel(tendersSnapshot),
         status: 'COMPLETED',
@@ -426,58 +632,25 @@ export function PosCheckoutPage() {
         })),
       })
 
+      setPayFlash(true)
+      window.setTimeout(() => setPayFlash(false), 400)
+      setReceiptSuccessOpen(true)
       setLines([])
-      setCash('')
-      setMomo('')
-      setAirtel('')
-      setCard('')
-      setMomoRef('')
-      setAirtelRef('')
-      setMomoVerified(false)
-      setAirtelVerified(false)
-      setOnAcct('')
-      setOnAcctCustomer('')
+      resetTenderState({
+        setSelectedTender,
+        setCashTendered,
+        setMomoVerified,
+        setAirtelVerified,
+        setMomoRef,
+        setAirtelRef,
+        setOnAcctCustomer,
+      })
     } catch (e) {
       setError(normalizeApiError(e).message)
     } finally {
       setBusy(false)
     }
   }
-
-  const copyEscPos = async () => {
-    if (!printedReceipt?.escPos) return
-    await navigator.clipboard.writeText(printedReceipt.escPos)
-  }
-
-  const downloadEscPos = () => {
-    if (!printedReceipt?.escPos || !printedReceipt.transactionId) return
-    const blob = new Blob([printedReceipt.escPos], { type: 'text/plain;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `receipt-${printedReceipt.transactionId}.escpos.txt`
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    URL.revokeObjectURL(url)
-  }
-
-  const reprintEscPos = async () => {
-    if (!lastSalesOrderId) return
-    setError(null)
-    setPrintingReceipt(true)
-    try {
-      const printed = await posReprintReceipt(lastSalesOrderId)
-      setPrintedReceipt(printed)
-    } catch (e) {
-      setError(normalizeApiError(e).message)
-    } finally {
-      setPrintingReceipt(false)
-    }
-  }
-  const printerType = printedReceipt?.printerType ?? null
-  const browserPrintDisabled = printerType === 'sms-only'
-  const showHtmlPreview = !browserPrintDisabled
 
   const saveCatalog = async () => {
     setError(null)
@@ -506,33 +679,37 @@ export function PosCheckoutPage() {
     }
   }
 
+  const chargeLabel = formatPosMoney(payableTotal, currency)
+  const showSearchDropdown = searchQuery.trim().length > 0 && searchResults.length > 0
+  const showRecent = !searchQuery.trim() && recentProducts.length > 0
+
+  const tenderButtons: { id: TenderChoice; label: string; icon: ReactNode }[] = [
+    { id: 'CASH', label: t('pos.cash'), icon: <Banknote size={20} /> },
+    { id: 'MOMO', label: t('pos.momo'), icon: <Smartphone size={20} /> },
+    { id: 'AIRTEL_MONEY', label: t('pos.airtel'), icon: <MessageCircle size={20} /> },
+    { id: 'CARD', label: t('pos.card'), icon: <CreditCard size={20} /> },
+    { id: 'ON_ACCOUNT', label: t('pos.onAccount'), icon: <FileText size={20} /> },
+  ]
+
   return (
-    <div className="pos-checkout page-container--wide">
+    <div className={`pos-checkout-v2 page-container--wide${payFlash ? ' pos-checkout-v2--flash-success' : ''}`}>
       <BrowserCompatibilityBanner />
+      <video ref={videoRef} className="hidden" playsInline muted aria-hidden />
 
-      <FlowGuide title={posGuide.title} steps={posGuide.steps} />
-
-      <header className="page-header page-header--split border-b border-[var(--border-subtle)] pb-4">
+      <div className="pos-checkout-v2__toolbar">
         <div className="flex items-center gap-2">
-          <ShoppingBag className="h-8 w-8 shrink-0 text-[var(--color-brand-700)]" aria-hidden />
-          <div>
-            <h1 className="page-title">{t('pos.title')}</h1>
-            <p className="page-lead">{t('pos.subtitle')}</p>
-          </div>
+          <ShoppingBag className="h-7 w-7 shrink-0 text-[var(--color-primary)]" aria-hidden />
+          <h1 className="m-0 text-xl font-bold text-[var(--color-text-primary)]">{t('pos.title')}</h1>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="pos-checkout-v2__toolbar-meta">
           {canReturns ? (
-            <Link
-              to="/returns"
-              className="rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-sm text-[var(--color-brand-800)] no-underline hover:bg-neutral-50"
-            >
+            <Link to="/returns" className="text-sm text-[var(--color-primary)] no-underline hover:underline">
               {t('nav.returns')}
             </Link>
           ) : null}
-          <label className="flex items-center gap-1">
-            <span className="text-neutral-600">{t('pos.currency')}</span>
+          <label>
+            {t('pos.currency')}
             <input
-              className="w-24 rounded border border-[var(--border-subtle)] px-2 py-1 uppercase"
               list={currencyDatalistId}
               value={currency}
               onChange={(e) => setCurrency(e.target.value.trim().toUpperCase().slice(0, 8))}
@@ -542,470 +719,389 @@ export function PosCheckoutPage() {
             <datalist id={currencyDatalistId}>
               <option value="RWF" />
               <option value="USD" />
-              <option value="EUR" />
-              <option value="GBP" />
-              <option value="KES" />
-              <option value="UGX" />
-              <option value="TZS" />
             </datalist>
           </label>
-          <label className="flex items-center gap-1">
-            <span className="text-neutral-600">{t('pos.register')}</span>
-            <input
-              className="w-28 rounded border border-[var(--border-subtle)] px-2 py-1"
-              value={register}
-              onChange={(e) => setRegister(e.target.value)}
-              placeholder="REG-01"
-            />
+          <label>
+            {t('pos.register')}
+            <input value={register} onChange={(e) => setRegister(e.target.value)} placeholder="REG-01" />
           </label>
         </div>
-      </header>
+      </div>
 
-      <div className="pos-checkout__grid">
-        <section className="surface-card">
-          <div className="mb-3 flex items-center gap-2 text-sm font-medium text-neutral-800">
-            <ScanBarcode className="h-4 w-4" />
-            {t('pos.scan')}
-          </div>
-          <video ref={videoRef} className="hidden" playsInline muted aria-hidden />
-          <div className="flex gap-2">
-            <input
-              ref={scanRef}
-              id={scanId}
-              autoComplete="off"
-              className="ui-input pos-scan-input min-w-0 flex-1 border-2 border-[var(--color-brand-300)] focus:border-[var(--color-brand-600)]"
-              placeholder={t('pos.scanPlaceholder')}
-              value={barcode}
-              onChange={(e) => setBarcode(e.target.value)}
-              onKeyDown={onScanKey}
-              disabled={busy}
-              aria-label={t('pos.scan')}
-            />
-            <button
-              type="button"
-              className="btn btn--primary shrink-0"
-              onClick={() => void addFromScan()}
-              disabled={busy}
-            >
-              {t('pos.add')}
-            </button>
-          </div>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--color-surface)] px-3 py-1.5 text-sm text-neutral-800 hover:bg-neutral-50 disabled:opacity-50"
-              onClick={() => void startScan()}
-              disabled={busy}
-            >
-              {scanning ? t('pos.scanWithCameraActive') : t('pos.scanWithCamera')}
-            </button>
-            {scanning && (
-              <button
-                type="button"
-                className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm text-red-900"
-                onClick={() => stopScan()}
-              >
-                {t('pos.stopCameraScan')}
-              </button>
-            )}
-            {!isDesktop() && (
-              <button
-                type="button"
-                className="rounded-lg border border-[var(--border-subtle)] bg-[var(--color-surface)] px-3 py-1.5 text-sm text-neutral-800 hover:bg-neutral-50 disabled:opacity-50"
-                onClick={() => void connectHidScanner((c) => void addBarcodeToCart(c))}
-                disabled={busy || !supports.hid}
-                title={!supports.hid ? t('pos.usbScannerUnsupported') : undefined}
-              >
-                {t('pos.connectUsbScanner')}
-              </button>
-            )}
-          </div>
-          <p className="mt-2 text-xs text-neutral-500">{t('pos.scanHint')}</p>
-
-          <button
-            type="button"
-            className="mt-4 text-sm text-[var(--color-brand-800)] underline"
-            onClick={() => setShowCatalog((s) => !s)}
-          >
-            {t('pos.toggleCatalog')}
-          </button>
-          {showCatalog && (
-            <div className="mt-3 grid gap-2 rounded-lg bg-[var(--surface-overlay)] p-3">
-              <input className="rounded border px-2 py-1" placeholder={t('pos.newBarcode')} value={nBc} onChange={(e) => setNBc(e.target.value)} />
-              <input className="rounded border px-2 py-1" placeholder={t('pos.newName')} value={nName} onChange={(e) => setNName(e.target.value)} />
-              <input className="rounded border px-2 py-1" placeholder={t('pos.newPrice')} value={nPrice} onChange={(e) => setNPrice(e.target.value)} />
-              <label className="block text-sm text-neutral-700">
-                <span className="block text-neutral-600">{t('pos.linkInventoryProduct')}</span>
-                <select
-                  className="mt-1 w-full rounded border border-[var(--border-subtle)] px-2 py-2 text-sm"
-                  value={nProductId}
-                  onChange={(e) => setNProductId(e.target.value)}
-                  disabled={busy || catalogProductsLoading}
+      <div className="pos-checkout-v2__layout">
+        <div className="pos-checkout-v2__left">
+          <div className="pos-search-wrap">
+            <div className="pos-search">
+              <Search className="pos-search__icon" size={20} aria-hidden />
+              <input
+                ref={searchRef}
+                id={searchId}
+                className="pos-search__input"
+                autoComplete="off"
+                placeholder={t('pos.searchPlaceholder')}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={onSearchKey}
+                disabled={busy}
+                aria-label={t('pos.scan')}
+                aria-autocomplete="list"
+                aria-controls={showSearchDropdown ? 'pos-search-results' : undefined}
+                aria-expanded={showSearchDropdown}
+              />
+              <span className="pos-search__hint">{t('pos.searchFocusHint')}</span>
+              {searchQuery ? (
+                <button
+                  type="button"
+                  className="pos-search__clear"
+                  aria-label={t('common.close')}
+                  onClick={() => {
+                    setSearchQuery('')
+                    setScanPreview(null)
+                    searchRef.current?.focus()
+                  }}
                 >
+                  <X size={16} />
+                </button>
+              ) : null}
+            </div>
+            {showSearchDropdown ? (
+              <ul id="pos-search-results" className="pos-search-results" role="listbox">
+                {searchResults.map((item, index) => (
+                  <li key={item.barcode}>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={index === activeResultIndex}
+                      className={`pos-search-results__item ${index === activeResultIndex ? 'pos-search-results__item--active' : ''}`}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => pickSearchResult(item)}
+                    >
+                      <span className="pos-search-results__name">{item.displayName}</span>
+                      <span className="pos-search-results__barcode">{item.barcode}</span>
+                      <span className="pos-search-results__price">
+                        {formatPosMoney(item.unitPrice, item.currencyCode || currency)}
+                      </span>
+                      <span className="pos-search-results__stock">
+                        <Badge variant={stockBadgeVariant('ok')} size="sm">
+                          {t('pos.inStock')}
+                        </Badge>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+
+          {showRecent ? (
+            <div className="pos-recent">
+              <p className="pos-recent__label">{t('pos.recent')}</p>
+              <div className="pos-recent__scroll">
+                {recentProducts.map((item) => (
+                  <button
+                    key={item.barcode}
+                    type="button"
+                    className="pos-recent__chip"
+                    onClick={() => void addBarcodeToCart(item.barcode)}
+                  >
+                    <span className="pos-recent__chip-name">{item.displayName}</span>
+                    <span className="pos-recent__chip-price">
+                      {formatPosMoney(item.unitPrice, item.currencyCode || currency)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="pos-basket">
+            {lines.length === 0 ? (
+              <div className="pos-basket__empty">
+                <ShoppingBag className="pos-basket__empty-icon" size={48} strokeWidth={1.25} />
+                <p className="pos-basket__empty-title">{t('pos.basketEmptyTitle')}</p>
+                <p className="pos-basket__empty-desc">{t('pos.basketEmptyDesc')}</p>
+              </div>
+            ) : (
+              <ul className="pos-basket__list">
+                {lines.map((l) => (
+                  <li
+                    key={l.key}
+                    className={`pos-basket__row ${removingKeys.has(l.key) ? 'pos-basket__row--removing' : ''} ${l.convertError ? 'bg-amber-50' : ''}`}
+                  >
+                    <p className="pos-basket__name" title={l.displayName}>
+                      {l.displayName}
+                    </p>
+                    <div className="pos-basket__qty">
+                      <button
+                        type="button"
+                        className="pos-basket__qty-btn"
+                        onClick={() => bumpQty(l.key, -1)}
+                        aria-label="decrease quantity"
+                      >
+                        −
+                      </button>
+                      <span className="pos-basket__qty-val">{l.quantity}</span>
+                      <button
+                        type="button"
+                        className="pos-basket__qty-btn"
+                        onClick={() => bumpQty(l.key, 1)}
+                        aria-label="increase quantity"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <p className="pos-basket__line-total">{decMul(l.displayUnit, l.quantity)}</p>
+                    <button
+                      type="button"
+                      className="pos-basket__remove"
+                      onClick={() => removeLine(l.key)}
+                      aria-label="remove line"
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <details className="pos-advanced">
+            <summary>{t('pos.moreOptions')}</summary>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button" className="ui-btn ui-btn--secondary ui-btn--sm" onClick={() => void startScan()} disabled={busy}>
+                {scanning ? t('pos.scanWithCameraActive') : t('pos.scanWithCamera')}
+              </button>
+              {scanning ? (
+                <button type="button" className="ui-btn ui-btn--ghost ui-btn--sm" onClick={() => stopScan()}>
+                  {t('pos.stopCameraScan')}
+                </button>
+              ) : null}
+              {!isDesktop() && supports.hid ? (
+                <button
+                  type="button"
+                  className="ui-btn ui-btn--ghost ui-btn--sm"
+                  onClick={() => void connectHidScanner((c) => void addBarcodeToCart(c))}
+                  disabled={busy}
+                >
+                  {t('pos.connectUsbScanner')}
+                </button>
+              ) : null}
+              <button type="button" className="ui-btn ui-btn--ghost ui-btn--sm" onClick={() => setShowCatalog((s) => !s)}>
+                {t('pos.toggleCatalog')}
+              </button>
+            </div>
+            {showCatalog ? (
+              <div className="mt-3 grid gap-2 rounded-lg bg-[var(--color-bg-hover)] p-3">
+                <input className="ui-field__input" placeholder={t('pos.newBarcode')} value={nBc} onChange={(e) => setNBc(e.target.value)} />
+                <input className="ui-field__input" placeholder={t('pos.newName')} value={nName} onChange={(e) => setNName(e.target.value)} />
+                <input className="ui-field__input" placeholder={t('pos.newPrice')} value={nPrice} onChange={(e) => setNPrice(e.target.value)} />
+                <select className="ui-field__input" value={nProductId} onChange={(e) => setNProductId(e.target.value)} disabled={catalogProductsLoading}>
                   <option value="">{t('pos.noInventoryProduct')}</option>
                   {catalogProducts.map((p) => (
                     <option key={p.productId} value={p.productId}>
                       {p.name}
-                      {p.sku ? ` (${p.sku})` : ''}
                     </option>
                   ))}
                 </select>
-              </label>
-              {catalogProductsError && (
-                <p className="text-xs text-amber-800" role="status">
-                  {t('pos.catalogProductsError')}
-                </p>
-              )}
-              {!catalogProducts.length && !catalogProductsLoading && !catalogProductsError && showCatalog && (
-                <p className="text-xs text-neutral-500">{t('pos.catalogProductsEmpty')}</p>
-              )}
-              <details className="rounded border border-[var(--border-subtle)] bg-[var(--color-surface)]/50 px-2 py-1 text-xs">
-                <summary className="cursor-pointer text-neutral-600">{t('pos.productIdManual')}</summary>
-                <input
-                  className="mt-2 w-full rounded border px-2 py-1 font-mono text-sm"
-                  placeholder={t('pos.productId')}
-                  value={nProductOverride}
-                  onChange={(e) => setNProductOverride(e.target.value)}
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-              </details>
+                {catalogProductsError ? <p className="text-xs text-amber-800">{t('pos.catalogProductsError')}</p> : null}
+                <Button variant="secondary" size="sm" onClick={() => void saveCatalog()} loading={busy}>
+                  {t('pos.saveItem')}
+                </Button>
+              </div>
+            ) : null}
+            <label className="mt-3 block text-sm">
+              <span className="text-[var(--color-text-secondary)]">{t('pos.customer')}</span>
               <input
-                className="rounded border px-2 py-1"
-                placeholder={t('pos.reorderPoint')}
-                inputMode="decimal"
-                value={nReorder}
-                onChange={(e) => setNReorder(e.target.value)}
-              />
-              <button type="button" className="rounded bg-neutral-800 py-2 text-sm text-white" onClick={() => void saveCatalog()} disabled={busy}>
-                {t('pos.saveItem')}
-              </button>
-            </div>
-          )}
-
-          <label className="mt-4 block text-sm">
-            <span className="text-neutral-600">{t('pos.customer')}</span>
-            <input
-              className="mt-1 w-full rounded border border-[var(--border-subtle)] px-2 py-2"
-              value={customer}
-              onChange={(e) => setCustomer(e.target.value)}
-              placeholder={t('pos.walkIn')}
-            />
-          </label>
-        </section>
-
-        <section className="surface-card">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <span className="text-sm font-medium text-neutral-800">{t('pos.cart')}</span>
-            <span className="text-lg font-bold tabular-nums text-[var(--color-brand-900)]">
-              {payableTotal} {currency}
-            </span>
-          </div>
-          {canDiscount ? (
-            <label className="mb-3 block text-sm">
-              <span className="text-neutral-600">{t('pos.discount', { defaultValue: 'Discount (RWF)' })}</span>
-              <input
-                className="mt-1 w-full max-w-xs rounded border border-[var(--border-subtle)] px-2 py-2"
-                inputMode="decimal"
-                value={discountAmount}
-                onChange={(e) => setDiscountAmount(e.target.value)}
-                placeholder="0"
+                className="ui-field__input mt-1 w-full"
+                value={customer}
+                onChange={(e) => setCustomer(e.target.value)}
+                placeholder={t('pos.walkIn')}
               />
             </label>
-          ) : null}
-          <ul className="pos-cart-list space-y-2">
-            {lines.map((l) => (
-              <li
-                key={l.key}
-                className={`pos-cart-line ${l.convertError ? 'border-amber-400 bg-amber-50' : ''}`}
-              >
-                <div className="pos-cart-line__info min-w-0">
-                  <div className="truncate font-medium">{l.displayName}</div>
-                  <div className="text-xs text-neutral-500">{l.barcode}</div>
-                  {l.currencyCode !== currency && (
-                    <div className="text-xs text-neutral-500">
-                      {t('pos.catalogNative')}: {l.unitPrice} {l.currencyCode}
-                      {l.convertError && ` — ${t('pos.fxMissing')}`}
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center gap-1">
-                  <button type="button" className="pos-qty-btn" onClick={() => bumpQty(l.key, -1)} aria-label="decrease quantity">
-                    <Minus className="h-4 w-4" />
+            {canDiscount ? (
+              <label className="mt-2 block text-sm">
+                <span className="text-[var(--color-text-secondary)]">{t('pos.discount', { defaultValue: 'Discount' })}</span>
+                <input
+                  className="ui-field__input mt-1 w-full"
+                  inputMode="decimal"
+                  value={discountAmount}
+                  onChange={(e) => setDiscountAmount(e.target.value)}
+                />
+              </label>
+            ) : null}
+          </details>
+        </div>
+
+        <div className="pos-checkout-v2__right">
+          <section className="pos-pay-panel" aria-label={t('pos.tenders')}>
+            <div className="flex items-center gap-2 text-sm font-semibold text-[var(--color-text-primary)]">
+              <Wallet size={18} aria-hidden />
+              {t('pos.paymentPanel')}
+            </div>
+
+            <div className="pos-pay-summary">
+              <div className="pos-pay-summary__row">
+                <span>{t('pos.subtotal')}</span>
+                <span className="num">{formatPosMoney(subtotalDisplay, currency)}</span>
+              </div>
+              <div className="pos-pay-summary__row">
+                <span>{t('pos.vatLine')}</span>
+                <span className="num">{formatPosMoney(vatDisplay, currency)}</span>
+              </div>
+              <hr className="pos-pay-summary__divider" />
+              <div className="pos-pay-summary__total">
+                <span>{t('pos.total')}</span>
+                <span className="pos-pay-summary__total-value">{chargeLabel}</span>
+              </div>
+            </div>
+
+            <ul className="pos-tender-list">
+              {tenderButtons.map((tb) => (
+                <li key={tb.id}>
+                  <button
+                    type="button"
+                    className={`pos-tender-btn ${selectedTender === tb.id ? 'pos-tender-btn--selected' : ''}`}
+                    onClick={() => {
+                      setSelectedTender(tb.id)
+                      setMomoVerified(false)
+                      setAirtelVerified(false)
+                      if (tb.id === 'CASH' && !cashTendered) {
+                        setCashTendered(payableTotal)
+                      }
+                      if (tb.id === 'MOMO') {
+                        setMomoModalOpen(true)
+                      }
+                      if (tb.id === 'AIRTEL_MONEY') {
+                        setAirtelModalOpen(true)
+                      }
+                    }}
+                  >
+                    <span className="pos-tender-btn__icon">{tb.icon}</span>
+                    {tb.label}
+                    <ArrowRight className="pos-tender-btn__arrow" size={18} aria-hidden />
                   </button>
-                  <span className="min-w-[2rem] text-center font-semibold tabular-nums">{l.quantity}</span>
-                  <button type="button" className="pos-qty-btn" onClick={() => bumpQty(l.key, 1)} aria-label="increase quantity">
-                    <Plus className="h-4 w-4" />
-                  </button>
+                </li>
+              ))}
+            </ul>
+
+            <div className={`pos-tender-detail ${selectedTender ? 'pos-tender-detail--open' : ''}`}>
+              {selectedTender === 'CASH' ? (
+                <div className="pos-tender-detail__inner">
+                  <label>
+                    {t('pos.amountTendered')}
+                    <input
+                      inputMode="decimal"
+                      value={cashTendered}
+                      onChange={(e) => setCashTendered(e.target.value)}
+                      autoFocus
+                    />
+                  </label>
+                  {changeDue ? (
+                    <p className="pos-tender-detail__change">
+                      {t('pos.changeDue')}: <span className="num">{formatPosMoney(changeDue, currency)}</span>
+                    </p>
+                  ) : null}
                 </div>
-                <div className="text-right tabular-nums">
-                  <div className="font-medium">{decMul(l.displayUnit, l.quantity)}</div>
-                  <div className="text-[10px] text-neutral-500">{currency}</div>
+              ) : null}
+              {selectedTender === 'MOMO' ? (
+                <div className="pos-tender-detail__inner">
+                  <label>
+                    {t('pos.momoPhone')}
+                    <input
+                      type="tel"
+                      value={momoPhone}
+                      onChange={(e) => {
+                        setMomoPhone(e.target.value)
+                        localStorage.setItem(POS_MOMO_PHONE_KEY, e.target.value)
+                      }}
+                      placeholder="+250..."
+                    />
+                  </label>
+                  <Button variant="secondary" size="sm" onClick={() => setMomoModalOpen(true)}>
+                    {momoVerified ? t('pos.momoVerified', { ref: momoRef }) : t('pos.collectMomo')}
+                  </Button>
                 </div>
-                <button
-                  type="button"
-                  className="btn btn--sm btn--ghost text-red-600"
-                  onClick={() => removeLine(l.key)}
-                  aria-label="remove line"
-                >
-                  ×
-                </button>
-              </li>
-            ))}
-            {!lines.length && <li className="text-center text-sm text-neutral-500">{t('pos.emptyCart')}</li>}
-          </ul>
-        </section>
+              ) : null}
+              {selectedTender === 'AIRTEL_MONEY' ? (
+                <div className="pos-tender-detail__inner">
+                  <Button variant="secondary" size="sm" onClick={() => setAirtelModalOpen(true)}>
+                    {airtelVerified ? t('pos.airtelVerified', { ref: airtelRef }) : t('pos.collectAirtel')}
+                  </Button>
+                </div>
+              ) : null}
+              {selectedTender === 'ON_ACCOUNT' ? (
+                <div className="pos-tender-detail__inner">
+                  <label>
+                    {t('pos.onAccountCustomer')}
+                    <input value={onAcctCustomer} onChange={(e) => setOnAcctCustomer(e.target.value)} />
+                  </label>
+                </div>
+              ) : null}
+            </div>
+
+            <button
+              type="button"
+              className="pos-charge-btn"
+              disabled={!canCharge}
+              onClick={() => void pay()}
+            >
+              {busy ? (
+                <span className="pos-charge-btn__spinner" aria-hidden />
+              ) : (
+                <>
+                  <Landmark size={20} aria-hidden />
+                  {t('pos.charge', { amount: chargeLabel })}
+                </>
+              )}
+            </button>
+          </section>
+        </div>
       </div>
 
-      <section className="pos-tenders-panel surface-card bg-[var(--color-brand-10)]">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm font-medium text-neutral-800">
-          <span className="inline-flex items-center gap-2">
-            <Wallet className="h-4 w-4" />
-            {t('pos.tenders')}
-          </span>
-          <Link to="/pos/history" className="text-xs font-normal text-[var(--color-brand-700)] no-underline hover:underline">
-            Sale history
-          </Link>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          <label className="text-sm">
-            <span className="text-neutral-600">{t('pos.cash')}</span>
-            <input className="mt-1 w-full rounded border px-2 py-2" inputMode="decimal" value={cash} onChange={(e) => setCash(e.target.value)} />
-          </label>
-          <label className="text-sm">
-            <span className="text-neutral-600">Mobile Money (MoMo)</span>
-            <input
-              className="mt-1 w-full rounded border px-2 py-2"
-              inputMode="decimal"
-              value={momo}
-              onChange={(e) => {
-                setMomo(e.target.value)
-                setMomoVerified(false)
-                setMomoRef('')
-              }}
-            />
-            {Number(momo || '0') > 0 ? (
-              <button
-                type="button"
-                className="mt-1 w-full rounded border border-[var(--color-brand-200)] bg-[var(--color-brand-10)] px-2 py-1.5 text-xs font-medium text-[var(--color-brand-900)]"
-                onClick={() => setMomoModalOpen(true)}
-              >
-                {momoVerified ? `MoMo verified (${momoRef})` : 'Collect MoMo payment'}
-              </button>
-            ) : null}
-          </label>
-          <label className="text-sm">
-            <span className="text-neutral-600">Airtel Money</span>
-            <input
-              className="mt-1 w-full rounded border px-2 py-2"
-              inputMode="decimal"
-              value={airtel}
-              onChange={(e) => {
-                setAirtel(e.target.value)
-                setAirtelVerified(false)
-                setAirtelRef('')
-              }}
-            />
-            {Number(airtel || '0') > 0 ? (
-              <button
-                type="button"
-                className="mt-1 w-full rounded border border-[var(--color-brand-200)] bg-[var(--color-brand-10)] px-2 py-1.5 text-xs font-medium text-[var(--color-brand-900)]"
-                onClick={() => setAirtelModalOpen(true)}
-              >
-                {airtelVerified ? `Airtel verified (${airtelRef})` : 'Collect Airtel payment'}
-              </button>
-            ) : null}
-          </label>
-          <label className="text-sm">
-            <span className="text-neutral-600">{t('pos.card')}</span>
-            <input className="mt-1 w-full rounded border px-2 py-2" inputMode="decimal" value={card} onChange={(e) => setCard(e.target.value)} />
-          </label>
-          <label className="text-sm">
-            <span className="text-neutral-600">{t('pos.onAccount')}</span>
-            <input className="mt-1 w-full rounded border px-2 py-2" inputMode="decimal" value={onAcct} onChange={(e) => setOnAcct(e.target.value)} />
-          </label>
-        </div>
-        <label className="mt-2 block max-w-xl text-sm">
-          <span className="text-neutral-600">{t('pos.onAccountCustomer')}</span>
-          <input
-            className="mt-1 w-full rounded border px-2 py-2"
-            value={onAcctCustomer}
-            onChange={(e) => setOnAcctCustomer(e.target.value)}
-            placeholder={t('pos.walkIn')}
-          />
-        </label>
-        <div className="pos-pay-inline mt-4 flex flex-wrap items-center gap-3">
-          <button type="button" className="btn btn--sm" onClick={fillRemainder}>
-            {t('pos.fillRemainder')}
-          </button>
-          <span className="text-sm text-neutral-600">
-            {t('pos.tenderTotal')}: <strong className="tabular-nums">{tenderSum}</strong> /{' '}
-            <span className="tabular-nums">{payableTotal}</span>
-          </span>
-          <button type="button" className="btn btn--pay ml-auto" onClick={() => void pay()} disabled={busy}>
-            {t('pos.pay')}
-          </button>
-        </div>
-      </section>
-
-      {lines.length > 0 && !receipt ? (
-        <div className="pos-pay-sticky" role="region" aria-label={t('pos.pay')}>
-          <div className="pos-pay-sticky__total">
-            {t('pos.cart')}
-            <strong>
-              {payableTotal} {currency}
-            </strong>
-            <span className="pos-pay-sticky__tender">
-              {t('pos.tenderTotal')}: {tenderSum}
-            </span>
-          </div>
-          <button type="button" className="btn btn--pay" onClick={() => void pay()} disabled={busy}>
-            {t('pos.pay')}
-          </button>
+      {error ? (
+        <div className="pos-error" role="alert">
+          {error}
         </div>
       ) : null}
 
-      {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
-          {error}
-        </div>
-      )}
-
-      {receipt && (
-        <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal-panel modal-panel--md">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="mt-0 text-lg font-semibold">{t('pos.receipt')}</h2>
-              <EfdStatusBadge />
-            </div>
-            {showHtmlPreview ? (
-              <div className="receipt-print border border-dashed border-neutral-300 p-2" dangerouslySetInnerHTML={{ __html: receipt.html }} />
-            ) : (
-              <div className="rounded border border-[var(--border-subtle)] bg-neutral-50 px-3 py-2 text-sm text-neutral-700">
-                {t('pos.smsOnlyReceiptNotice')}
-              </div>
-            )}
-            <div className="mt-3 rounded border border-[var(--border-subtle)] bg-neutral-50 p-2">
-              <div className="mb-1 text-xs text-neutral-600">
-                {t('pos.escpos')}
-                {printedReceipt ? ` (${printedReceipt.printerType})` : ''}
-              </div>
-              {printedReceipt && <div className="mb-2 text-xs text-neutral-500">{t('pos.printerTypeHint', { type: printedReceipt.printerType })}</div>}
-              {printingReceipt && <div className="text-xs text-neutral-500">{t('pos.generatingReceipt')}</div>}
-              {!printingReceipt && printedReceipt && (
-                <>
-                  <pre className="max-h-44 overflow-auto whitespace-pre-wrap break-words text-[11px] leading-4">
-                    {printedReceipt.escPos}
-                  </pre>
-                  <div className="mt-2 text-xs text-neutral-600">
-                    {t('pos.smsReceiptsSent')}: {printedReceipt.smsReceiptsSent}
-                  </div>
-                </>
-              )}
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {lastSalesOrderId ? (
-                <button
-                  type="button"
-                  className="btn btn--primary w-full sm:w-auto"
-                  onClick={() => setDeliveryOpen(true)}
-                >
-                  Send receipt (WhatsApp / SMS)
-                </button>
-              ) : null}
-              <button
-                type="button"
-                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-neutral-900 py-2 text-white"
-                onClick={() => printHtmlFragment(receipt.html)}
-                disabled={browserPrintDisabled}
-                title={browserPrintDisabled ? t('pos.browserPrintDisabled') : undefined}
-              >
-                <Printer className="h-4 w-4" />
-                {t('pos.print')}
-              </button>
-              <button
-                type="button"
-                className="rounded-lg border px-3 py-2 text-sm"
-                onClick={() => void reprintEscPos()}
-                disabled={printingReceipt || !lastSalesOrderId}
-              >
-                {t('pos.reprint')}
-              </button>
-              <button
-                type="button"
-                className="rounded-lg border px-3 py-2 text-sm"
-                onClick={() => void copyEscPos()}
-                disabled={!printedReceipt}
-              >
-                {t('pos.copyEscpos')}
-              </button>
-              <button type="button" className="rounded-lg border px-3 py-2 text-sm" onClick={downloadEscPos} disabled={!printedReceipt}>
-                {t('pos.downloadEscpos')}
-              </button>
-              <button
-                type="button"
-                className="rounded-lg border px-3 py-2 text-sm font-medium"
-                disabled={!printedReceipt?.escPos}
-                onClick={() => {
-                  const payload = printedReceipt?.escPos
-                  if (payload) {
-                    void printReceipt(payload)
-                  }
-                }}
-                title={isDesktop() ? t('pos.printNativeHint') : t('pos.printReceiptHint')}
-              >
-                {t('pos.printReceipt')}
-              </button>
-              {!isDesktop() && (
-                <>
-                  <button
-                    type="button"
-                    className="rounded-lg border px-3 py-2 text-sm"
-                    disabled={!printedReceipt?.escPos}
-                    onClick={() => {
-                      const payload = printedReceipt?.escPos
-                      if (payload) {
-                        void printViaWebBluetooth(payload)
-                      }
-                    }}
-                    title={t('pos.printBluetoothHint')}
-                  >
-                    {t('pos.printBluetooth')}
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-lg border px-3 py-2 text-sm"
-                    disabled={!printedReceipt?.escPos}
-                    onClick={() => {
-                      const payload = printedReceipt?.escPos
-                      if (payload) {
-                        void printViaWebSerial(payload)
-                      }
-                    }}
-                    title={t('pos.printSerialHint')}
-                  >
-                    {t('pos.printSerial')}
-                  </button>
-                </>
-              )}
-              <button type="button" className="rounded-lg border px-4 py-2" onClick={() => setReceipt(null)}>
-                {t('pos.close')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <PosReceiptSuccessModal
+        open={receiptSuccessOpen}
+        amountLabel={chargeLabel}
+        receiptNumber={successReceiptNo}
+        printing={printingReceipt}
+        onPrint={() => {
+          if (receipt?.html) {
+            printHtmlFragment(receipt.html)
+          } else if (printedReceipt?.escPos) {
+            void printReceipt(printedReceipt.escPos)
+          }
+        }}
+        onWhatsApp={() => {
+          setDeliveryChannel('WHATSAPP')
+          setDeliveryOpen(true)
+        }}
+        onSms={() => {
+          setDeliveryChannel('SMS')
+          setDeliveryOpen(true)
+        }}
+        onNewSale={() => {
+          clearSale()
+        }}
+      />
 
       <ReceiptDeliveryModal
         receiptId={deliveryOpen ? lastSalesOrderId : null}
-        defaultPhone={customer.trim() ? customer : ''}
-        title="Send sale receipt"
-        onClose={() => setDeliveryOpen(false)}
+        defaultPhone={momoPhone || customer.trim()}
+        title={deliveryChannel === 'SMS' ? t('pos.sendSms') : t('pos.sendWhatsApp')}
+        onClose={() => {
+          setDeliveryOpen(false)
+          setDeliveryChannel(null)
+        }}
       />
 
       <MomoPaymentModal
         open={momoModalOpen}
-        amount={Number(momo || '0')}
+        amount={Number(payableTotal)}
         provider="MTN"
         onCancel={() => setMomoModalOpen(false)}
         onSuccess={(ref) => {
@@ -1016,7 +1112,7 @@ export function PosCheckoutPage() {
       />
       <MomoPaymentModal
         open={airtelModalOpen}
-        amount={Number(airtel || '0')}
+        amount={Number(payableTotal)}
         provider="AIRTEL_MONEY"
         onCancel={() => setAirtelModalOpen(false)}
         onSuccess={(ref) => {

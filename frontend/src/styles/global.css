@@ -2,6 +2,7 @@
 @import '../components/ui/components.css';
 @import './shell-layout.css';
 @import '../features/dashboards/dashboard.css';
+@import '../features/pos/pos-checkout.css';
 
 *,
 *::before,
