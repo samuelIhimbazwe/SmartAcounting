@@ -1,5 +1,6 @@
 import axios from 'axios'
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios'
+import { invalidateSession, isSessionInvalidationInProgress } from '../auth/signOut'
 import { normalizeApiError } from './errors'
 import { useAuthStore } from '../stores/authStore'
 import { captureError } from '../monitoring/sentry'
@@ -7,6 +8,7 @@ import { isUuid } from '../tenant/uuid'
 
 interface RetryableRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean
+  skipAuthRefresh?: boolean
 }
 
 interface RefreshResponse {
@@ -38,9 +40,9 @@ apiClient.interceptors.request.use((config) => {
 let refreshPromise: Promise<string | null> | null = null
 
 async function refreshSessionToken() {
-  const { refreshToken, tenantId, userId, setTokens, clearSession } = useAuthStore.getState()
+  const { refreshToken, tenantId, userId, setTokens } = useAuthStore.getState()
   if (!refreshToken) {
-    clearSession()
+    await invalidateSession({ revoke: false })
     return null
   }
 
@@ -70,7 +72,7 @@ async function refreshSessionToken() {
 
     return nextAccessToken
   } catch {
-    clearSession()
+    await invalidateSession({ revoke: true })
     return null
   }
 }
@@ -81,7 +83,13 @@ apiClient.interceptors.response.use(
     const config = error.config as RetryableRequestConfig | undefined
     const status = error.response?.status
 
-    if (status === 401 && config && !config._retry) {
+    if (
+      status === 401 &&
+      config &&
+      !config._retry &&
+      !config.skipAuthRefresh &&
+      !isSessionInvalidationInProgress()
+    ) {
       config._retry = true
 
       if (!refreshPromise) {

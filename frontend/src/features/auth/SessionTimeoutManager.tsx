@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { refreshAccessToken } from '../../shared/api/auth'
-import { normalizeApiError } from '../../shared/api/errors'
 import { useModalFocusTrap } from '../../shared/hooks/useModalFocusTrap'
 import { signOut } from '../../shared/auth/signOut'
 import { useAuthStore } from '../../shared/stores/authStore'
@@ -16,17 +15,25 @@ function formatSeconds(totalSeconds: number) {
 
 export function SessionTimeoutManager() {
   const { t } = useTranslation()
-  const { accessToken, refreshToken, expiresAt, tenantId, userId, setTokens, clearSession } = useAuthStore()
+  const { accessToken, refreshToken, expiresAt, tenantId, userId, setTokens } = useAuthStore()
   const [remainingMs, setRemainingMs] = useState<number | null>(null)
   const [refreshing, setRefreshing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const sessionEndingRef = useRef(false)
   const hasActiveSession = Boolean(accessToken && expiresAt)
   const visibleRemainingMs = hasActiveSession ? remainingMs : null
+
+  const endSession = useCallback(() => {
+    if (sessionEndingRef.current) {
+      return
+    }
+    sessionEndingRef.current = true
+    void signOut().then(() => window.location.assign('/login'))
+  }, [])
 
   const isOpen = Boolean(visibleRemainingMs !== null && visibleRemainingMs <= WARNING_WINDOW_MS)
   const dialogRef = useModalFocusTrap({
     active: isOpen,
-    onEscape: onSignOutNow,
+    onEscape: endSession,
   })
   const countdownLabel = useMemo(() => {
     if (visibleRemainingMs === null) {
@@ -44,8 +51,7 @@ export function SessionTimeoutManager() {
     const tick = () => {
       const next = expiresAt - Date.now()
       if (next <= 0) {
-        clearSession()
-        window.location.assign('/login')
+        endSession()
         return
       }
       setRemainingMs(next)
@@ -54,31 +60,25 @@ export function SessionTimeoutManager() {
     tick()
     const interval = window.setInterval(tick, 1_000)
     return () => window.clearInterval(interval)
-  }, [clearSession, expiresAt, hasActiveSession])
+  }, [endSession, expiresAt, hasActiveSession])
 
   async function onStaySignedIn() {
     if (!refreshToken) {
-      clearSession()
-      window.location.assign('/login')
+      endSession()
       return
     }
 
     setRefreshing(true)
-    setError(null)
     try {
       const next = await refreshAccessToken({ refreshToken, tenantId, userId })
       setTokens(next)
       setRemainingMs(next.expiresAt ? next.expiresAt - Date.now() : null)
-    } catch (caughtError) {
-      const apiError = normalizeApiError(caughtError)
-      setError(apiError.message)
+    } catch {
+      endSession()
+      return
     } finally {
       setRefreshing(false)
     }
-  }
-
-  function onSignOutNow() {
-    void signOut().then(() => window.location.assign('/login'))
   }
 
   if (!isOpen || !countdownLabel) {
@@ -104,16 +104,11 @@ export function SessionTimeoutManager() {
         <p className="sr-only" aria-live="polite">
           {t('session.expiringBody', { remaining: countdownLabel })}
         </p>
-        {error && (
-          <p className="m-0 text-xs text-amber-700" role="alert" aria-live="assertive">
-            {error}
-          </p>
-        )}
         <div className="flex items-center justify-end gap-2">
           <button
             type="button"
             className="rounded-md border border-[var(--border-default)] px-3 py-2 text-sm text-neutral-700"
-            onClick={onSignOutNow}
+            onClick={endSession}
           >
             {t('session.signOutNow')}
           </button>
