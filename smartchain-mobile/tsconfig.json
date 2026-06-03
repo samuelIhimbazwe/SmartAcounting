@@ -3,7 +3,11 @@
   "compilerOptions": {
     "experimentalDecorators": true,
     "emitDecoratorMetadata": false,
-    "useDefineForClassFields": false
+    "useDefineForClassFields": false,
+    "jsx": "react-native",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true
   },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "index.js", "App.tsx"],
   "exclude": ["__tests__", "src/__tests__", "src/fiscal/__tests__", "src/api/__contracts__", "node_modules"]
 }

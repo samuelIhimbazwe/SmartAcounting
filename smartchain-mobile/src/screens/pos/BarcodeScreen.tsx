@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 import {Button, Searchbar} from 'react-native-paper';
 import {Camera, useCameraDevice, useCodeScanner} from 'react-native-vision-camera';
