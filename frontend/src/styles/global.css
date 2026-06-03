@@ -1,6 +1,7 @@
 @import './tokens.css';
 @import '../components/ui/components.css';
 @import './shell-layout.css';
+@import '../features/dashboards/dashboard.css';
 
 *,
 *::before,

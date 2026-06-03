@@ -1,11 +1,12 @@
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
+import { Badge, Button, EmptyState, Skeleton } from '../../../components/ui'
 import { getDashboardAnomalies } from '../../../shared/api/dashboards'
 import { rolesWithAnomalies } from '../../../shared/api/dashboardRoleConfig'
 import type { Role } from '../../../shared/types/roles'
 
-export function DashboardAnomaliesPanel({ role }: { role: Role }) {
+export function DashboardAnomaliesPanel({ role, compact = false }: { role: Role; compact?: boolean }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const show = rolesWithAnomalies.includes(role)
@@ -21,34 +22,78 @@ export function DashboardAnomaliesPanel({ role }: { role: Role }) {
     return null
   }
 
-  const items = data ?? []
+  const items = (data ?? []).slice(0, 6)
+
+  if (compact) {
+    return (
+      <article className="dash-panel dash-anomalies--compact">
+        <header className="dash-panel__head">
+          <h3 className="dash-panel__title">{t('dashboard.anomaliesTitle')}</h3>
+        </header>
+        {isLoading ? (
+          <div className="dash-panel__loading">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} variant="text" height={40} />
+            ))}
+          </div>
+        ) : items.length === 0 ? (
+          <EmptyState
+            title={t('dashboard.anomaliesEmpty')}
+            description={t('dashboard.panelEmptyBody')}
+            action={
+              <Button variant="secondary" size="sm" onClick={() => navigate('/actions')}>
+                {t('dashboard.viewActions')}
+              </Button>
+            }
+          />
+        ) : (
+          <ul className="dash-panel__list">
+            {items.map((item) => (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  className="dash-anomaly-row"
+                  onClick={() => navigate(`/anomalies/${item.id}`, { state: { anomaly: item } })}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
+                    <p className="dash-anomaly-row__title">{item.title}</p>
+                    <Badge variant="warning" size="sm">
+                      {item.severity}
+                    </Badge>
+                  </div>
+                  {item.details ? <p className="dash-anomaly-row__detail">{item.details}</p> : null}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </article>
+    )
+  }
 
   return (
-    <article className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-card)]">
-      <h3 className="m-0 text-sm font-semibold uppercase tracking-wide text-neutral-500">
-        {t('dashboard.anomaliesTitle')}
-      </h3>
-      {isLoading && <p className="mt-2 text-sm text-neutral-500">{t('dashboard.loadingData')}</p>}
-      {!isLoading && items.length === 0 && (
-        <p className="mt-2 text-sm text-neutral-500">{t('dashboard.anomaliesEmpty')}</p>
+    <article className="dash-panel">
+      <header className="dash-panel__head">
+        <h3 className="dash-panel__title">{t('dashboard.anomaliesTitle')}</h3>
+      </header>
+      {isLoading && (
+        <div className="dash-panel__loading">
+          <Skeleton variant="text" height={14} />
+        </div>
       )}
-      <ul className="mt-3 space-y-2">
+      {!isLoading && items.length === 0 && (
+        <EmptyState title={t('dashboard.anomaliesEmpty')} description={t('dashboard.panelEmptyBody')} />
+      )}
+      <ul className="dash-panel__list">
         {items.map((item) => (
           <li key={item.id}>
             <button
               type="button"
-              className="block w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-3 text-left transition-colors hover:bg-white"
+              className="dash-anomaly-row"
               onClick={() => navigate(`/anomalies/${item.id}`, { state: { anomaly: item } })}
             >
-              <div className="flex items-center justify-between gap-2">
-                <p className="m-0 text-sm font-semibold text-neutral-900">{item.title}</p>
-                <span className="rounded-full bg-[var(--surface-overlay)] px-2 py-0.5 text-[10px] font-semibold uppercase text-neutral-600">
-                  {item.severity}
-                </span>
-              </div>
-              {item.details && (
-                <p className="m-0 mt-1 text-xs leading-5 text-neutral-600">{item.details}</p>
-              )}
+              <p className="dash-anomaly-row__title">{item.title}</p>
+              {item.details && <p className="dash-anomaly-row__detail">{item.details}</p>}
             </button>
           </li>
         ))}
